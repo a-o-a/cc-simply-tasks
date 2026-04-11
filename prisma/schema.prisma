@@ -1,0 +1,18 @@
+// Phase 0: datasource + generator만. 실제 모델은 Phase 1에서 추가.
+// Postgres 이관 대비: provider만 교체할 수 있게 raw SQL 금지.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Phase 0 placeholder — prisma generate가 model 없이는 실패하므로 최소 모델 하나.
+// Phase 1에서 TeamMember/WorkItem/WorkTicket/CalendarEvent/AuditLog 로 교체.
+model Bootstrap {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+}

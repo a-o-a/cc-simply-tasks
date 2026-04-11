@@ -1,0 +1,5 @@
+-- CreateTable
+CREATE TABLE "Bootstrap" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
