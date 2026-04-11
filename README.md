@@ -28,23 +28,44 @@
 
 ```
 .
-├── app/                # Next.js app router
+├── app/
 │   ├── layout.tsx
 │   ├── page.tsx
-│   └── globals.css
+│   ├── globals.css
+│   └── api/
+│       └── work-items/         # 레퍼런스 구현
+│           ├── route.ts        # GET(list), POST
+│           └── [id]/
+│               ├── route.ts    # GET, PATCH, DELETE
+│               └── tickets/
+│                   ├── route.ts         # GET, POST
+│                   └── [ticketId]/route.ts  # PATCH, DELETE
 ├── lib/
-│   └── db.ts           # Prisma 싱글톤
+│   ├── db.ts              # Prisma 싱글톤 + SQLite PRAGMA
+│   ├── enums.ts           # enum 소스 오브 트루스
+│   ├── time.ts            # KST/UTC 변환
+│   ├── actor.ts           # getActorContext
+│   ├── diff.ts            # before/after diff
+│   ├── audit.ts           # withAudit (TransactionClient 강제)
+│   ├── http.ts            # 표준 에러 응답 + withErrorHandler
+│   ├── pagination.ts      # cursor 기반
+│   ├── optimisticLock.ts  # If-Match 검사
+│   └── validation/        # zod 스키마
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/
-├── .nvmrc              # node 16
+├── docs/
+│   └── DEVELOPMENT.md     # 개발 가이드 (API 패턴, 컨벤션)
+├── .nvmrc                 # node 16
 ├── .env.example
 ├── package.json
 ├── tsconfig.json
 ├── next.config.js
-├── PLAN.md             # 전체 실행 계획
+├── PLAN.md                # 전체 실행 계획
 └── README.md
 ```
+
+> 새 API를 작성할 때는 반드시 [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)의 컨벤션을 따를 것.
 
 ## 개발 시작
 
@@ -80,7 +101,7 @@ npm run dev
 | **0** | 프로젝트 부트스트랩 (Next.js + Prisma + SQLite + TS) | ✅ 완료 |
 | **1** | Prisma 스키마 확정 (도메인 모델 + enum + 인덱스) | ✅ 완료 |
 | **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ✅ 완료 |
-| **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ⏳ 대기 |
+| **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | 🟡 진행 중 (work-items 레퍼런스 완료) |
 | **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | ⏳ 대기 |
 | **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |

@@ -94,15 +94,21 @@
 - [x] `lib/validation/` — zod: `common`, `teamMember`, `workItem`, `workTicket`, `calendarEvent`
 - [x] `tsc --noEmit` + `next build` 통과
 
-### Phase 3 — API 라우트 (app/api)
+### Phase 3 — API 라우트 (app/api) 🟡 진행 중
 모든 write는 `$transaction` + `withAudit` + `getActorContext` 필수.
+개발 규칙: [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) 준수.
+레퍼런스 구현: `app/api/work-items/*`.
 
 - [ ] `team-members` — GET(list) / POST / PATCH / DELETE(soft)
-- [ ] `work-items`
-  - GET(list): `?status&assigneeId&ticket&cursor&pageSize`, `deletedAt IS NULL`
-  - POST / PATCH (If-Match) / DELETE(soft)
-  - GET(:id): 상세 + tickets include
-- [ ] `work-items/:id/tickets` — POST / PATCH / DELETE
+- [x] **`work-items` (레퍼런스 구현 완료)**
+  - [x] GET(list): `?status&assigneeId&category&priority&ticket&cursor&pageSize`, `deletedAt IS NULL`, assignee include
+  - [x] POST (zod 검증 + CREATE 감사 로그)
+  - [x] GET(:id): 상세 + tickets/assignee include
+  - [x] PATCH(:id): If-Match 필수, 부분 업데이트
+  - [x] DELETE(:id): If-Match 필수, soft delete
+- [x] **`work-items/:id/tickets` (레퍼런스 구현 완료)**
+  - [x] GET(list) / POST
+  - [x] PATCH(:ticketId) / DELETE(:ticketId) (If-Match 필수)
 - [ ] `calendar-events` — GET(range) / POST / PATCH(:id) / DELETE(:id)
 - [ ] `audit-logs` — GET `?entityType&entityId&cursor` (읽기 전용)
 

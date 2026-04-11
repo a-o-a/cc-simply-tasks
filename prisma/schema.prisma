@@ -51,7 +51,7 @@ model WorkItem {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  assignee TeamMember?  @relation(fields: [assigneeId], references: [id])
+  assignee TeamMember?  @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
   tickets  WorkTicket[]
 
   @@index([assigneeId, status])
@@ -71,7 +71,7 @@ model WorkTicket {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  workItem WorkItem @relation(fields: [workItemId], references: [id])
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
 
   @@unique([workItemId, systemName, ticketNumber])
   @@index([workItemId])
@@ -92,7 +92,7 @@ model CalendarEvent {
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
-  member TeamMember? @relation(fields: [memberId], references: [id])
+  member TeamMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
 
   @@index([startDateTime, endDateTime])
   @@index([memberId])
