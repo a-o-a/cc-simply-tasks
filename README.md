@@ -78,8 +78,8 @@ npm run dev
 | Phase | 내용 | 상태 |
 |---|---|---|
 | **0** | 프로젝트 부트스트랩 (Next.js + Prisma + SQLite + TS) | ✅ 완료 |
-| **1** | Prisma 스키마 확정 (도메인 모델 + enum + 인덱스) | 🟡 진행 중 |
-| **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ⏳ 대기 |
+| **1** | Prisma 스키마 확정 (도메인 모델 + enum + 인덱스) | ✅ 완료 |
+| **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ✅ 완료 |
 | **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ⏳ 대기 |
 | **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | ⏳ 대기 |
 | **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
@@ -89,8 +89,27 @@ npm run dev
 - Node 16 런타임 선언 (`.nvmrc`, `engines`)
 - Next.js 13.5.11 / React 18.2 / TypeScript 5.2 strict
 - Prisma 5.10.2 + SQLite 연결, Prisma 싱글톤 (`lib/db.ts`)
-- Placeholder 모델 1개 (`Bootstrap`) — Phase 1에서 실제 도메인 모델로 교체
 - `next build` / `prisma generate` / `prisma migrate dev` 전부 통과
+
+### Phase 1 완료 내역
+- 도메인 모델: `TeamMember`, `WorkItem`, `WorkTicket`, `CalendarEvent`, `AuditLog`
+- SQLite는 native enum 미지원 → enum 컬럼은 String 저장, `lib/enums.ts`가 소스 오브 트루스
+- Soft delete 필드 (`deletedAt`) 전 모델 적용
+- 인덱스: `WorkItem[assigneeId,status]`, `[transferDate]`, `[startDate,endDate]`, `WorkTicket@@unique([workItemId,systemName,ticketNumber])`, `AuditLog[entityType,entityId,createdAt]` 등
+- 초기 migration `20260411144540_init` 적용 완료
+
+### Phase 2 완료 내역
+- `lib/enums.ts` — 모든 enum 값의 소스 오브 트루스 (Status/Priority/Category/MemberRole/ActorType/AuditAction/AuditEntityType)
+- `lib/db.ts` — Prisma 싱글톤 + `ensureSqlitePragma()` (WAL / busy_timeout / foreign_keys)
+- `lib/time.ts` — KST/UTC 변환, all-day 반열림 구간 정규화
+- `lib/actor.ts` — `getActorContext(req)` (x-forwarded-for / x-actor-name / user-agent)
+- `lib/diff.ts` — before/after 변경 필드만 추출 + JSON 직렬화
+- `lib/audit.ts` — `withAudit(tx, ...)` 헬퍼 (**`Prisma.TransactionClient` 타입 강제**로 트랜잭션 밖 호출 차단)
+- `lib/http.ts` — 표준 에러 응답 포맷 + `withErrorHandler` + Prisma 에러 매핑 (P2002/P2025)
+- `lib/pagination.ts` — cursor 기반 (기본 50, 최대 200)
+- `lib/optimisticLock.ts` — `If-Match` 헤더 기반 낙관적 락
+- `lib/validation/` — zod 스키마 (common, teamMember, workItem, workTicket, calendarEvent)
+- `next build` / `tsc --noEmit` 통과
 
 ## 알려진 리스크 / 이슈
 

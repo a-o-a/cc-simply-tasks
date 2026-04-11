@@ -47,40 +47,52 @@
 
 ## 2. 실행 계획
 
-### Phase 0 — 프로젝트 부트스트랩
-- [ ] Next.js 13.5 (app router) + TypeScript + Prisma + SQLite 초기화
-- [ ] `engines: { node: ">=18.18" }` 고정 (사내 제약 시 16 유지 + 명시)
-- [ ] `prisma/schema.prisma` 초기 파일, `DATABASE_URL` 환경변수 기반
-- [ ] `prisma/dev.db` gitignore, `.env.example` 작성
-- [ ] `lib/db.ts` Prisma 클라이언트 싱글톤
-- [ ] SQLite PRAGMA: `busy_timeout=5000`, `journal_mode=WAL`
+### Phase 0 — 프로젝트 부트스트랩 ✅ 완료
+- [x] Next.js 13.5.11 (app router) + TypeScript 5.2 strict + Prisma 5.10.2 + SQLite
+- [x] `engines: { node: ">=16.14 <17" }` + `.nvmrc` (사내 Node 16 제약)
+- [x] `prisma/schema.prisma`, `DATABASE_URL` 환경변수 기반
+- [x] `prisma/dev.db` gitignore, `.env.example`
+- [x] `lib/db.ts` Prisma 싱글톤
+- [x] SQLite PRAGMA는 Phase 2에서 `ensureSqlitePragma()`로 배치
 
-### Phase 1 — 스키마 확정 (보완 반영)
-- [ ] **enum**: `Status { DRAFT, IN_PROGRESS, READY_TO_TRANSFER, TRANSFERRED, CANCELED }`
-- [ ] **enum**: `Priority { LOW, NORMAL, HIGH }`
-- [ ] **enum**: `ActorType { ANONYMOUS /* 추후 USER */ }`
-- [ ] `TeamMember { id, name, role, deletedAt }`
-- [ ] `WorkItem { id, title, description, category, status, priority, order, assigneeId?, startDate?, endDate?, transferDate?, createdAt, updatedAt, deletedAt }`
-  - 인덱스: `[assigneeId, status]`, `[transferDate]`, `[startDate, endDate]`, `[deletedAt]`
-- [ ] `WorkTicket { id, workItemId, systemName, ticketNumber, ticketUrl?, createdAt, deletedAt }`
-  - `@@unique([workItemId, systemName, ticketNumber])`
-- [ ] `CalendarEvent { id, title, memberId?, startDateTime, endDateTime, allDay, note?, createdAt, updatedAt, deletedAt }`
-  - 인덱스: `[startDateTime, endDateTime]`, `[memberId]`
-  - 규칙: `allDay=true`면 `[start, end)` 반열림 + 00:00 UTC 정규화
-- [ ] `AuditLog { id, entityType, entityId, action, beforeJson?, afterJson?, actorType, actorName?, actorIp?, userAgent?, createdAt }`
-  - 인덱스: `[entityType, entityId, createdAt]`
+### Phase 1 — 스키마 확정 ✅ 완료
+> SQLite는 native enum 미지원 → enum 컬럼은 String 저장, `lib/enums.ts`가 소스 오브 트루스.
+> Postgres 이관 시 String → enum 타입으로 교체.
+
+- [x] enum 값(`lib/enums.ts`):
+  - Status: `DRAFT / IN_PROGRESS / READY_TO_TRANSFER / TRANSFERRED / CANCELED`
+  - Priority: `LOW / NORMAL / HIGH`
+  - Category: `FEATURE / BUGFIX / IMPROVEMENT / REFACTOR / OPS / ETC`
+  - MemberRole: `BACKEND / FRONTEND / FULLSTACK / PM / QA / DESIGNER / ETC`
+  - ActorType: `ANONYMOUS` (추후 `USER`)
+  - AuditAction: `CREATE / UPDATE / DELETE / RESTORE`
+  - AuditEntityType: `WorkItem / WorkTicket / CalendarEvent / TeamMember`
+- [x] `TeamMember { id, name, role, createdAt, updatedAt, deletedAt }`
+- [x] `WorkItem { id, title, description, category, status, priority, order, assigneeId?, startDate?, endDate?, transferDate?, createdAt, updatedAt, deletedAt }`
+  - 인덱스: `[assigneeId, status]`, `[transferDate]`, `[startDate, endDate]`, `[deletedAt]`, `[status]`
+- [x] `WorkTicket { id, workItemId, systemName, ticketNumber, ticketUrl?, createdAt, updatedAt, deletedAt }`
+  - `@@unique([workItemId, systemName, ticketNumber])` + `[workItemId]`, `[ticketNumber]` 인덱스
+- [x] `CalendarEvent { id, title, memberId?, startDateTime, endDateTime, allDay, note?, createdAt, updatedAt, deletedAt }`
+  - 인덱스: `[startDateTime, endDateTime]`, `[memberId]`, `[deletedAt]`
+  - 규칙: `allDay=true`면 `[start, end)` 반열림 + 00:00 UTC 정규화 (`lib/time.ts`)
+- [x] `AuditLog { id, entityType, entityId, action, beforeJson?, afterJson?, actorType, actorName?, actorIp?, userAgent?, createdAt }`
+  - 인덱스: `[entityType, entityId, createdAt]`, `[createdAt]`
   - `beforeJson`/`afterJson`은 **변경 필드만** 담는 diff (String, JSON stringified)
-- [ ] `id`는 전부 `cuid()`
+- [x] 모든 `id`는 `cuid()`
+- [x] 초기 migration `20260411144540_init` 적용
 
-### Phase 2 — 공통 인프라
-- [ ] `lib/time.ts` — 타임존 유틸 (UTC ↔ Asia/Seoul, all-day 정규화)
-- [ ] `lib/actor.ts` — `getActorContext(req)`: `x-forwarded-for` → IP, `x-actor-name` header → 이름, UA 추출
-- [ ] `lib/audit.ts` — `withAudit(tx, { entityType, entityId, action, before, after, actor })` 헬퍼. **Prisma `$transaction` 내부에서만 호출되도록 타입 강제** (`Prisma.TransactionClient` 파라미터)
-- [ ] `lib/diff.ts` — before/after 객체에서 변경 필드만 추출
-- [ ] `lib/validation/` — zod 스키마 (workItem, workTicket, calendarEvent, teamMember)
-- [ ] `lib/http.ts` — `{ error: { code, message } }` 표준 응답 헬퍼
-- [ ] `lib/pagination.ts` — cursor 기반 (기본 50, 최대 200)
-- [ ] `lib/optimisticLock.ts` — `If-Match: updatedAt` 검증, 불일치 시 409
+### Phase 2 — 공통 인프라 ✅ 완료
+- [x] `lib/enums.ts` — enum 값 상수 배열 + union 타입 export
+- [x] `lib/db.ts` — `ensureSqlitePragma()`: `journal_mode=WAL`, `busy_timeout=5000`, `foreign_keys=ON` (첫 연결 시 1회)
+- [x] `lib/time.ts` — `APP_TIMEZONE`, `kstDateStringToUtc`, `utcToKstDateString`, `normalizeAllDayRange`, `kstTodayUtc`
+- [x] `lib/actor.ts` — `getActorContext(req)`: `x-forwarded-for` 우선 → IP, `x-actor-name` → 이름, UA
+- [x] `lib/audit.ts` — `withAudit(tx, ...)` 헬퍼. **`Prisma.TransactionClient` 타입 강제**로 트랜잭션 밖 호출 차단. UPDATE 시 diff 없음이면 스킵.
+- [x] `lib/diff.ts` — `computeDiff` + `diffToJsonStrings` (Date ISO 정규화 포함)
+- [x] `lib/http.ts` — `{ error: { code, message, details? } }` + `HttpError` + `withErrorHandler` (ZodError/Prisma P2002/P2025 매핑)
+- [x] `lib/pagination.ts` — cursor 기반, 기본 50 / 최대 200, `parsePagination` + `toPage`
+- [x] `lib/optimisticLock.ts` — `assertIfMatch(req, updatedAt)` 불일치 시 409 + serverUpdatedAt 반환
+- [x] `lib/validation/` — zod: `common`, `teamMember`, `workItem`, `workTicket`, `calendarEvent`
+- [x] `tsc --noEmit` + `next build` 통과
 
 ### Phase 3 — API 라우트 (app/api)
 모든 write는 `$transaction` + `withAudit` + `getActorContext` 필수.
