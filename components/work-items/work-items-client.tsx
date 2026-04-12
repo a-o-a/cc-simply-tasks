@@ -56,19 +56,21 @@ type ViewMode = "table" | "kanban" | "gantt";
 const VIEW_KEY = "cc-simply-tasks:work-items-view";
 
 interface Filters {
-  status: Status | "";
-  assigneeId: string;
-  category: Category | "";
-  priority: Priority | "";
+  status: Status[];
+  assigneeId: string[];
+  category: Category[];
+  priority: Priority[];
   ticket: string;
+  transferDate: string;
 }
 
 const EMPTY_FILTERS: Filters = {
-  status: "",
-  assigneeId: "",
-  category: "",
-  priority: "",
+  status: ["DRAFT", "IN_PROGRESS", "INTERNAL_TEST", "EXTERNAL_TEST", "READY_TO_TRANSFER"],
+  assigneeId: [],
+  category: [],
+  priority: [],
   ticket: "",
+  transferDate: "",
 };
 
 export function WorkItemsClient() {
@@ -118,11 +120,12 @@ export function WorkItemsClient() {
         "/api/work-items",
         {
           query: {
-            status: filters.status || undefined,
-            assigneeId: filters.assigneeId || undefined,
-            category: filters.category || undefined,
-            priority: filters.priority || undefined,
+            status: filters.status.length > 0 ? filters.status.join(",") : undefined,
+            assigneeId: filters.assigneeId.length > 0 ? filters.assigneeId.join(",") : undefined,
+            category: filters.category.length > 0 ? filters.category.join(",") : undefined,
+            priority: filters.priority.length > 0 ? filters.priority.join(",") : undefined,
             ticket: filters.ticket.trim() || undefined,
+            transferDate: filters.transferDate || undefined,
           },
         },
       );
@@ -180,7 +183,16 @@ export function WorkItemsClient() {
       );
 
       try {
-        await api.patch(`/api/work-items/${id}`, { status }, originalItem.updatedAt);
+        const updated = await api.patch<WorkItemListItem>(
+          `/api/work-items/${id}`,
+          { status },
+          originalItem.updatedAt,
+        );
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, ...updated, assignee: item.assignee } : item
+          )
+        );
         toast({
           title: "상태 변경됨",
           description: `${originalItem.title}의 상태가 ${STATUS_LABELS[status]}으로 변경되었습니다.`,
@@ -204,11 +216,10 @@ export function WorkItemsClient() {
   );
 
   return (
-    <div className="px-8 py-10">
+    <div className="px-8 py-6">
       <header className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">작업</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             담당자별/이관일별로 작업을 관리합니다. 카드/행을 클릭하면 상세가 열립니다.
           </p>
         </div>
@@ -236,9 +247,14 @@ export function WorkItemsClient() {
         ) : items.length === 0 ? (
           <EmptyState onCreate={openCreate} />
         ) : view === "table" ? (
-          <TableView items={items} onOpen={openDrawer} />
+          <TableView items={items} onOpen={openDrawer} onUpdate={updateItemStatus} />
         ) : view === "kanban" ? (
-          <KanbanView items={items} onOpen={openDrawer} onUpdate={updateItemStatus} />
+          <KanbanView
+            items={items}
+            visibleStatuses={filters.status.length > 0 ? filters.status : STATUSES}
+            onOpen={openDrawer}
+            onUpdate={updateItemStatus}
+          />
         ) : (
           <GanttView items={items} onOpen={openDrawer} />
         )}
@@ -346,70 +362,119 @@ function FilterBar({
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
     onChange({ ...filters, [key]: value });
   }
+
+  function toggleStatus(status: Status) {
+    const newStatus = filters.status.includes(status)
+      ? filters.status.filter((s) => s !== status)
+      : [...filters.status, status];
+    set("status", newStatus);
+  }
+
+  function toggleAssignee(id: string) {
+    const newAssignee = filters.assigneeId.includes(id)
+      ? filters.assigneeId.filter((a) => a !== id)
+      : [...filters.assigneeId, id];
+    set("assigneeId", newAssignee);
+  }
+
+  function toggleCategory(category: Category) {
+    const newCategory = filters.category.includes(category)
+      ? filters.category.filter((c) => c !== category)
+      : [...filters.category, category];
+    set("category", newCategory);
+  }
+
+  function togglePriority(priority: Priority) {
+    const newPriority = filters.priority.includes(priority)
+      ? filters.priority.filter((p) => p !== priority)
+      : [...filters.priority, priority];
+    set("priority", newPriority);
+  }
+
   const hasAny =
-    filters.status ||
-    filters.assigneeId ||
-    filters.category ||
-    filters.priority ||
+    filters.status.length > 0 ||
+    filters.assigneeId.length > 0 ||
+    filters.category.length > 0 ||
+    filters.priority.length > 0 ||
     filters.ticket;
 
   return (
     <div className="mt-4 grid gap-3 rounded-lg border bg-card p-3 md:grid-cols-5">
       <div className="space-y-1.5">
         <Label className="text-xs">상태</Label>
-        <Select
-          value={filters.status}
-          onChange={(e) => set("status", e.target.value as Status | "")}
-        >
-          <option value="">전체</option>
+        <div className="flex flex-wrap gap-1">
           {STATUSES.map((s) => (
-            <option key={s} value={s}>
+            <button
+              key={s}
+              onClick={() => toggleStatus(s)}
+              className={cn(
+                "inline-flex items-center rounded px-2 py-1 text-xs",
+                filters.status.includes(s)
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+              )}
+            >
               {STATUS_LABELS[s]}
-            </option>
+            </button>
           ))}
-        </Select>
+        </div>
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs">담당자</Label>
-        <Select
-          value={filters.assigneeId}
-          onChange={(e) => set("assigneeId", e.target.value)}
-        >
-          <option value="">전체</option>
+        <div className="flex flex-wrap gap-1">
           {members.map((m) => (
-            <option key={m.id} value={m.id}>
+            <button
+              key={m.id}
+              onClick={() => toggleAssignee(m.id)}
+              className={cn(
+                "inline-flex items-center rounded px-2 py-1 text-xs",
+                filters.assigneeId.includes(m.id)
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+              )}
+            >
               {m.name}
-            </option>
+            </button>
           ))}
-        </Select>
+        </div>
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs">분류</Label>
-        <Select
-          value={filters.category}
-          onChange={(e) => set("category", e.target.value as Category | "")}
-        >
-          <option value="">전체</option>
+        <div className="flex flex-wrap gap-1">
           {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
+            <button
+              key={c}
+              onClick={() => toggleCategory(c)}
+              className={cn(
+                "inline-flex items-center rounded px-2 py-1 text-xs",
+                filters.category.includes(c)
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+              )}
+            >
               {CATEGORY_LABELS[c]}
-            </option>
+            </button>
           ))}
-        </Select>
+        </div>
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs">우선순위</Label>
-        <Select
-          value={filters.priority}
-          onChange={(e) => set("priority", e.target.value as Priority | "")}
-        >
-          <option value="">전체</option>
+        <div className="flex flex-wrap gap-1">
           {PRIORITIES.map((p) => (
-            <option key={p} value={p}>
+            <button
+              key={p}
+              onClick={() => togglePriority(p)}
+              className={cn(
+                "inline-flex items-center rounded px-2 py-1 text-xs",
+                filters.priority.includes(p)
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+              )}
+            >
               {PRIORITY_LABELS[p]}
-            </option>
+            </button>
           ))}
-        </Select>
+        </div>
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs">티켓 번호</Label>
@@ -431,6 +496,14 @@ function FilterBar({
             </Button>
           ) : null}
         </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs">이관일 (부터)</Label>
+        <Input
+          type="date"
+          value={filters.transferDate}
+          onChange={(e) => set("transferDate", e.target.value)}
+        />
       </div>
     </div>
   );

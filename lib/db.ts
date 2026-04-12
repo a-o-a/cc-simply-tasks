@@ -34,9 +34,10 @@ export function ensureSqlitePragma(): Promise<void> {
 
   pragmaPromise = (async () => {
     try {
-      await prisma.$executeRawUnsafe("PRAGMA journal_mode = WAL;");
-      await prisma.$executeRawUnsafe("PRAGMA busy_timeout = 5000;");
-      await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON;");
+      // `journal_mode` returns a row in SQLite, so query API must be used.
+      await prisma.$queryRawUnsafe("PRAGMA journal_mode = WAL;");
+      await prisma.$queryRawUnsafe("PRAGMA busy_timeout = 5000;");
+      await prisma.$queryRawUnsafe("PRAGMA foreign_keys = ON;");
       globalForPrisma.prismaPragmaApplied = true;
     } catch (err) {
       // PRAGMA 실패는 치명적이지 않지만 로그에 남김.

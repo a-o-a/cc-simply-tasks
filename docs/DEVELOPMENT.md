@@ -240,8 +240,14 @@ export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Para
 
 - **모든 PATCH/DELETE 필수.** 헤더 누락도 `BAD_REQUEST`로 거부.
 - 클라이언트는 직전 GET의 `updatedAt`(ISO)을 그대로 `If-Match`에 실어 보냄.
+- PATCH 성공 뒤에는 응답 본문의 최신 `updatedAt`을 클라이언트 목록 상태에도 즉시 반영해야 함. 낙관적 업데이트만 하고 이전 `updatedAt`을 유지하면 다음 PATCH에서 자기 자신의 변경과 충돌할 수 있음.
 - 서버는 `assertIfMatch(req, before.updatedAt)` 호출. 불일치 시 `CONFLICT` + `{ serverUpdatedAt }`.
 - GET 응답 헤더에 `ETag: "<updatedAt ISO>"`는 1차에 필수 아님 (body의 `updatedAt`으로 충분).
+
+### 4.4.1 SQLite 경로 / PRAGMA 메모
+
+- SQLite `file:` 경로는 `schema.prisma` 기준 상대경로로 해석됨. 현재 로컬 개발 기본값은 `.env(.example)`의 `DATABASE_URL="file:./dev.db"`이며 실제 파일은 `prisma/dev.db`.
+- SQLite PRAGMA 중 결과 row를 반환하는 항목(`journal_mode`, `busy_timeout`, `foreign_keys`)은 Prisma에서 `$queryRawUnsafe(...)`로 호출해야 dev 로그에 불필요한 에러가 남지 않음.
 
 ### 4.5 감사 로그
 

@@ -4,14 +4,18 @@ import * as React from "react";
 import {
   DndContext,
   DragEndEvent,
+  PointerSensor,
   useDraggable,
   useDroppable,
+  useSensor,
+  useSensors,
 } from "@dnd-kit/core";
 import { formatDate } from "@/lib/client/format";
 import type { WorkItemListItem } from "@/lib/client/types";
 import { STATUSES, type Status } from "@/lib/enums";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
+import { PriorityBadge } from "./priority-badge";
 
 /**
  * 칸반 보기 — 상태별 컬럼.
@@ -51,10 +55,16 @@ function KanbanCard({
       <div className="line-clamp-2 font-medium">{item.title}</div>
       <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
         <span>{item.assignee?.name ?? "미배정"}</span>
-        <span>{PRIORITY_LABELS[item.priority]}</span>
+        <PriorityBadge priority={item.priority} />
       </div>
       {item.transferDate ? (
-        <div className="mt-1 text-[11px] text-muted-foreground">
+        <div className={cn("mt-1 text-[11px] text-muted-foreground", (() => {
+          const today = new Date().toDateString();
+          const transfer = new Date(item.transferDate!).toDateString();
+          if (transfer === today) return "text-blue-600 font-semibold";
+          if (new Date(item.transferDate!) < new Date()) return "text-red-600 font-semibold";
+          return "";
+        })())}>
           이관 {formatDate(item.transferDate)}
         </div>
       ) : null}
@@ -102,13 +112,23 @@ function KanbanColumn({
 
 export function KanbanView({
   items,
+  visibleStatuses,
   onOpen,
   onUpdate,
 }: {
   items: WorkItemListItem[];
+  visibleStatuses: readonly Status[];
   onOpen: (item: WorkItemListItem) => void;
   onUpdate: (id: string, status: Status) => void;
 }) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  );
+
   const grouped = React.useMemo(() => {
     const map = new Map<Status, WorkItemListItem[]>();
     for (const s of STATUSES) map.set(s, []);
@@ -129,9 +149,14 @@ export function KanbanView({
   }
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-        {STATUSES.map((status) => {
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <div
+        className="grid gap-3"
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(visibleStatuses.length, 1)}, minmax(0, 1fr))`,
+        }}
+      >
+        {visibleStatuses.map((status) => {
           const list = grouped.get(status) ?? [];
           return (
             <KanbanColumn
