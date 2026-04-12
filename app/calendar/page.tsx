@@ -5,5 +5,9 @@ import { CalendarClient } from "@/components/calendar/calendar-client";
  * 월 보기 1차. 주/일 보기는 후속.
  */
 export default function CalendarPage() {
-  return <CalendarClient />;
+  return (
+    <div className="h-full overflow-hidden">
+      <CalendarClient />
+    </div>
+  );
 }

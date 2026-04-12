@@ -20,7 +20,7 @@ import {
   utcMsToKstDateString,
 } from "@/lib/client/calendar";
 import { toast } from "@/lib/client/use-toast";
-import type { CalendarEvent, Member } from "@/lib/client/types";
+import type { CalendarEvent, CalendarEventCategory, Member } from "@/lib/client/types";
 
 /**
  * 캘린더 이벤트 생성/수정 다이얼로그.
@@ -47,9 +47,17 @@ type Props = {
   onDeleted: () => void;
 };
 
+const CATEGORY_OPTIONS: { value: CalendarEventCategory; label: string }[] = [
+  { value: "HOLIDAY", label: "휴일" },
+  { value: "WORK", label: "업무" },
+  { value: "ABSENCE", label: "부재" },
+  { value: "ETC", label: "기타" },
+];
+
 interface FormState {
   title: string;
-  memberId: string;
+  memberIds: string[];
+  category: CalendarEventCategory;
   allDay: boolean;
   // all-day 시: yyyy-mm-dd
   startDate: string;
@@ -66,7 +74,8 @@ function emptyState(defaultDate?: string): FormState {
   });
   return {
     title: "",
-    memberId: "",
+    memberIds: [],
+    category: "ETC" as CalendarEventCategory,
     allDay: true,
     startDate: today,
     endDate: today,
@@ -87,7 +96,8 @@ function fromEvent(event: CalendarEvent): FormState {
     );
     return {
       title: event.title,
-      memberId: event.memberId ?? "",
+      memberIds: event.members.map((m) => m.member.id),
+      category: event.category,
       allDay: true,
       startDate,
       endDate,
@@ -98,7 +108,8 @@ function fromEvent(event: CalendarEvent): FormState {
   }
   return {
     title: event.title,
-    memberId: event.memberId ?? "",
+    memberIds: event.members.map((m) => m.member.id),
+    category: event.category,
     allDay: false,
     startDate: utcMsToKstDateString(new Date(event.startDateTime).getTime()),
     endDate: utcMsToKstDateString(new Date(event.endDateTime).getTime()),
@@ -205,7 +216,8 @@ export function EventFormDialog({
 
     const payload = {
       title,
-      memberId: state.memberId || null,
+      memberIds: state.memberIds,
+      category: state.category,
       note: state.note.trim() || null,
       ...datePayload,
     };
@@ -274,6 +286,20 @@ export function EventFormDialog({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="ce-category">카테고리</Label>
+              <Select
+                id="ce-category"
+                value={state.category}
+                onChange={(e) => update("category", e.target.value as CalendarEventCategory)}
+              >
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="ce-title">제목</Label>
               <Input
                 id="ce-title"
@@ -285,19 +311,29 @@ export function EventFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ce-member">담당자</Label>
-              <Select
-                id="ce-member"
-                value={state.memberId}
-                onChange={(e) => update("memberId", e.target.value)}
-              >
-                <option value="">없음</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </Select>
+              <Label>담당자</Label>
+              <div className="max-h-32 overflow-y-auto rounded-md border border-input bg-background p-2 space-y-1">
+                {members.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">등록된 팀원이 없습니다</p>
+                ) : (
+                  members.map((m) => (
+                    <label key={m.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-accent">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 rounded border-input"
+                        checked={state.memberIds.includes(m.id)}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? [...state.memberIds, m.id]
+                            : state.memberIds.filter((id) => id !== m.id);
+                          update("memberIds", next);
+                        }}
+                      />
+                      {m.name}
+                    </label>
+                  ))
+                )}
+              </div>
             </div>
             <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input

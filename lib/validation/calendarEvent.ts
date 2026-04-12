@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { cuidSchema, isoDateTimeSchema } from "./common";
+import { CALENDAR_EVENT_CATEGORIES } from "@/lib/enums";
 
 export const calendarEventCreateSchema = z
   .object({
     title: z.string().min(1).max(300),
-    memberId: cuidSchema.optional().nullable(),
+    memberIds: z.array(cuidSchema).default([]),
+    category: z.enum(CALENDAR_EVENT_CATEGORIES).default("ETC"),
     startDateTime: isoDateTimeSchema,
     endDateTime: isoDateTimeSchema,
     allDay: z.boolean().default(false),
@@ -22,7 +24,8 @@ export const calendarEventCreateSchema = z
 export const calendarEventUpdateSchema = z
   .object({
     title: z.string().min(1).max(300).optional(),
-    memberId: cuidSchema.nullable().optional(),
+    memberIds: z.array(cuidSchema).optional(),
+    category: z.enum(CALENDAR_EVENT_CATEGORIES).optional(),
     startDateTime: isoDateTimeSchema.optional(),
     endDateTime: isoDateTimeSchema.optional(),
     allDay: z.boolean().optional(),

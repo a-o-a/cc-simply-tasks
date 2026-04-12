@@ -25,8 +25,8 @@ model TeamMember {
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
-  workItems      WorkItem[]
-  calendarEvents CalendarEvent[]
+  workItems            WorkItem[]
+  calendarEventMembers CalendarEventMember[]
 
   @@index([deletedAt])
 }
@@ -79,10 +79,11 @@ model WorkTicket {
   @@index([deletedAt])
 }
 
+// category 허용값: lib/enums.ts > CALENDAR_EVENT_CATEGORIES
 model CalendarEvent {
   id            String    @id @default(cuid())
   title         String
-  memberId      String?
+  category      String    @default("ETC")
   // UTC 저장. allDay=true면 [start, end) 반열림 + 00:00 UTC 정규화(lib/time.ts 담당).
   startDateTime DateTime
   endDateTime   DateTime
@@ -92,11 +93,21 @@ model CalendarEvent {
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
-  member TeamMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  members CalendarEventMember[]
 
   @@index([startDateTime, endDateTime])
-  @@index([memberId])
   @@index([deletedAt])
+}
+
+model CalendarEventMember {
+  eventId  String
+  memberId String
+
+  event  CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member TeamMember    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, memberId])
+  @@index([memberId])
 }
 
 /// entityType 허용값: lib/enums.ts > AUDIT_ENTITY_TYPES

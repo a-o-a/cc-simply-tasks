@@ -2,56 +2,63 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/client/api";
 import {
   eventDayKeys,
-  kstDateStringToUtcMs,
-  kstMonthEnd,
+  kstAddDays,
   kstMonthGrid,
-  kstMonthStart,
-  utcMsToKstDateString,
-  weekdayLabel,
+  kstWeekContaining,
+  kstWeekFetchRange,
 } from "@/lib/client/calendar";
 import { toast } from "@/lib/client/use-toast";
 import type { CalendarEvent, Member } from "@/lib/client/types";
 import { cn } from "@/lib/utils";
+import { MemberFilter } from "@/components/member-filter";
 import { EventFormDialog } from "./event-form-dialog";
-
-/**
- * 캘린더 페이지 — 월 보기.
- *
- * - KST 기준 1달 그리드(6주 = 42칸), 일요일 시작
- * - 그리드 상단의 from/to 범위를 그대로 GET /api/calendar-events 의 from/to에 사용
- * - 셀의 [+] → 해당 일을 default로 한 생성 모달
- * - 이벤트 칩 클릭 → 수정 모달
- * - 1차 범위에서는 주/일 보기는 생략 (Phase 5+)
- */
+import { MonthView, getCategoryBadge } from "./month-view";
+import { WeekView } from "./week-view";
+import { useCalendarDrag, type DragData } from "./use-calendar-drag";
 
 type ListResponse = { items: CalendarEvent[] };
+type ViewMode = "month" | "week";
+
+// ── 오늘 KST 날짜 ──────────────────────────────────────────────────────────────
+
+function todayKst() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+}
+
+function cursorFromDateStr(dateStr: string): { year: number; month0: number } {
+  const [y, m] = dateStr.split("-").map(Number);
+  return { year: y, month0: m - 1 };
+}
+
+// ── 메인 컴포넌트 ──────────────────────────────────────────────────────────────
 
 export function CalendarClient() {
-  const today = React.useMemo(
-    () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }),
-    [],
-  );
+  const today = React.useMemo(todayKst, []);
 
-  const [cursor, setCursor] = React.useState(() => {
-    const d = new Date();
-    return {
-      year: Number(
-        d.toLocaleDateString("en-US", { timeZone: "Asia/Seoul", year: "numeric" }),
-      ),
-      month0:
-        Number(
-          d.toLocaleDateString("en-US", { timeZone: "Asia/Seoul", month: "numeric" }),
-        ) - 1,
-    };
-  });
+  const [cursor, setCursor] = React.useState(() => cursorFromDateStr(today));
+  const [selectedDate, setSelectedDate] = React.useState(today);
+  const [viewMode, setViewMode] = React.useState<ViewMode>("month");
 
   const [events, setEvents] = React.useState<CalendarEvent[]>([]);
   const [members, setMembers] = React.useState<Member[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [selectedMemberIds, setSelectedMemberIds] = React.useState(
+    new Set<string>(),
+  );
+  const [activeDragData, setActiveDragData] = React.useState<DragData | null>(
+    null,
+  );
 
   const [dialogState, setDialogState] = React.useState<
     | { mode: "closed" }
@@ -59,23 +66,15 @@ export function CalendarClient() {
     | { mode: "edit"; event: CalendarEvent }
   >({ mode: "closed" });
 
-  const grid = React.useMemo(
-    () => kstMonthGrid(cursor.year, cursor.month0),
-    [cursor],
-  );
+  // ── 패치 범위 ───────────────────────────────────────────────────────────────
 
-  const monthStartMs = React.useMemo(
-    () => kstMonthStart(cursor.year, cursor.month0),
-    [cursor],
-  );
-  const monthEndMs = React.useMemo(
-    () => kstMonthEnd(cursor.year, cursor.month0),
-    [cursor],
-  );
+  const { fromMs: gridFromMs, toMs: gridToMs } = React.useMemo(() => {
+    if (viewMode === "week") return kstWeekFetchRange(selectedDate);
+    const grid = kstMonthGrid(cursor.year, cursor.month0);
+    return { fromMs: grid[0], toMs: grid[41] + 24 * 60 * 60 * 1000 };
+  }, [viewMode, selectedDate, cursor]);
 
-  // 그리드 전체 범위로 fetch (월 경계 일부가 잘리지 않도록)
-  const gridFromMs = grid[0];
-  const gridToMs = grid[grid.length - 1] + 24 * 60 * 60 * 1000;
+  // ── 데이터 로드 ─────────────────────────────────────────────────────────────
 
   const loadEvents = React.useCallback(async () => {
     setLoading(true);
@@ -110,15 +109,23 @@ export function CalendarClient() {
   React.useEffect(() => {
     void loadMembers();
   }, [loadMembers]);
-
   React.useEffect(() => {
     void loadEvents();
   }, [loadEvents]);
 
-  // dayKey → events
+  // ── 필터링 & dayMap ─────────────────────────────────────────────────────────
+
+  const filteredEvents = React.useMemo(() => {
+    if (selectedMemberIds.size === 0) return events;
+    return events.filter((e) =>
+      e.category === "HOLIDAY" ||
+      e.members.some((m) => selectedMemberIds.has(m.member.id)),
+    );
+  }, [events, selectedMemberIds]);
+
   const eventsByDay = React.useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
-    for (const event of events) {
+    for (const event of filteredEvents) {
       for (const key of eventDayKeys(event)) {
         const list = map.get(key) ?? [];
         list.push(event);
@@ -126,156 +133,239 @@ export function CalendarClient() {
       }
     }
     return map;
-  }, [events]);
+  }, [filteredEvents]);
+
+  // ── 그리드 / 주 계산 ────────────────────────────────────────────────────────
+
+  const grid = React.useMemo(
+    () => kstMonthGrid(cursor.year, cursor.month0),
+    [cursor],
+  );
+
+  const weekDates = React.useMemo(
+    () => kstWeekContaining(selectedDate),
+    [selectedDate],
+  );
+
+  // ── 네비게이션 ──────────────────────────────────────────────────────────────
 
   function gotoPrev() {
-    setCursor((c) =>
-      c.month0 === 0
-        ? { year: c.year - 1, month0: 11 }
-        : { year: c.year, month0: c.month0 - 1 },
-    );
+    if (viewMode === "month") {
+      setCursor((c) =>
+        c.month0 === 0
+          ? { year: c.year - 1, month0: 11 }
+          : { year: c.year, month0: c.month0 - 1 },
+      );
+    } else {
+      const d = kstAddDays(selectedDate, -7);
+      setSelectedDate(d);
+      setCursor(cursorFromDateStr(d));
+    }
   }
   function gotoNext() {
-    setCursor((c) =>
-      c.month0 === 11
-        ? { year: c.year + 1, month0: 0 }
-        : { year: c.year, month0: c.month0 + 1 },
-    );
+    if (viewMode === "month") {
+      setCursor((c) =>
+        c.month0 === 11
+          ? { year: c.year + 1, month0: 0 }
+          : { year: c.year, month0: c.month0 + 1 },
+      );
+    } else {
+      const d = kstAddDays(selectedDate, 7);
+      setSelectedDate(d);
+      setCursor(cursorFromDateStr(d));
+    }
   }
   function gotoToday() {
-    const d = new Date();
-    setCursor({
-      year: Number(
-        d.toLocaleDateString("en-US", { timeZone: "Asia/Seoul", year: "numeric" }),
-      ),
-      month0:
-        Number(
-          d.toLocaleDateString("en-US", { timeZone: "Asia/Seoul", month: "numeric" }),
-        ) - 1,
-    });
+    setSelectedDate(today);
+    setCursor(cursorFromDateStr(today));
+  }
+  function handleDateSelect(dayKey: string) {
+    setSelectedDate(dayKey);
+    setCursor(cursorFromDateStr(dayKey));
+  }
+  function switchView(mode: ViewMode) {
+    setViewMode(mode);
   }
 
+  // ── 팀원 필터 ───────────────────────────────────────────────────────────────
+
+  function toggleMember(memberId: string) {
+    setSelectedMemberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(memberId)) next.delete(memberId);
+      else next.add(memberId);
+      return next;
+    });
+  }
+  function clearMembers() {
+    setSelectedMemberIds(new Set());
+  }
+
+  // ── 드래그 앤 드롭 ──────────────────────────────────────────────────────────
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
+  const { handleDragEnd } = useCalendarDrag(setEvents, loadEvents);
+
+  const activeEvent = React.useMemo(
+    () =>
+      activeDragData
+        ? (events.find((e) => e.id === activeDragData.eventId) ?? null)
+        : null,
+    [activeDragData, events],
+  );
+
+  // ── 헤더 라벨 ──────────────────────────────────────────────────────────────
+
+  const headerLabel = React.useMemo(() => {
+    if (viewMode === "month") {
+      return `${cursor.year}년 ${cursor.month0 + 1}월`;
+    }
+    const startDay = Number(weekDates[0].slice(8, 10));
+    const endDay = Number(weekDates[6].slice(8, 10));
+    const startMonth = Number(weekDates[0].slice(5, 7));
+    const endMonth = Number(weekDates[6].slice(5, 7));
+    const year = Number(weekDates[3].slice(0, 4));
+    if (startMonth === endMonth) {
+      return `${year}년 ${startMonth}월 ${startDay}일 – ${endDay}일`;
+    }
+    return `${year}년 ${startMonth}월 ${startDay}일 – ${endMonth}월 ${endDay}일`;
+  }, [viewMode, cursor, weekDates]);
+
+  // ── 렌더 ────────────────────────────────────────────────────────────────────
+
   return (
-    <div className="px-8 py-10">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">캘린더</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            팀의 일정을 한눈에. 모든 시각은 KST 기준입니다.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={gotoToday}>
-            오늘
-          </Button>
+    <DndContext
+      sensors={sensors}
+      onDragStart={(e) =>
+        setActiveDragData((e.active.data.current as DragData) ?? null)
+      }
+      onDragEnd={(e) => {
+        setActiveDragData(null);
+        void handleDragEnd(e);
+      }}
+      onDragCancel={() => setActiveDragData(null)}
+    >
+      <div className="flex h-full flex-col overflow-hidden">
+        {/* ── 헤더 ── */}
+        <header className="flex shrink-0 items-center gap-3 border-b px-6 py-3">
+          {/* 년월 네비게이션 */}
           <div className="flex items-center rounded-md border bg-card">
-            <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전 달">
+            <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="px-3 text-sm font-medium tabular-nums">
-              {cursor.year}년 {cursor.month0 + 1}월
+            <span className="min-w-[13rem] px-3 text-center text-sm font-medium tabular-nums">
+              {headerLabel}
             </span>
-            <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음 달">
+            <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* 팀원 필터 */}
+          <MemberFilter
+            members={members}
+            selectedIds={selectedMemberIds}
+            onToggle={toggleMember}
+            onClear={clearMembers}
+          />
+
+          <div className="flex-1" />
+
+          {/* 뷰 토글 */}
+          <div className="flex overflow-hidden rounded-md border text-sm">
+            <button
+              onClick={() => switchView("month")}
+              className={cn(
+                "px-3 py-1.5 transition-colors",
+                viewMode === "month"
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-accent",
+              )}
+            >
+              월
+            </button>
+            <button
+              onClick={() => switchView("week")}
+              className={cn(
+                "border-l px-3 py-1.5 transition-colors",
+                viewMode === "week"
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-accent",
+              )}
+            >
+              주
+            </button>
+          </div>
+
+          <Button variant="outline" onClick={gotoToday}>
+            오늘
+          </Button>
+
+          {loading && (
+            <span className="text-xs text-muted-foreground">불러오는 중…</span>
+          )}
+
           <Button
-            onClick={() => setDialogState({ mode: "create", defaultDate: today })}
+            onClick={() =>
+              setDialogState({ mode: "create", defaultDate: selectedDate })
+            }
           >
             <Plus className="mr-2 h-4 w-4" />
             이벤트 추가
           </Button>
-        </div>
-      </header>
+        </header>
 
-      <div className="mt-6 overflow-hidden rounded-lg border bg-card">
-        {/* 요일 헤더 */}
-        <div className="grid grid-cols-7 border-b text-xs font-medium text-muted-foreground">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div
-              key={i}
-              className={cn(
-                "px-2 py-2 text-center",
-                i === 0 && "text-rose-500",
-                i === 6 && "text-blue-500",
-              )}
-            >
-              {weekdayLabel(i)}
-            </div>
-          ))}
-        </div>
-
-        {/* 셀 */}
-        <div className="grid grid-cols-7">
-          {grid.map((dayMs, idx) => {
-            const dayKey = utcMsToKstDateString(dayMs);
-            const inMonth = dayMs >= monthStartMs && dayMs < monthEndMs;
-            const isToday = dayKey === today;
-            const dayEvents = eventsByDay.get(dayKey) ?? [];
-            const dayNum = Number(dayKey.slice(8, 10));
-            const colIdx = idx % 7;
-
-            return (
-              <div
-                key={dayKey}
-                className={cn(
-                  "group relative min-h-[110px] border-b border-r p-1.5 last:border-r-0",
-                  idx >= 35 && "border-b-0",
-                  (idx + 1) % 7 === 0 && "border-r-0",
-                  !inMonth && "bg-muted/20 text-muted-foreground",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={cn(
-                      "inline-flex h-5 w-5 items-center justify-center text-xs",
-                      colIdx === 0 && inMonth && "text-rose-500",
-                      colIdx === 6 && inMonth && "text-blue-500",
-                      isToday &&
-                        "rounded-full bg-primary font-semibold text-primary-foreground",
-                    )}
-                  >
-                    {dayNum}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setDialogState({ mode: "create", defaultDate: dayKey })
-                    }
-                    className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"
-                    aria-label="이벤트 추가"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </button>
-                </div>
-                <div className="mt-1 space-y-0.5">
-                  {dayEvents.slice(0, 3).map((event) => (
-                    <button
-                      key={event.id}
-                      onClick={() =>
-                        setDialogState({ mode: "edit", event })
-                      }
-                      className="block w-full truncate rounded bg-primary/10 px-1.5 py-0.5 text-left text-[11px] font-medium text-primary hover:bg-primary/20"
-                      title={event.title}
-                    >
-                      {event.title}
-                    </button>
-                  ))}
-                  {dayEvents.length > 3 ? (
-                    <div className="px-1.5 text-[10px] text-muted-foreground">
-                      +{dayEvents.length - 3}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          {/* 캘린더 영역 */}
+          <div className="flex-1 overflow-hidden p-4">
+            {viewMode === "month" ? (
+              <MonthView
+                grid={grid}
+                cursor={cursor}
+                today={today}
+                eventsByDay={eventsByDay}
+                onAddClick={(dayKey) =>
+                  setDialogState({ mode: "create", defaultDate: dayKey })
+                }
+                onEventClick={(event) =>
+                  setDialogState({ mode: "edit", event })
+                }
+              />
+            ) : (
+              <WeekView
+                weekDates={weekDates}
+                today={today}
+                eventsByDay={eventsByDay}
+                onAddClick={(dayKey) =>
+                  setDialogState({ mode: "create", defaultDate: dayKey })
+                }
+                onEventClick={(event) =>
+                  setDialogState({ mode: "edit", event })
+                }
+              />
+            )}
+          </div>
       </div>
 
-      {loading ? (
-        <p className="mt-3 text-xs text-muted-foreground">불러오는 중...</p>
-      ) : null}
+      {/* ── 드래그 오버레이 ── */}
+      <DragOverlay dropAnimation={null}>
+        {activeEvent ? (
+          <div className="pointer-events-none min-w-[8rem] rounded border bg-card px-2 py-1 text-xs font-medium opacity-90 shadow-lg">
+            <span
+              className={cn(
+                "mr-1 rounded px-1 text-[9px] font-semibold",
+                getCategoryBadge(activeEvent.category).className,
+              )}
+            >
+              {getCategoryBadge(activeEvent.category).label}
+            </span>
+            {activeEvent.title}
+          </div>
+        ) : null}
+      </DragOverlay>
 
+      {/* ── 이벤트 폼 다이얼로그 ── */}
       <EventFormDialog
         open={dialogState.mode !== "closed"}
         editing={dialogState.mode === "edit" ? dialogState.event : null}
@@ -293,6 +383,6 @@ export function CalendarClient() {
           void loadEvents();
         }}
       />
-    </div>
+    </DndContext>
   );
 }

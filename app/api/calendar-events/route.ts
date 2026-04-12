@@ -27,10 +27,12 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       deletedAt: null,
       startDateTime: { lt: filters.to },
       endDateTime: { gt: filters.from },
-      ...(filters.memberId ? { memberId: filters.memberId } : {}),
+      ...(filters.memberId
+        ? { members: { some: { memberId: filters.memberId } } }
+        : {}),
     },
     include: {
-      member: true,
+      members: { include: { member: true } },
     },
     orderBy: [{ startDateTime: "asc" }, { id: "asc" }],
   });
@@ -50,12 +52,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     const row = await tx.calendarEvent.create({
       data: {
         title: input.title,
-        memberId: input.memberId ?? null,
+        category: input.category,
         startDateTime: input.startDateTime,
         endDateTime: input.endDateTime,
         allDay: input.allDay,
         note: input.note ?? null,
+        members: {
+          create: input.memberIds.map((memberId) => ({ memberId })),
+        },
       },
+      include: { members: { include: { member: true } } },
     });
     await withAudit(tx, {
       entityType: "CalendarEvent",

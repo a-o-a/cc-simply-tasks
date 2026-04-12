@@ -167,6 +167,42 @@ export function WorkItemsClient() {
     setDrawerId(item.id);
   }
 
+  const updateItemStatus = React.useCallback(
+    async (id: string, status: Status) => {
+      const originalItem = items.find((item) => item.id === id);
+      if (!originalItem) return;
+
+      // Optimistic update
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, status } : item
+        )
+      );
+
+      try {
+        await api.patch(`/api/work-items/${id}`, { status }, originalItem.updatedAt);
+        toast({
+          title: "상태 변경됨",
+          description: `${originalItem.title}의 상태가 ${STATUS_LABELS[status]}으로 변경되었습니다.`,
+        });
+      } catch (err) {
+        // Rollback
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, status: originalItem.status } : item
+          )
+        );
+        const message = err instanceof ApiError ? err.message : "상태 변경 실패";
+        toast({
+          title: "상태 변경 실패",
+          description: message,
+          variant: "destructive",
+        });
+      }
+    },
+    [items],
+  );
+
   return (
     <div className="px-8 py-10">
       <header className="flex items-center justify-between gap-4">
@@ -202,7 +238,7 @@ export function WorkItemsClient() {
         ) : view === "table" ? (
           <TableView items={items} onOpen={openDrawer} />
         ) : view === "kanban" ? (
-          <KanbanView items={items} onOpen={openDrawer} />
+          <KanbanView items={items} onOpen={openDrawer} onUpdate={updateItemStatus} />
         ) : (
           <GanttView items={items} onOpen={openDrawer} />
         )}

@@ -55,17 +55,19 @@ export type WorkItemDetail = WorkItemListItem & {
   tickets: WorkTicket[];
 };
 
+export type CalendarEventCategory = "HOLIDAY" | "WORK" | "ABSENCE" | "ETC";
+
 export type CalendarEvent = {
   id: string;
   title: string;
-  memberId: string | null;
+  category: CalendarEventCategory;
   startDateTime: string;
   endDateTime: string;
   allDay: boolean;
   note: string | null;
   createdAt: string;
   updatedAt: string;
-  member: Member | null;
+  members: { member: Member }[];
 };
 
 export type AuditLog = {

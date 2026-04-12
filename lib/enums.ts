@@ -42,6 +42,14 @@ export const MEMBER_ROLES = [
 ] as const;
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 
+export const CALENDAR_EVENT_CATEGORIES = [
+  "HOLIDAY",
+  "WORK",
+  "ABSENCE",
+  "ETC",
+] as const;
+export type CalendarEventCategory = (typeof CALENDAR_EVENT_CATEGORIES)[number];
+
 export const ACTOR_TYPES = ["ANONYMOUS"] as const; // 추후 "USER" 추가
 export type ActorType = (typeof ACTOR_TYPES)[number];
 

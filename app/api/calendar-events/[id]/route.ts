@@ -16,7 +16,7 @@ export const GET = withErrorHandler(
     await ensureSqlitePragma();
     const row = await prisma.calendarEvent.findFirst({
       where: { id: params.id, deletedAt: null },
-      include: { member: true },
+      include: { members: { include: { member: true } } },
     });
     if (!row) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
     return NextResponse.json(row);
@@ -39,20 +39,29 @@ export const PATCH = withErrorHandler(
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
       assertIfMatch(req, before.updatedAt);
 
+      // memberIds가 제공된 경우 기존 멤버 교체
+      if (input.memberIds !== undefined) {
+        await tx.calendarEventMember.deleteMany({ where: { eventId: params.id } });
+        for (const memberId of input.memberIds) {
+          await tx.calendarEventMember.create({ data: { eventId: params.id, memberId } });
+        }
+      }
+
       const after = await tx.calendarEvent.update({
         where: { id: params.id },
         data: {
           ...(input.title !== undefined ? { title: input.title } : {}),
-          ...(input.memberId !== undefined ? { memberId: input.memberId } : {}),
           ...(input.startDateTime !== undefined
             ? { startDateTime: input.startDateTime }
             : {}),
           ...(input.endDateTime !== undefined
             ? { endDateTime: input.endDateTime }
             : {}),
+          ...(input.category !== undefined ? { category: input.category } : {}),
           ...(input.allDay !== undefined ? { allDay: input.allDay } : {}),
           ...(input.note !== undefined ? { note: input.note } : {}),
         },
+        include: { members: { include: { member: true } } },
       });
       await withAudit(tx, {
         entityType: "CalendarEvent",

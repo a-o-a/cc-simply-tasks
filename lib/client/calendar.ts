@@ -80,3 +80,25 @@ const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 export function weekdayLabel(idx: number): string {
   return WEEKDAYS[idx];
 }
+
+/** dateStr에 n일을 더한 KST 날짜 문자열 반환 (Korea는 DST 없음). */
+export function kstAddDays(dateStr: string, days: number): string {
+  return utcMsToKstDateString(kstDateStringToUtcMs(dateStr) + days * DAY_MS);
+}
+
+/** dateStr을 포함하는 일요일~토요일 7일 KST 날짜 배열. */
+export function kstWeekContaining(dateStr: string): string[] {
+  const ms = kstDateStringToUtcMs(dateStr);
+  const dow = new Date(ms + KST_OFFSET_MINUTES * 60 * 1000).getUTCDay(); // 0=Sun
+  const sundayMs = ms - dow * DAY_MS;
+  return Array.from({ length: 7 }, (_, i) => utcMsToKstDateString(sundayMs + i * DAY_MS));
+}
+
+/** 주 뷰 이벤트 fetch 범위 (해당 주 일요일 00:00 KST ~ 다음 주 일요일 00:00 KST). */
+export function kstWeekFetchRange(dateStr: string): { fromMs: number; toMs: number } {
+  const week = kstWeekContaining(dateStr);
+  return {
+    fromMs: kstDateStringToUtcMs(week[0]),
+    toMs: kstDateStringToUtcMs(week[6]) + DAY_MS,
+  };
+}
