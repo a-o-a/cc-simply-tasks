@@ -54,8 +54,9 @@
 │       └── audit-logs/
 │           └── route.ts         # GET(read-only, ?entityType&entityId 등)
 ├── components/
-│   ├── app-shell.tsx            # 사이드바 + 게이트 + 토스터 셸
+│   ├── app-shell.tsx            # 사이드바 + 게이트 + 토스터 셸 (h-screen 레이아웃)
 │   ├── sidebar.tsx              # 좌측 네비게이션 (240/64 collapsible)
+│   ├── member-filter.tsx        # 재사용 팀원 필터 (Radix Popover, 5열 그리드 멀티셀렉트)
 │   ├── actor-name-gate.tsx      # 액터 이름 강제 모달 (ESC/바깥 차단)
 │   ├── toaster.tsx
 │   ├── theme-provider.tsx / theme-toggle.tsx
@@ -71,8 +72,12 @@
 │   │   ├── work-item-form-dialog.tsx
 │   │   └── status-badge.tsx
 │   ├── calendar/
-│   │   ├── calendar-client.tsx    # 월 보기 진입점
-│   │   └── event-form-dialog.tsx  # 생성/수정/삭제 통합
+│   │   ├── calendar-client.tsx    # 오케스트레이터 (DnD 컨텍스트, 상태, 레이아웃)
+│   │   ├── month-view.tsx         # 월 보기 그리드 (draggable 칩 + droppable 셀)
+│   │   ├── week-view.tsx          # 주 보기 타임그리드
+│   │   ├── event-form-dialog.tsx  # 생성/수정/삭제 통합
+│   │   ├── use-calendar-drag.ts   # @dnd-kit 드래그 훅 (낙관적 업데이트)
+│   │   └── calendar-sidebar.tsx   # 미니 캘린더 사이드바 (현재 미사용)
 │   ├── dashboard/
 │   │   └── dashboard-client.tsx   # 상태 카운트 + 오늘 이관 예정 + 최근 활동
 │   └── members/
@@ -96,6 +101,7 @@
 │   ├── optimisticLock.ts        # If-Match 낙관적 락
 │   ├── utils.ts                 # cn (clsx + tailwind-merge)
 │   └── validation/              # zod 스키마 (common/teamMember/workItem/workTicket/calendarEvent)
+│       # calendar.ts — kstMonthGrid, kstWeekContaining, kstAddDays, eventDayKeys
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/
@@ -148,6 +154,7 @@ npm run dev
 | **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ✅ 완료 |
 | **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ✅ 완료 |
 | **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더 + 대시보드) | ✅ 완료 |
+| **4+** | 캘린더 개선 (주 보기, 드래그 이동, 팀원 필터, 카테고리 정리, 다중 담당자) | ✅ 완료 |
 | **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |
 
@@ -157,10 +164,11 @@ npm run dev
 
 ### 현재 상태 (2026-04-12)
 
-Phase 0–4 전체 완료. 앱이 정상 동작하며 `next build` / `tsc --noEmit` 모두 통과.
+Phase 0–4 + 캘린더 개선 완료. `tsc --noEmit` 통과.
 
 ```
 git log --oneline
+e0df184 feat: 캘린더 대폭 개선 — 주 보기, 드래그, 팀원 필터, 카테고리 정리
 452d7c9 fix: encode x-actor-name header for non-latin1 (Korean) characters
 002258e feat: phase 4 step 5-7 — gantt, calendar month view, dashboard
 0b26d6c feat: phase 4 step 4 — work items list, drawer, tickets, activity
@@ -181,17 +189,33 @@ acbe675 feat: phase 4 step 1 — design system bootstrap (tailwind + shadcn)
 | 낙관적 락 | PATCH/DELETE 전에 If-Match 헤더 필수 (이전 GET의 `updatedAt`). 409 충돌 시 "다른 사용자가 먼저 수정했습니다" 토스트 + 자동 재로드. |
 | 감사 로그 | 모든 write는 `$transaction` + `withAudit(tx, ...)` 패턴 필수. `tx`가 `Prisma.TransactionClient`임을 타입으로 강제. |
 | 대시보드 카운트 | 현재는 work-items 첫 페이지(50건) 기준. 전체 카운트는 Phase 5에서 `/api/work-items/count` 별도 API 추가 예정. |
+| 캘린더 카테고리 | 4종: HOLIDAY/WORK/ABSENCE/ETC. DB에 구값(MEETING 등) 잔존 가능 → `getCategoryBadge()` 폴백 처리. |
+| HOLIDAY 이벤트 | 스페셜 취급: 팀원 필터 무관 항상 노출, 셀 핑크 배경, 일자 옆 제목 표시, 칩은 별도 미표시. |
+| AppShell 레이아웃 | `h-screen overflow-hidden` + main `overflow-y-auto`. 캘린더 페이지는 `h-full`로 주 보기 내부 스크롤 처리. |
+| MemberFilter | `components/member-filter.tsx` — Radix Popover 기반, 재사용 가능. 캘린더 헤더에 배치. |
 
 ### 남은 작업 (Phase 5–6, 선택)
 
 - `[ ]` 대시보드 전체 카운트용 dedicated count API
 - `[ ]` CSV export (`/api/work-items/export.csv`)
 - `[ ]` Gantt 드래그 reorder / 바 리사이즈
-- `[ ]` 캘린더 주/일 보기
+- `[ ]` 캘린더 — 휴일 전용 관리 (일반 이벤트와 분리, 공휴일 자동 연동 등 검토 중)
+- `[ ]` 캘린더 — 작업 목록에 MemberFilter 적용
 - `[ ]` Audit log 보존 정책 / archive
 - `[ ]` Postgres 이관 런북 (DATABASE_URL 교체 → `prisma migrate` → seed)
 
 ---
+
+### Phase 4+ 캘린더 개선 완료 내역 (2026-04-12)
+- **주 보기(Week view)** — 타임그리드 64px/hr, 종일 스트립, 겹치는 이벤트 컬럼 분할, 마운트 시 8시 자동 스크롤
+- **드래그로 날짜 이동** — `@dnd-kit/core` + `PointerSensor(distance:8)`, 낙관적 업데이트 → PATCH → 실패 시 롤백
+- **팀원 필터** — `components/member-filter.tsx` (재사용 가능), 헤더에 배치, 5열 그리드 드롭다운
+- **카테고리 정리** — 5종 → 4종 (HOLIDAY/WORK/ABSENCE/ETC), 구값 폴백(`getCategoryBadge`)
+- **HOLIDAY 스페셜 처리** — 셀 핑크 배경, 일자 옆 제목, 팀원 필터 무관 항상 노출, 칩 제외
+- **이벤트 폼** — 카테고리 최상단 배치, 다중 담당자 체크박스 선택
+- **다이얼로그 애니메이션** — 슬라이드업 커스텀 keyframe (`globals.css`)
+- **AppShell** — `h-screen overflow-hidden` 레이아웃으로 변경 (주 보기 내부 스크롤 지원)
+- **CalendarEvent 스키마** — 다대다 담당자(`CalendarEventMember` 조인 테이블), `category` 컬럼 추가
 
 ### Phase 4 Step 5–7 완료 내역
 - **Step 5 — Gantt 뷰** (`components/work-items/gantt-view.tsx`)
