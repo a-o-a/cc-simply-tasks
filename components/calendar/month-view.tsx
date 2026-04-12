@@ -12,12 +12,30 @@ import {
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, CalendarEventCategory } from "@/lib/client/types";
 
+// Record는 알려진 타입만 커버 — 구 값(MEETING 등)은 catOrder() 헬퍼로 안전하게 조회
 export const CATEGORY_ORDER: Record<CalendarEventCategory, number> = {
   HOLIDAY: 0,
   WORK:    1,
   ABSENCE: 2,
   ETC:     3,
 };
+const CATEGORY_ORDER_FALLBACK: Record<string, number> = {
+  ...CATEGORY_ORDER,
+  MEETING: 1, VACATION: 2, ANNIVERSARY: 3,
+};
+export function catOrder(cat: string): number {
+  return CATEGORY_ORDER_FALLBACK[cat] ?? 99;
+}
+
+/** 종일 우선 → 카테고리 → 제목 asc */
+export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
+  return events.slice().sort((a, b) => {
+    if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+    const catDiff = catOrder(a.category) - catOrder(b.category);
+    if (catDiff !== 0) return catDiff;
+    return a.title.localeCompare(b.title, "ko");
+  });
+}
 
 const CATEGORY_BADGE_MAP: Record<string, { label: string; className: string }> = {
   HOLIDAY: { label: "휴일", className: "bg-rose-500/20 text-rose-400" },
@@ -178,11 +196,7 @@ export function MonthView({
             const inMonth = dayMs >= monthStartMs && dayMs < monthEndMs;
             const isToday = dayKey === today;
             const rawEvents = eventsByDay.get(dayKey) ?? [];
-            const dayEvents = rawEvents.slice().sort((a, b) => {
-              const catDiff =
-                CATEGORY_ORDER[a.category] - CATEGORY_ORDER[b.category];
-              return catDiff !== 0 ? catDiff : a.title.localeCompare(b.title, "ko");
-            });
+            const dayEvents = sortEvents(rawEvents);
             const dayNum = Number(dayKey.slice(8, 10));
             const colIdx = idx % 7;
             const isSunday = colIdx === 0;

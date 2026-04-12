@@ -281,7 +281,7 @@ export function EventFormDialog({
               {editing ? "이벤트 수정" : "이벤트 추가"}
             </DialogTitle>
             <DialogDescription>
-              팀원의 일정을 캘린더에 표시합니다. 모든 시각은 KST 기준입니다.
+              팀원의 일정을 캘린더에 표시합니다. (KST)
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">

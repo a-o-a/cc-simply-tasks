@@ -79,7 +79,7 @@
 │   │   ├── use-calendar-drag.ts   # @dnd-kit 드래그 훅 (낙관적 업데이트)
 │   │   └── calendar-sidebar.tsx   # 미니 캘린더 사이드바 (현재 미사용)
 │   ├── dashboard/
-│   │   └── dashboard-client.tsx   # 상태 카운트 + 오늘 이관 예정 + 최근 활동
+│   │   └── dashboard-client.tsx   # 이번주 이관 예정 | 진행중인 작업 | 오늘 일정 + 최근 활동
 │   └── members/
 │       └── (members-client.tsx는 app/members/ 아래에 위치)
 ├── lib/
@@ -155,7 +155,8 @@ npm run dev
 | **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ✅ 완료 |
 | **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더 + 대시보드) | ✅ 완료 |
 | **4+** | 캘린더 개선 (주 보기, 드래그 이동, 팀원 필터, 카테고리 정리, 다중 담당자) | ✅ 완료 |
-| **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
+| **4++** | 대시보드 개편 (3열 레이아웃, 진행중인 작업, 작업 드로어 연동) | ✅ 완료 |
+| **5** | 폴리싱 (작업 탭 개선, CSV export 등 선택) | ⏳ 진행 중 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |
 
 ---
@@ -164,18 +165,7 @@ npm run dev
 
 ### 현재 상태 (2026-04-12)
 
-Phase 0–4 + 캘린더 개선 완료. `tsc --noEmit` 통과.
-
-```
-git log --oneline
-e0df184 feat: 캘린더 대폭 개선 — 주 보기, 드래그, 팀원 필터, 카테고리 정리
-452d7c9 fix: encode x-actor-name header for non-latin1 (Korean) characters
-002258e feat: phase 4 step 5-7 — gantt, calendar month view, dashboard
-0b26d6c feat: phase 4 step 4 — work items list, drawer, tickets, activity
-21b51a3 feat: phase 4 step 2-3 — app shell, actor gate, members CRUD
-acbe675 feat: phase 4 step 1 — design system bootstrap (tailwind + shadcn)
-85dff4b feat: phase 3 complete — team-members, calendar-events, audit-logs APIs
-```
+Phase 0–4 + 캘린더 개선 + 대시보드 개편 완료. `tsc --noEmit` 통과.
 
 ### 알아야 할 결정사항
 
@@ -188,7 +178,8 @@ acbe675 feat: phase 4 step 1 — design system bootstrap (tailwind + shadcn)
 | 날짜/시간 | 저장: UTC ISO. 표시: KST. all-day 이벤트는 반열림 `[start, end)` 구간. |
 | 낙관적 락 | PATCH/DELETE 전에 If-Match 헤더 필수 (이전 GET의 `updatedAt`). 409 충돌 시 "다른 사용자가 먼저 수정했습니다" 토스트 + 자동 재로드. |
 | 감사 로그 | 모든 write는 `$transaction` + `withAudit(tx, ...)` 패턴 필수. `tx`가 `Prisma.TransactionClient`임을 타입으로 강제. |
-| 대시보드 카운트 | 현재는 work-items 첫 페이지(50건) 기준. 전체 카운트는 Phase 5에서 `/api/work-items/count` 별도 API 추가 예정. |
+| 대시보드 레이아웃 | 3열: 이번주 이관 예정 \| 진행중인 작업 \| 오늘 일정, 하단: 최근 활동. 작업 클릭 → `WorkItemDrawer` 오픈. |
+| 대시보드 카운트 | work-items 첫 페이지(50건) 기준. 전체 카운트는 Phase 5에서 `/api/work-items/count` 별도 API 추가 예정. |
 | 캘린더 카테고리 | 4종: HOLIDAY/WORK/ABSENCE/ETC. DB에 구값(MEETING 등) 잔존 가능 → `getCategoryBadge()` 폴백 처리. |
 | HOLIDAY 이벤트 | 스페셜 취급: 팀원 필터 무관 항상 노출, 셀 핑크 배경, 일자 옆 제목 표시, 칩은 별도 미표시. |
 | AppShell 레이아웃 | `h-screen overflow-hidden` + main `overflow-y-auto`. 캘린더 페이지는 `h-full`로 주 보기 내부 스크롤 처리. |
@@ -196,6 +187,7 @@ acbe675 feat: phase 4 step 1 — design system bootstrap (tailwind + shadcn)
 
 ### 남은 작업 (Phase 5–6, 선택)
 
+- `[ ]` **작업 탭 개선** (Phase 5 진행 중)
 - `[ ]` 대시보드 전체 카운트용 dedicated count API
 - `[ ]` CSV export (`/api/work-items/export.csv`)
 - `[ ]` Gantt 드래그 reorder / 바 리사이즈
@@ -205,6 +197,12 @@ acbe675 feat: phase 4 step 1 — design system bootstrap (tailwind + shadcn)
 - `[ ]` Postgres 이관 런북 (DATABASE_URL 교체 → `prisma migrate` → seed)
 
 ---
+
+### Phase 4++ 대시보드 개편 완료 내역 (2026-04-12)
+- **레이아웃 재편** — 상태 카드 5개 제거 → 3열 동일 비율: 이번주 이관 예정 · 진행중인 작업 · 오늘 일정
+- **진행중인 작업 패널** — `IN_PROGRESS` 필터링, 제목·담당자 표시
+- **작업 클릭 → WorkItemDrawer** — 이번주 이관 예정·진행중인 작업 양쪽에서 드로어 오픈, 드로어 내 수정/삭제 후 목록 자동 갱신
+- **이벤트 정렬 통일** — 종일 우선 → 카테고리(HOLIDAY→WORK→ABSENCE→ETC) → 제목 asc (대시보드·캘린더 공통 `sortEvents()` 적용)
 
 ### Phase 4+ 캘린더 개선 완료 내역 (2026-04-12)
 - **주 보기(Week view)** — 타임그리드 64px/hr, 종일 스트립, 겹치는 이벤트 컬럼 분할, 마운트 시 8시 자동 스크롤

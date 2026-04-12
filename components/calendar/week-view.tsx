@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { kstDateStringToUtcMs, weekdayLabel } from "@/lib/client/calendar";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, CalendarEventCategory } from "@/lib/client/types";
-import { getCategoryBadge, kstTime } from "./month-view";
+import { getCategoryBadge, kstTime, sortEvents } from "./month-view";
 
 const HOUR_HEIGHT = 64; // px per hour → 1536px total
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -252,7 +252,7 @@ export function WeekView({
           <span className="text-[10px] text-muted-foreground">종일</span>
         </div>
         {weekDates.map((d) => {
-          const allDayEvs = (eventsByDay.get(d) ?? []).filter((e) => e.allDay);
+          const allDayEvs = sortEvents((eventsByDay.get(d) ?? []).filter((e) => e.allDay));
           return (
             <AllDayCell
               key={d}
