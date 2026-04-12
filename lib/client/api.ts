@@ -77,7 +77,7 @@ async function request<T>(
     headers["Content-Type"] = "application/json";
   }
   const actorName = readActorName();
-  if (actorName) headers["x-actor-name"] = actorName;
+  if (actorName) headers["x-actor-name"] = encodeURIComponent(actorName);
   if (options.ifMatch) headers["If-Match"] = options.ifMatch;
 
   let res: Response;

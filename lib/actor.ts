@@ -29,7 +29,8 @@ export function getActorContext(req: NextRequest | Request): ActorContext {
     : (req as NextRequest).ip ?? null;
 
   const rawName = headers.get("x-actor-name");
-  const actorName = rawName && rawName.trim().length > 0 ? rawName.trim() : null;
+  const decoded = rawName ? (() => { try { return decodeURIComponent(rawName); } catch { return rawName; } })() : null;
+  const actorName = decoded && decoded.trim().length > 0 ? decoded.trim() : null;
 
   const userAgent = headers.get("user-agent");
 
