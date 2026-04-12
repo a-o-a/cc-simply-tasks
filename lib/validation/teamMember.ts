@@ -8,5 +8,10 @@ export const teamMemberCreateSchema = z.object({
 
 export const teamMemberUpdateSchema = teamMemberCreateSchema.partial();
 
+export const teamMemberListQuerySchema = z.object({
+  role: z.enum(MEMBER_ROLES).optional(),
+});
+
 export type TeamMemberCreateInput = z.infer<typeof teamMemberCreateSchema>;
 export type TeamMemberUpdateInput = z.infer<typeof teamMemberUpdateSchema>;
+export type TeamMemberListQuery = z.infer<typeof teamMemberListQuerySchema>;

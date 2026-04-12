@@ -33,13 +33,21 @@
 │   ├── page.tsx
 │   ├── globals.css
 │   └── api/
-│       └── work-items/         # 레퍼런스 구현
-│           ├── route.ts        # GET(list), POST
-│           └── [id]/
-│               ├── route.ts    # GET, PATCH, DELETE
-│               └── tickets/
-│                   ├── route.ts         # GET, POST
-│                   └── [ticketId]/route.ts  # PATCH, DELETE
+│       ├── work-items/         # 레퍼런스 구현
+│       │   ├── route.ts        # GET(list), POST
+│       │   └── [id]/
+│       │       ├── route.ts    # GET, PATCH, DELETE
+│       │       └── tickets/
+│       │           ├── route.ts         # GET, POST
+│       │           └── [ticketId]/route.ts  # PATCH, DELETE
+│       ├── team-members/
+│       │   ├── route.ts        # GET(list), POST
+│       │   └── [id]/route.ts   # GET, PATCH, DELETE
+│       ├── calendar-events/
+│       │   ├── route.ts        # GET(range), POST
+│       │   └── [id]/route.ts   # GET, PATCH, DELETE
+│       └── audit-logs/
+│           └── route.ts        # GET(read-only)
 ├── lib/
 │   ├── db.ts              # Prisma 싱글톤 + SQLite PRAGMA
 │   ├── enums.ts           # enum 소스 오브 트루스
@@ -101,7 +109,7 @@ npm run dev
 | **0** | 프로젝트 부트스트랩 (Next.js + Prisma + SQLite + TS) | ✅ 완료 |
 | **1** | Prisma 스키마 확정 (도메인 모델 + enum + 인덱스) | ✅ 완료 |
 | **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ✅ 완료 |
-| **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | 🟡 진행 중 (work-items 레퍼런스 완료) |
+| **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ✅ 완료 |
 | **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | ⏳ 대기 |
 | **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |
@@ -118,6 +126,15 @@ npm run dev
 - Soft delete 필드 (`deletedAt`) 전 모델 적용
 - 인덱스: `WorkItem[assigneeId,status]`, `[transferDate]`, `[startDate,endDate]`, `WorkTicket@@unique([workItemId,systemName,ticketNumber])`, `AuditLog[entityType,entityId,createdAt]` 등
 - 초기 migration `20260411144540_init` 적용 완료
+
+### Phase 3 완료 내역
+- **work-items** (레퍼런스): list/get/create/update(If-Match)/delete(soft) + 5개 필터 + 페이지네이션
+- **work-items/:id/tickets**: list/create + ticket item PATCH/DELETE (유니크 제약 자동 매핑)
+- **team-members**: list(`?role`)/get/create/update/delete
+- **calendar-events**: range query(`?from&to&memberId`, [from,to) overlap)/get/create/update/delete
+- **audit-logs** (read-only): list with `entityType/entityId/action/actorName` 필터
+- 전체 API 9개 엔드포인트, 모두 `withErrorHandler` + `$transaction` + `withAudit` + `assertIfMatch` 패턴 통일
+- `tsc --noEmit` / `next build` 통과
 
 ### Phase 2 완료 내역
 - `lib/enums.ts` — 모든 enum 값의 소스 오브 트루스 (Status/Priority/Category/MemberRole/ActorType/AuditAction/AuditEntityType)

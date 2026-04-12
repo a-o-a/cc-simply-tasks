@@ -94,23 +94,24 @@
 - [x] `lib/validation/` — zod: `common`, `teamMember`, `workItem`, `workTicket`, `calendarEvent`
 - [x] `tsc --noEmit` + `next build` 통과
 
-### Phase 3 — API 라우트 (app/api) 🟡 진행 중
+### Phase 3 — API 라우트 (app/api) ✅ 완료
 모든 write는 `$transaction` + `withAudit` + `getActorContext` 필수.
 개발 규칙: [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) 준수.
 레퍼런스 구현: `app/api/work-items/*`.
 
-- [ ] `team-members` — GET(list) / POST / PATCH / DELETE(soft)
-- [x] **`work-items` (레퍼런스 구현 완료)**
-  - [x] GET(list): `?status&assigneeId&category&priority&ticket&cursor&pageSize`, `deletedAt IS NULL`, assignee include
-  - [x] POST (zod 검증 + CREATE 감사 로그)
-  - [x] GET(:id): 상세 + tickets/assignee include
-  - [x] PATCH(:id): If-Match 필수, 부분 업데이트
-  - [x] DELETE(:id): If-Match 필수, soft delete
-- [x] **`work-items/:id/tickets` (레퍼런스 구현 완료)**
-  - [x] GET(list) / POST
-  - [x] PATCH(:ticketId) / DELETE(:ticketId) (If-Match 필수)
-- [ ] `calendar-events` — GET(range) / POST / PATCH(:id) / DELETE(:id)
-- [ ] `audit-logs` — GET `?entityType&entityId&cursor` (읽기 전용)
+- [x] **`work-items`**
+  - [x] GET(list): `?status&assigneeId&category&priority&ticket&cursor&pageSize`
+  - [x] POST / GET(:id) / PATCH(:id, If-Match) / DELETE(:id, soft)
+- [x] **`work-items/:id/tickets`**
+  - [x] GET / POST / PATCH(:ticketId) / DELETE(:ticketId)
+- [x] **`team-members`**
+  - [x] GET(list): `?role&cursor&pageSize`
+  - [x] POST / GET(:id) / PATCH(:id, If-Match) / DELETE(:id, soft)
+- [x] **`calendar-events`**
+  - [x] GET(range): `?from&to&memberId` (반열림 [from, to) overlap, 페이지네이션 없음)
+  - [x] POST / GET(:id) / PATCH(:id, If-Match) / DELETE(:id, soft)
+- [x] **`audit-logs`** (읽기 전용)
+  - [x] GET: `?entityType&entityId&action&actorName&cursor&pageSize`
 
 ### Phase 4 — UI (MVP)
 - [ ] 액터 이름 강제 모달 (localStorage 미설정 시 차단) + fetch interceptor가 `x-actor-name` 자동 주입
