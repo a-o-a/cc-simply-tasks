@@ -124,11 +124,23 @@
   - [x] `components/theme-provider.tsx` (next-themes), `components/theme-toggle.tsx`
   - [x] `components/ui/button.tsx` (shadcn 표준 5 variant + 4 size)
   - [x] 임시 홈 페이지로 smoke test (버튼 + 상태 칩 + 다크 토글)
-- [ ] **Step 2 — 레이아웃 + 네비게이션 + 액터 이름 강제 모달**
-  - [ ] 사이드바 네비게이션 (홈 / 작업 / 캘린더 / 멤버)
-  - [ ] localStorage 액터 이름 강제 입력 모달
-  - [ ] `lib/client/api.ts` fetch wrapper (`x-actor-name` 자동, `If-Match` 처리, 에러 토스트)
-- [ ] **Step 3 — 멤버 관리 페이지** (가장 단순, 패턴 검증)
+- [x] **Step 2 — 레이아웃 + 네비게이션 + 액터 이름 강제 모달**
+  - [x] `lib/client/api.ts` fetch wrapper (`x-actor-name` 자동, `If-Match` 처리, 표준 에러 → `ApiError`)
+  - [x] `lib/client/use-toast.ts` + `components/toaster.tsx` (모듈 스코프 store + Radix toast)
+  - [x] shadcn 프리미티브: `input`, `label`, `dialog`, `toast`
+  - [x] `components/actor-name-gate.tsx` — localStorage 비어있으면 모달 강제, ESC/바깥 클릭 차단
+  - [x] `components/sidebar.tsx` — 240/64 collapsible, 라우트 활성 매칭, 액터 이름 표시/변경, 다크 토글
+  - [x] `components/app-shell.tsx` — RootLayout(서버 컴포넌트)에서 children을 받아 사이드바/게이트/토스터로 감쌈
+  - [x] 스텁 페이지: `/work-items`, `/calendar`, `/members`
+  - [x] `tsc --noEmit` / `next build` 통과
+- [x] **Step 3 — 멤버 관리 페이지** (가장 단순, 패턴 검증)
+  - [x] `lib/enum-labels.ts` — enum 값 → 한글 라벨 매핑 (소스 오브 트루스는 `lib/enums.ts`)
+  - [x] `components/ui/select.tsx` — 네이티브 `<select>` 기반 (Radix Select 도입은 필요할 때 교체)
+  - [x] `app/members/members-client.tsx` — 목록 fetch / 빈상태 / 스켈레톤 / 에러
+  - [x] 생성 + 수정 다이얼로그 (`MemberFormDialog`) — `If-Match: updatedAt` 자동 처리, 토스트 피드백
+  - [x] 삭제 확인 다이얼로그 (`DeleteMemberDialog`) — soft delete + If-Match
+  - [x] 낙관적 락 충돌(409) 처리 패턴: 토스트 + 자동 재로드
+  - [x] `tsc --noEmit` / `next build` 통과 (members 페이지 5.7kB)
 - [ ] **Step 4 — 작업 목록 (테이블 + 칸반 토글) + 필터 + 드로어 + 활동 탭**
 - [ ] **Step 5 — Gantt 뷰** (담당자 그룹 + Unassigned)
 - [ ] **Step 6 — 캘린더 뷰** (월/주, all-day 규칙 반영)

@@ -34,6 +34,9 @@
 │   ├── layout.tsx
 │   ├── page.tsx
 │   ├── globals.css
+│   ├── work-items/page.tsx     # 작업 목록 (Phase 4 Step 4)
+│   ├── calendar/page.tsx       # 캘린더 (Phase 4 Step 6)
+│   ├── members/page.tsx        # 멤버 관리 (Phase 4 Step 3)
 │   └── api/
 │       ├── work-items/         # 레퍼런스 구현
 │       │   ├── route.ts        # GET(list), POST
@@ -50,7 +53,17 @@
 │       │   └── [id]/route.ts   # GET, PATCH, DELETE
 │       └── audit-logs/
 │           └── route.ts        # GET(read-only)
+├── components/
+│   ├── app-shell.tsx      # 사이드바 + 게이트 + 토스터 셸
+│   ├── sidebar.tsx        # 좌측 네비게이션 (240/64 collapsible)
+│   ├── actor-name-gate.tsx # 액터 이름 강제 모달
+│   ├── toaster.tsx
+│   ├── theme-provider.tsx / theme-toggle.tsx
+│   └── ui/                # shadcn 프리미티브 (button/input/label/dialog/toast)
 ├── lib/
+│   ├── client/
+│   │   ├── api.ts         # fetch wrapper (x-actor-name 자동, If-Match)
+│   │   └── use-toast.ts   # 모듈 스코프 토스트 store
 │   ├── db.ts              # Prisma 싱글톤 + SQLite PRAGMA
 │   ├── enums.ts           # enum 소스 오브 트루스
 │   ├── time.ts            # KST/UTC 변환
@@ -112,9 +125,27 @@ npm run dev
 | **1** | Prisma 스키마 확정 (도메인 모델 + enum + 인덱스) | ✅ 완료 |
 | **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ✅ 완료 |
 | **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ✅ 완료 |
-| **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | 🟡 진행 중 (Step 1 디자인 시스템 부트스트랩 완료) |
+| **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | 🟡 진행 중 (Step 3 멤버 관리 페이지 완료 — 패턴 검증) |
 | **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |
+
+### Phase 4 Step 3 완료 내역
+- `lib/enum-labels.ts` — enum 값 → 한글 라벨 매핑 (`lib/enums.ts`가 값/타입 소스 오브 트루스, 이 파일은 표시 전용)
+- `components/ui/select.tsx` — 네이티브 `<select>` 기반 (Radix Select는 필요할 때 교체)
+- `app/members/members-client.tsx` — 멤버 목록/생성/수정/삭제, 스켈레톤/빈상태/에러 상태 일체
+- 생성 + 수정 다이얼로그 통합 (mode 분기), `If-Match: updatedAt` 낙관적 락 자동 처리
+- 낙관적 락 충돌(409) 처리: "다른 사용자가 먼저 수정했습니다" 토스트 + 자동 재로드
+- 이 페이지의 패턴(목록 → 다이얼로그 → 토스트 → 재로드)은 다음 단계의 작업/캘린더에서 그대로 답습
+
+### Phase 4 Step 2 완료 내역
+- `lib/client/api.ts` — fetch wrapper. `x-actor-name`을 localStorage에서 자동 주입, PATCH/DELETE의 `If-Match` 헤더 처리, 표준 에러 응답을 `ApiError`로 매핑
+- `lib/client/use-toast.ts` + `components/toaster.tsx` — 모듈 스코프 store 기반 토스트 (어디서든 `toast(...)` 호출 가능)
+- shadcn 프리미티브 추가: `input`, `label`, `dialog`, `toast`
+- `components/actor-name-gate.tsx` — localStorage에 actor name이 없으면 ESC/바깥 클릭이 차단된 모달로 입력 강제
+- `components/sidebar.tsx` — 240/64px collapsible, 라우트 활성 매칭, 액터 이름 표시 + 변경, 다크 토글, collapsed 상태도 localStorage에 저장
+- `components/app-shell.tsx` — `RootLayout`(서버 컴포넌트)에서 children을 받아 사이드바 + 게이트 + 토스터를 한 번에 감싸는 클라이언트 셸
+- 스텁 페이지: `/work-items`, `/calendar`, `/members` (Step 3+에서 채워짐)
+- `tsc --noEmit` / `next build` 통과
 
 ### Phase 0 완료 내역
 - Node 16 런타임 선언 (`.nvmrc`, `engines`)
