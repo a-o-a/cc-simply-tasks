@@ -1,15 +1,106 @@
-:root {
-  color-scheme: light;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * 디자인 토큰 — CSS 변수.
+ *
+ * 뉴트럴: zinc 계열 (HSL 값은 Tailwind zinc 팔레트 기준)
+ * 강조:   blue-600
+ * radius: 6px
+ *
+ * 라이트/다크 모두 동일한 토큰 이름 → 컴포넌트는 모드 신경 안 써도 됨.
+ */
+@layer base {
+  :root {
+    /* zinc 기반 라이트 */
+    --background: 0 0% 100%;            /* white */
+    --foreground: 240 10% 3.9%;         /* zinc-950 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    /* primary = blue-600 */
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 4.8% 95.9%;        /* zinc-100 */
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%; /* zinc-500 */
+
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;       /* red-500 */
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;             /* zinc-200 */
+    --input: 240 5.9% 90%;
+    --ring: 221 83% 53%;                /* blue-600 (focus ring) */
+
+    --radius: 0.5rem;
+
+    /* status semantic */
+    --status-draft: 240 3.8% 46.1%;        /* zinc-500 */
+    --status-in-progress: 221 83% 53%;     /* blue-600 */
+    --status-ready: 38 92% 50%;            /* amber-500 */
+    --status-transferred: 142 71% 45%;     /* emerald-500 */
+    --status-canceled: 0 72% 51%;          /* rose-600 */
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;         /* zinc-950 */
+    --foreground: 0 0% 98%;             /* zinc-50 */
+
+    --card: 240 10% 5.9%;               /* slightly lifted */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 5.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 217 91% 60%;             /* blue-500 */
+    --primary-foreground: 240 10% 3.9%;
+
+    --secondary: 240 3.7% 15.9%;        /* zinc-800 */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;   /* zinc-400 */
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 50.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;           /* zinc-800 */
+    --input: 240 3.7% 15.9%;
+    --ring: 217 91% 60%;
+
+    /* status semantic — 다크에서도 같은 hue 살짝 밝게 */
+    --status-draft: 240 5% 64.9%;
+    --status-in-progress: 217 91% 60%;
+    --status-ready: 38 92% 55%;
+    --status-transferred: 142 71% 50%;
+    --status-canceled: 0 72% 56%;
+  }
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  background: #ffffff;
-  color: #18181b;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    @apply bg-background text-foreground;
+  }
+  body {
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+  }
 }

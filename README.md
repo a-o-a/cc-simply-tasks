@@ -22,7 +22,9 @@
 | DB (1차) | SQLite (file) | WAL + busy_timeout PRAGMA |
 | DB (이후) | Postgres | `DATABASE_URL` 교체 가능하게 raw SQL 금지 |
 | 검증 | zod 3.23 | |
-| UI (예정) | Tailwind + shadcn/ui | Phase 4 |
+| UI | Tailwind 3.4 + shadcn/ui (Radix) | zinc 뉴트럴 + blue-600 강조, 다크모드 |
+| 테마 | next-themes 0.2 | system / light / dark |
+| 아이콘 | lucide-react | |
 
 ## 디렉터리 구조 (현재)
 
@@ -110,7 +112,7 @@ npm run dev
 | **1** | Prisma 스키마 확정 (도메인 모델 + enum + 인덱스) | ✅ 완료 |
 | **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ✅ 완료 |
 | **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ✅ 완료 |
-| **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | ⏳ 대기 |
+| **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | 🟡 진행 중 (Step 1 디자인 시스템 부트스트랩 완료) |
 | **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |
 

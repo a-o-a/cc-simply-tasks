@@ -113,15 +113,27 @@
 - [x] **`audit-logs`** (읽기 전용)
   - [x] GET: `?entityType&entityId&action&actorName&cursor&pageSize`
 
-### Phase 4 — UI (MVP)
-- [ ] 액터 이름 강제 모달 (localStorage 미설정 시 차단) + fetch interceptor가 `x-actor-name` 자동 주입
-- [ ] 레이아웃 + 네비게이션 (홈 / 작업 / 캘린더 / 멤버)
-- [ ] 작업 목록 (필터: 상태/담당자/티켓번호 검색, 페이지네이션)
-- [ ] 작업 드로어: 기본 정보 / 티켓 / **활동(감사 로그) 탭**
-- [ ] Gantt 뷰: 담당자 그룹 + **Unassigned 그룹** 포함
-- [ ] 캘린더 뷰 (월/주), all-day 구간 규칙 반영
-- [ ] 멤버 관리 페이지
-- [ ] 공통: 빈 상태 / 로딩 스켈레톤 / 에러 토스트 / 낙관적 락 충돌 토스트
+### Phase 4 — UI (MVP) 🟡 진행 중
+디자인 결정: shadcn/ui + Tailwind, zinc 뉴트럴 + blue-600 강조, **다크모드 1차 포함**, WorkItem 목록은 **칸반/테이블 토글**.
+
+- [x] **Step 1 — 디자인 시스템 부트스트랩**
+  - [x] Tailwind 3.4 + PostCSS + shadcn 의존성 설치 (Node 16 호환 버전 핀)
+  - [x] `tailwind.config.ts` 디자인 토큰 (zinc + blue, status semantic)
+  - [x] `app/globals.css` CSS 변수 (라이트/다크 모두)
+  - [x] `lib/utils.ts` cn 헬퍼
+  - [x] `components/theme-provider.tsx` (next-themes), `components/theme-toggle.tsx`
+  - [x] `components/ui/button.tsx` (shadcn 표준 5 variant + 4 size)
+  - [x] 임시 홈 페이지로 smoke test (버튼 + 상태 칩 + 다크 토글)
+- [ ] **Step 2 — 레이아웃 + 네비게이션 + 액터 이름 강제 모달**
+  - [ ] 사이드바 네비게이션 (홈 / 작업 / 캘린더 / 멤버)
+  - [ ] localStorage 액터 이름 강제 입력 모달
+  - [ ] `lib/client/api.ts` fetch wrapper (`x-actor-name` 자동, `If-Match` 처리, 에러 토스트)
+- [ ] **Step 3 — 멤버 관리 페이지** (가장 단순, 패턴 검증)
+- [ ] **Step 4 — 작업 목록 (테이블 + 칸반 토글) + 필터 + 드로어 + 활동 탭**
+- [ ] **Step 5 — Gantt 뷰** (담당자 그룹 + Unassigned)
+- [ ] **Step 6 — 캘린더 뷰** (월/주, all-day 규칙 반영)
+- [ ] **Step 7 — 홈 대시보드** (상태별 카운트, 오늘 이관 예정)
+- [ ] **공통**: 빈 상태 / 스켈레톤 로딩 / 에러 토스트 / 낙관적 락 충돌 토스트
 
 ### Phase 5 — 폴리싱 (2차, 선택)
 - [ ] 대시보드 (상태별 카운트, 오늘 이관 예정)
