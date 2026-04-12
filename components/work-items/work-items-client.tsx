@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { LayoutGrid, ListChecks, Plus, Table as TableIcon } from "lucide-react";
+import {
+  GanttChartSquare,
+  LayoutGrid,
+  ListChecks,
+  Plus,
+  Table as TableIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +34,7 @@ import {
   STATUS_LABELS,
 } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
+import { GanttView } from "./gantt-view";
 import { KanbanView } from "./kanban-view";
 import { TableView } from "./table-view";
 import { WorkItemDrawer } from "./work-item-drawer";
@@ -45,7 +52,7 @@ import { WorkItemFormDialog } from "./work-item-form-dialog";
  * 1차 범위는 첫 페이지(50건)만 보여준다. 페이지네이션 next는 후속 단계에서.
  */
 
-type ViewMode = "table" | "kanban";
+type ViewMode = "table" | "kanban" | "gantt";
 const VIEW_KEY = "cc-simply-tasks:work-items-view";
 
 interface Filters {
@@ -79,7 +86,9 @@ export function WorkItemsClient() {
   // 보기 모드 복원
   React.useEffect(() => {
     const saved = window.localStorage.getItem(VIEW_KEY);
-    if (saved === "kanban" || saved === "table") setView(saved);
+    if (saved === "kanban" || saved === "table" || saved === "gantt") {
+      setView(saved);
+    }
   }, []);
 
   function changeView(next: ViewMode) {
@@ -192,8 +201,10 @@ export function WorkItemsClient() {
           <EmptyState onCreate={openCreate} />
         ) : view === "table" ? (
           <TableView items={items} onOpen={openDrawer} />
-        ) : (
+        ) : view === "kanban" ? (
           <KanbanView items={items} onOpen={openDrawer} />
+        ) : (
+          <GanttView items={items} onOpen={openDrawer} />
         )}
       </section>
 
@@ -244,6 +255,13 @@ function ViewToggle({
         label="칸반"
       >
         <LayoutGrid className="h-4 w-4" />
+      </ToggleButton>
+      <ToggleButton
+        active={value === "gantt"}
+        onClick={() => onChange("gantt")}
+        label="간트"
+      >
+        <GanttChartSquare className="h-4 w-4" />
       </ToggleButton>
     </div>
   );

@@ -113,7 +113,7 @@
 - [x] **`audit-logs`** (읽기 전용)
   - [x] GET: `?entityType&entityId&action&actorName&cursor&pageSize`
 
-### Phase 4 — UI (MVP) 🟡 진행 중
+### Phase 4 — UI (MVP) ✅ 완료
 디자인 결정: shadcn/ui + Tailwind, zinc 뉴트럴 + blue-600 강조, **다크모드 1차 포함**, WorkItem 목록은 **칸반/테이블 토글**.
 
 - [x] **Step 1 — 디자인 시스템 부트스트랩**
@@ -154,10 +154,25 @@
   - [x] `TableView` / `KanbanView` — 행/카드 클릭 → 드로어
   - [x] `WorkItemsClient` — 필터바 (status/assignee/category/priority/ticket), 보기 토글(localStorage), 빈상태/스켈레톤/에러
   - [x] `tsc --noEmit` / `next build` 통과 (work-items 페이지 13.7 kB)
-- [ ] **Step 5 — Gantt 뷰** (담당자 그룹 + Unassigned)
-- [ ] **Step 6 — 캘린더 뷰** (월/주, all-day 규칙 반영)
-- [ ] **Step 7 — 홈 대시보드** (상태별 카운트, 오늘 이관 예정)
-- [ ] **공통**: 빈 상태 / 스켈레톤 로딩 / 에러 토스트 / 낙관적 락 충돌 토스트
+- [x] **Step 5 — Gantt 뷰** (담당자 그룹 + Unassigned)
+  - [x] `components/work-items/gantt-view.tsx` — KST 자정 day 그리드, 1일 = 32px
+  - [x] 작업 페이지의 3번째 보기로 통합 (테이블 / 칸반 / 간트 토글)
+  - [x] 일정이 설정된 작업만 표시 (start/end가 둘 다 없으면 제외)
+  - [x] 미배정은 마지막 그룹, 주말 칼럼은 muted 배경
+  - [x] 드래그 reorder/리사이즈는 Phase 5+ 후속
+- [x] **Step 6 — 캘린더 뷰** (월/주, all-day 규칙 반영)
+  - [x] `lib/client/calendar.ts` — KST 월 그리드(6주 42칸), `eventDayKeys` (allDay 반열림 처리)
+  - [x] `components/calendar/calendar-client.tsx` — 월 보기, 이전/다음/오늘 네비
+  - [x] `components/calendar/event-form-dialog.tsx` — 생성/수정/삭제 통합, allDay 토글 + 시간 입력
+  - [x] 셀 호버 시 [+] 버튼, 이벤트 칩 클릭 → 수정 모달
+  - [x] 주/일 보기는 Phase 5+ 후속
+- [x] **Step 7 — 홈 대시보드** (상태별 카운트, 오늘 이관 예정)
+  - [x] `components/dashboard/dashboard-client.tsx`
+  - [x] 상태별 카운트 카드 5개 (status semantic 색상, 클릭 → 작업 페이지)
+  - [x] 오늘 이관 예정 작업 리스트 (TRANSFERRED/CANCELED 제외)
+  - [x] 최근 활동 (audit-logs 최근 10건)
+  - [x] 1차는 work items 첫 페이지(50건) 기반 카운트, 정확한 전체 카운트는 후속에서 dedicated count API로
+- [x] **공통**: 빈 상태 / 스켈레톤 로딩 / 에러 토스트 / 낙관적 락 충돌 토스트 (모든 페이지에 적용 완료)
 
 ### Phase 5 — 폴리싱 (2차, 선택)
 - [ ] 대시보드 (상태별 카운트, 오늘 이관 예정)

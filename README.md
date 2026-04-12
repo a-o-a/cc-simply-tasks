@@ -125,9 +125,26 @@ npm run dev
 | **1** | Prisma 스키마 확정 (도메인 모델 + enum + 인덱스) | ✅ 완료 |
 | **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ✅ 완료 |
 | **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ✅ 완료 |
-| **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | 🟡 진행 중 (Step 4 작업 목록 + 드로어 완료) |
+| **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더 + 대시보드) | ✅ 완료 |
 | **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |
+
+### Phase 4 Step 5–7 완료 내역
+- **Step 5 — Gantt 뷰** (`components/work-items/gantt-view.tsx`)
+  - KST 자정 day 그리드, 1일 = 32px, 작업 페이지의 3번째 보기로 통합 (테이블/칸반/간트)
+  - 담당자별 행 그룹 + 미배정 마지막, 주말 muted 배경, status semantic 색상 바
+  - 일정 없는 작업은 표시하지 않음 (테이블/칸반에서 확인)
+  - 드래그 reorder는 Phase 5+ 후속
+- **Step 6 — 캘린더 월 보기** (`components/calendar/`)
+  - `lib/client/calendar.ts` — KST 월 그리드(6주 42칸), `eventDayKeys` (allDay 반열림 처리)
+  - 이전/다음/오늘 네비, 셀 호버 [+] 버튼, 이벤트 칩 클릭 → 수정
+  - `EventFormDialog` — 생성/수정/삭제 통합, allDay 토글 시 시간/날짜 입력 전환
+  - 주/일 보기는 후속
+- **Step 7 — 홈 대시보드** (`components/dashboard/dashboard-client.tsx`)
+  - 상태별 카운트 카드 5개 (status semantic 색상, 클릭 → 작업 페이지)
+  - 오늘 이관 예정 작업 리스트 (TRANSFERRED/CANCELED 제외)
+  - 최근 활동 audit logs 10건
+  - 1차는 work items 첫 페이지(50건) 기반 카운트, 정확한 전체 카운트는 후속의 dedicated count API로
 
 ### Phase 4 Step 4 완료 내역
 - 프리미티브 추가: `textarea`, `badge`, `sheet`(우측 드로어), `tabs`
