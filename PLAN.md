@@ -173,9 +173,12 @@
   - [x] 최근 활동 (audit-logs 최근 10건)
   - [x] 1차는 work items 첫 페이지(50건) 기반 카운트, 정확한 전체 카운트는 후속에서 dedicated count API로
 - [x] **공통**: 빈 상태 / 스켈레톤 로딩 / 에러 토스트 / 낙관적 락 충돌 토스트 (모든 페이지에 적용 완료)
+- [x] **버그픽스**: `x-actor-name` 헤더에 한국어 이름 전송 시 `TypeError: String contains non ISO-8859-1 code point` 오류 수정
+  - 클라이언트(`lib/client/api.ts`): `encodeURIComponent(actorName)` 적용
+  - 서버(`lib/actor.ts`): `decodeURIComponent(rawName)` 적용
 
 ### Phase 5 — 폴리싱 (2차, 선택)
-- [ ] 대시보드 (상태별 카운트, 오늘 이관 예정)
+- [ ] 대시보드 전체 카운트용 dedicated count API (`/api/work-items/count`) — 현재는 첫 페이지 50건 기준
 - [ ] CSV export (`/api/work-items/export.csv`)
 - [ ] WorkItem priority별 색상/정렬
 - [ ] Audit log 보존 정책 (예: 1년 이후 archive)

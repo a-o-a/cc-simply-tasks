@@ -32,59 +32,81 @@
 .
 ├── app/
 │   ├── layout.tsx
-│   ├── page.tsx
+│   ├── page.tsx                 # 홈 대시보드
 │   ├── globals.css
-│   ├── work-items/page.tsx     # 작업 목록 (Phase 4 Step 4)
-│   ├── calendar/page.tsx       # 캘린더 (Phase 4 Step 6)
-│   ├── members/page.tsx        # 멤버 관리 (Phase 4 Step 3)
+│   ├── work-items/page.tsx      # 작업 목록 (테이블/칸반/간트 토글)
+│   ├── calendar/page.tsx        # 캘린더 (월 보기)
+│   ├── members/page.tsx         # 멤버 관리
 │   └── api/
-│       ├── work-items/         # 레퍼런스 구현
-│       │   ├── route.ts        # GET(list), POST
+│       ├── work-items/          # 레퍼런스 구현
+│       │   ├── route.ts         # GET(list+5필터), POST
 │       │   └── [id]/
-│       │       ├── route.ts    # GET, PATCH, DELETE
+│       │       ├── route.ts     # GET, PATCH(If-Match), DELETE(soft)
 │       │       └── tickets/
-│       │           ├── route.ts         # GET, POST
+│       │           ├── route.ts             # GET, POST
 │       │           └── [ticketId]/route.ts  # PATCH, DELETE
 │       ├── team-members/
-│       │   ├── route.ts        # GET(list), POST
-│       │   └── [id]/route.ts   # GET, PATCH, DELETE
+│       │   ├── route.ts         # GET(list), POST
+│       │   └── [id]/route.ts    # GET, PATCH, DELETE
 │       ├── calendar-events/
-│       │   ├── route.ts        # GET(range), POST
-│       │   └── [id]/route.ts   # GET, PATCH, DELETE
+│       │   ├── route.ts         # GET(range ?from&to), POST
+│       │   └── [id]/route.ts    # GET, PATCH, DELETE
 │       └── audit-logs/
-│           └── route.ts        # GET(read-only)
+│           └── route.ts         # GET(read-only, ?entityType&entityId 등)
 ├── components/
-│   ├── app-shell.tsx      # 사이드바 + 게이트 + 토스터 셸
-│   ├── sidebar.tsx        # 좌측 네비게이션 (240/64 collapsible)
-│   ├── actor-name-gate.tsx # 액터 이름 강제 모달
+│   ├── app-shell.tsx            # 사이드바 + 게이트 + 토스터 셸
+│   ├── sidebar.tsx              # 좌측 네비게이션 (240/64 collapsible)
+│   ├── actor-name-gate.tsx      # 액터 이름 강제 모달 (ESC/바깥 차단)
 │   ├── toaster.tsx
 │   ├── theme-provider.tsx / theme-toggle.tsx
-│   └── ui/                # shadcn 프리미티브 (button/input/label/dialog/toast)
+│   ├── ui/                      # shadcn 프리미티브
+│   │   ├── button.tsx / input.tsx / label.tsx / select.tsx / textarea.tsx
+│   │   ├── badge.tsx / dialog.tsx / sheet.tsx / tabs.tsx / toast.tsx
+│   ├── work-items/
+│   │   ├── work-items-client.tsx  # 필터바 + 보기 토글 진입점
+│   │   ├── table-view.tsx
+│   │   ├── kanban-view.tsx
+│   │   ├── gantt-view.tsx
+│   │   ├── work-item-drawer.tsx   # 우측 sheet (상세/티켓/활동 탭)
+│   │   ├── work-item-form-dialog.tsx
+│   │   └── status-badge.tsx
+│   ├── calendar/
+│   │   ├── calendar-client.tsx    # 월 보기 진입점
+│   │   └── event-form-dialog.tsx  # 생성/수정/삭제 통합
+│   ├── dashboard/
+│   │   └── dashboard-client.tsx   # 상태 카운트 + 오늘 이관 예정 + 최근 활동
+│   └── members/
+│       └── (members-client.tsx는 app/members/ 아래에 위치)
 ├── lib/
 │   ├── client/
-│   │   ├── api.ts         # fetch wrapper (x-actor-name 자동, If-Match)
-│   │   └── use-toast.ts   # 모듈 스코프 토스트 store
-│   ├── db.ts              # Prisma 싱글톤 + SQLite PRAGMA
-│   ├── enums.ts           # enum 소스 오브 트루스
-│   ├── time.ts            # KST/UTC 변환
-│   ├── actor.ts           # getActorContext
-│   ├── diff.ts            # before/after diff
-│   ├── audit.ts           # withAudit (TransactionClient 강제)
-│   ├── http.ts            # 표준 에러 응답 + withErrorHandler
-│   ├── pagination.ts      # cursor 기반
-│   ├── optimisticLock.ts  # If-Match 검사
-│   └── validation/        # zod 스키마
+│   │   ├── api.ts               # fetch wrapper (x-actor-name encodeURIComponent, If-Match)
+│   │   ├── use-toast.ts         # 모듈 스코프 토스트 store
+│   │   ├── types.ts             # 클라이언트용 도메인 타입 (Prisma import 금지)
+│   │   ├── format.ts            # KST 날짜/시간 포맷 + date input ↔ ISO 변환
+│   │   └── calendar.ts          # KST 월 그리드, eventDayKeys, weekdayLabel
+│   ├── db.ts                    # Prisma 싱글톤 + SQLite PRAGMA
+│   ├── enums.ts                 # enum 소스 오브 트루스 + union 타입
+│   ├── enum-labels.ts           # enum → 한글 라벨 (표시 전용)
+│   ├── time.ts                  # KST/UTC 변환, all-day 반열림 정규화
+│   ├── actor.ts                 # getActorContext (x-actor-name decodeURIComponent)
+│   ├── diff.ts                  # before/after 변경 필드 추출
+│   ├── audit.ts                 # withAudit (Prisma.TransactionClient 강제)
+│   ├── http.ts                  # 표준 에러 응답 + withErrorHandler
+│   ├── pagination.ts            # cursor 기반 (기본 50, 최대 200)
+│   ├── optimisticLock.ts        # If-Match 낙관적 락
+│   ├── utils.ts                 # cn (clsx + tailwind-merge)
+│   └── validation/              # zod 스키마 (common/teamMember/workItem/workTicket/calendarEvent)
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/
 ├── docs/
-│   └── DEVELOPMENT.md     # 개발 가이드 (API 패턴, 컨벤션)
-├── .nvmrc                 # node 16
+│   └── DEVELOPMENT.md           # 개발 가이드 (API 패턴, 컨벤션)
+├── .nvmrc                       # node 16
 ├── .env.example
 ├── package.json
 ├── tsconfig.json
 ├── next.config.js
-├── PLAN.md                # 전체 실행 계획
+├── PLAN.md                      # 전체 실행 계획 + 완료 체크
 └── README.md
 ```
 
@@ -128,6 +150,48 @@ npm run dev
 | **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더 + 대시보드) | ✅ 완료 |
 | **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |
+
+---
+
+## 핸드오프 메모 (다음 에이전트용)
+
+### 현재 상태 (2026-04-12)
+
+Phase 0–4 전체 완료. 앱이 정상 동작하며 `next build` / `tsc --noEmit` 모두 통과.
+
+```
+git log --oneline
+452d7c9 fix: encode x-actor-name header for non-latin1 (Korean) characters
+002258e feat: phase 4 step 5-7 — gantt, calendar month view, dashboard
+0b26d6c feat: phase 4 step 4 — work items list, drawer, tickets, activity
+21b51a3 feat: phase 4 step 2-3 — app shell, actor gate, members CRUD
+acbe675 feat: phase 4 step 1 — design system bootstrap (tailwind + shadcn)
+85dff4b feat: phase 3 complete — team-members, calendar-events, audit-logs APIs
+```
+
+### 알아야 할 결정사항
+
+| 사항 | 내용 |
+|---|---|
+| Node 버전 | **16 고정** (사내 제약). 로컬에서 Node 23 사용해도 동작하나 프로덕션은 16. |
+| enum 컬럼 | SQLite 미지원 → String 저장. `lib/enums.ts`가 유일한 소스 오브 트루스. |
+| 한글 헤더 인코딩 | `x-actor-name`은 `encodeURIComponent` (클라이언트) / `decodeURIComponent` (서버) 처리됨. |
+| 작업 목록 | 테이블 / 칸반 / 간트 3가지 보기 모두 유지. 한 쪽만 줄이는 방향은 먼저 꺼내지 말 것. |
+| 날짜/시간 | 저장: UTC ISO. 표시: KST. all-day 이벤트는 반열림 `[start, end)` 구간. |
+| 낙관적 락 | PATCH/DELETE 전에 If-Match 헤더 필수 (이전 GET의 `updatedAt`). 409 충돌 시 "다른 사용자가 먼저 수정했습니다" 토스트 + 자동 재로드. |
+| 감사 로그 | 모든 write는 `$transaction` + `withAudit(tx, ...)` 패턴 필수. `tx`가 `Prisma.TransactionClient`임을 타입으로 강제. |
+| 대시보드 카운트 | 현재는 work-items 첫 페이지(50건) 기준. 전체 카운트는 Phase 5에서 `/api/work-items/count` 별도 API 추가 예정. |
+
+### 남은 작업 (Phase 5–6, 선택)
+
+- `[ ]` 대시보드 전체 카운트용 dedicated count API
+- `[ ]` CSV export (`/api/work-items/export.csv`)
+- `[ ]` Gantt 드래그 reorder / 바 리사이즈
+- `[ ]` 캘린더 주/일 보기
+- `[ ]` Audit log 보존 정책 / archive
+- `[ ]` Postgres 이관 런북 (DATABASE_URL 교체 → `prisma migrate` → seed)
+
+---
 
 ### Phase 4 Step 5–7 완료 내역
 - **Step 5 — Gantt 뷰** (`components/work-items/gantt-view.tsx`)
