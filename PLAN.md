@@ -141,7 +141,19 @@
   - [x] 삭제 확인 다이얼로그 (`DeleteMemberDialog`) — soft delete + If-Match
   - [x] 낙관적 락 충돌(409) 처리 패턴: 토스트 + 자동 재로드
   - [x] `tsc --noEmit` / `next build` 통과 (members 페이지 5.7kB)
-- [ ] **Step 4 — 작업 목록 (테이블 + 칸반 토글) + 필터 + 드로어 + 활동 탭**
+- [x] **Step 4 — 작업 목록 (테이블 + 칸반 토글) + 필터 + 드로어 + 활동 탭**
+  - [x] 프리미티브: `textarea`, `badge`, `sheet`(우측 드로어), `tabs`
+  - [x] `lib/client/types.ts` — 도메인 타입 (Prisma client 직접 import 금지)
+  - [x] `lib/client/format.ts` — KST 일/시 포맷 + `<input type=date>` ↔ ISO 변환
+  - [x] `components/work-items/status-badge.tsx` — globals.css의 status semantic 변수 사용
+  - [x] `WorkItemFormDialog` — 생성/수정 통합, KST 자정 → UTC ISO 직렬화
+  - [x] `WorkItemDrawer` — 우측 sheet, 탭 (상세 / 티켓 / 활동)
+    - 상세: 메타데이터 + 설명
+    - 티켓: list/add/delete (CONFLICT는 "이미 등록된 티켓" 토스트로 매핑)
+    - 활동: `/api/audit-logs?entityType=WorkItem&entityId=...` 타임라인
+  - [x] `TableView` / `KanbanView` — 행/카드 클릭 → 드로어
+  - [x] `WorkItemsClient` — 필터바 (status/assignee/category/priority/ticket), 보기 토글(localStorage), 빈상태/스켈레톤/에러
+  - [x] `tsc --noEmit` / `next build` 통과 (work-items 페이지 13.7 kB)
 - [ ] **Step 5 — Gantt 뷰** (담당자 그룹 + Unassigned)
 - [ ] **Step 6 — 캘린더 뷰** (월/주, all-day 규칙 반영)
 - [ ] **Step 7 — 홈 대시보드** (상태별 카운트, 오늘 이관 예정)

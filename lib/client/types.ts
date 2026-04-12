@@ -1,0 +1,72 @@
+/**
+ * 클라이언트에서 공유하는 도메인 타입.
+ *
+ * Prisma client의 타입을 그대로 import하면 서버 코드가 클라이언트 번들로
+ * 끌려올 수 있어, 화면에서 다루는 모양만 손으로 정의한다. (1차 범위 한정)
+ */
+
+import type {
+  Category,
+  MemberRole,
+  Priority,
+  Status,
+  AuditAction,
+  AuditEntityType,
+} from "@/lib/enums";
+
+export type Member = {
+  id: string;
+  name: string;
+  role: MemberRole;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkTicket = {
+  id: string;
+  workItemId: string;
+  systemName: string;
+  ticketNumber: string;
+  ticketUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** 목록 응답에 들어 있는 work item (assignee include). */
+export type WorkItemListItem = {
+  id: string;
+  title: string;
+  description: string | null;
+  category: Category;
+  status: Status;
+  priority: Priority;
+  order: number;
+  assigneeId: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  transferDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  assignee: Member | null;
+};
+
+/** 상세 응답: 위에 tickets 추가. */
+export type WorkItemDetail = WorkItemListItem & {
+  tickets: WorkTicket[];
+};
+
+export type AuditLog = {
+  id: string;
+  entityType: AuditEntityType;
+  entityId: string;
+  action: AuditAction;
+  beforeJson: string | null;
+  afterJson: string | null;
+  actorType: string;
+  actorName: string | null;
+  actorIp: string | null;
+  userAgent: string | null;
+  createdAt: string;
+};
+
+export type ListResponse<T> = { items: T[]; nextCursor: string | null };

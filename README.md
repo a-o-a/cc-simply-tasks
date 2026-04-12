@@ -125,9 +125,22 @@ npm run dev
 | **1** | Prisma 스키마 확정 (도메인 모델 + enum + 인덱스) | ✅ 완료 |
 | **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ✅ 완료 |
 | **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ✅ 완료 |
-| **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | 🟡 진행 중 (Step 3 멤버 관리 페이지 완료 — 패턴 검증) |
+| **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더) | 🟡 진행 중 (Step 4 작업 목록 + 드로어 완료) |
 | **5** | 폴리싱 (대시보드, CSV export 등 선택) | ⏳ 대기 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |
+
+### Phase 4 Step 4 완료 내역
+- 프리미티브 추가: `textarea`, `badge`, `sheet`(우측 드로어), `tabs`
+- `lib/client/types.ts` — 도메인 타입 (Prisma client를 클라이언트 번들로 끌어오지 않기 위해 별도 정의)
+- `lib/client/format.ts` — KST 기준 일/시 포맷 + `<input type="date">` ↔ UTC ISO 변환 (KST 자정 보존)
+- `components/work-items/status-badge.tsx` — `globals.css`의 status semantic CSS 변수를 그대로 사용
+- `WorkItemFormDialog` — 생성/수정 통합, 5개 메타데이터(상태/우선순위/분류/담당자/기간/이관일/설명)
+- `WorkItemDrawer` — 우측 sheet + Radix Tabs (상세 / 티켓 / 활동)
+  - 티켓 탭: list/add/delete, P2002 → "이미 등록된 티켓" 토스트
+  - 활동 탭: `/api/audit-logs?entityType=WorkItem&entityId=…` 타임라인
+- `TableView` (행 클릭) / `KanbanView` (상태별 컬럼) — 보기 토글은 localStorage에 저장
+- `WorkItemsClient` — 필터바(상태/담당자/분류/우선순위/티켓), 빈상태/스켈레톤/에러 일체
+- 1차 범위에서는 첫 페이지(50건)만 표시. nextCursor 페이지 이동/드래그 reorder는 후속
 
 ### Phase 4 Step 3 완료 내역
 - `lib/enum-labels.ts` — enum 값 → 한글 라벨 매핑 (`lib/enums.ts`가 값/타입 소스 오브 트루스, 이 파일은 표시 전용)
