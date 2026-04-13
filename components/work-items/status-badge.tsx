@@ -9,11 +9,14 @@ import { cn } from "@/lib/utils";
  */
 
 const STATUS_VAR: Record<Status, string> = {
-  DRAFT: "--status-draft",
+  WAITING: "--status-waiting",
   IN_PROGRESS: "--status-in-progress",
-  READY_TO_TRANSFER: "--status-ready",
+  INTERNAL_TEST: "--status-internal-test",
+  BUSINESS_TEST: "--status-business-test",
+  QA_TEST: "--status-qa-test",
+  TRANSFER_READY: "--status-transfer-ready",
   TRANSFERRED: "--status-transferred",
-  CANCELED: "--status-canceled",
+  HOLDING: "--status-holding",
 };
 
 export function StatusBadge({

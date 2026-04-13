@@ -15,7 +15,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError, api } from "@/lib/client/api";
 import { toast } from "@/lib/client/use-toast";
-import type { AppSettings, WorkSystem } from "@/lib/client/types";
+import type { AppSettings, WorkCategory, WorkSystem } from "@/lib/client/types";
 import { DEFAULT_SERVICE_NAME, SERVICE_NAME_STORAGE_KEY } from "@/lib/client/api";
 import { MembersClient } from "@/app/members/members-client";
 
@@ -31,7 +31,8 @@ export function SettingsClient() {
         <TabsList>
           <TabsTrigger value="service">서비스</TabsTrigger>
           <TabsTrigger value="members">멤버</TabsTrigger>
-          <TabsTrigger value="codes">코드 관리</TabsTrigger>
+          <TabsTrigger value="categories">분류 관리</TabsTrigger>
+          <TabsTrigger value="codes">시스템 코드</TabsTrigger>
           <TabsTrigger value="backup">백업</TabsTrigger>
         </TabsList>
 
@@ -40,6 +41,9 @@ export function SettingsClient() {
         </TabsContent>
         <TabsContent value="members" className="mt-6">
           <MembersClient />
+        </TabsContent>
+        <TabsContent value="categories" className="mt-6">
+          <CategoriesTab />
         </TabsContent>
         <TabsContent value="codes" className="mt-6">
           <CodesTab />
@@ -133,7 +137,212 @@ function BackupTab() {
   );
 }
 
-/* ───────────────────────────── 코드 관리 탭 ───────────────────────────── */
+/* ───────────────────────────── 분류 관리 탭 ───────────────────────────── */
+
+type WorkCategoryDialogState =
+  | { mode: "closed" }
+  | { mode: "create" }
+  | { mode: "edit"; item: WorkCategory };
+
+function CategoriesTab() {
+  const [items, setItems] = React.useState<WorkCategory[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [dialog, setDialog] = React.useState<WorkCategoryDialogState>({ mode: "closed" });
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.get<{ items: WorkCategory[] }>("/api/work-categories");
+      setItems(data.items);
+    } catch {
+      toast({ title: "분류 목록 조회 실패", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => { void load(); }, [load]);
+
+  async function handleDelete(item: WorkCategory) {
+    if (!confirm(`"${item.name}" 분류를 삭제할까요?`)) return;
+    try {
+      await api.delete(`/api/work-categories/${item.id}`, item.updatedAt);
+      toast({ title: "삭제되었습니다" });
+      void load();
+    } catch (err) {
+      toast({
+        title: "삭제 실패",
+        description: err instanceof ApiError ? err.message : undefined,
+        variant: "destructive",
+      });
+    }
+  }
+
+  return (
+    <div className="max-w-xl">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold">작업 분류 코드</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            작업을 등록할 때 선택 가능한 분류 목록입니다. (예: feature → 기능개발)
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
+          <Plus className="mr-2 h-4 w-4" />
+          추가
+        </Button>
+      </div>
+
+      <div className="rounded-lg border bg-card">
+        {loading ? (
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            등록된 분류가 없습니다. 추가 버튼을 눌러 시작하세요.
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="border-b text-left text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">코드</th>
+                <th className="px-4 py-3 font-medium">이름</th>
+                <th className="px-4 py-3 font-medium w-20" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b last:border-0 hover:bg-accent/30">
+                  <td className="px-4 py-3 font-mono text-xs">{item.code}</td>
+                  <td className="px-4 py-3">{item.name}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => setDialog({ mode: "edit", item })}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(item)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <WorkCategoryDialog
+        state={dialog}
+        onClose={() => setDialog({ mode: "closed" })}
+        onSaved={() => { setDialog({ mode: "closed" }); void load(); }}
+      />
+    </div>
+  );
+}
+
+function WorkCategoryDialog({
+  state,
+  onClose,
+  onSaved,
+}: {
+  state: WorkCategoryDialogState;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isOpen = state.mode !== "closed";
+  const editing = state.mode === "edit" ? state.item : null;
+
+  const [code, setCode] = React.useState("");
+  const [name, setName] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    if (state.mode === "edit") {
+      setCode(state.item.code);
+      setName(state.item.name);
+    } else if (state.mode === "create") {
+      setCode("");
+      setName("");
+    }
+  }, [state]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (editing) {
+        await api.patch(`/api/work-categories/${editing.id}`, { name }, editing.updatedAt);
+        toast({ title: "수정되었습니다" });
+      } else {
+        await api.post("/api/work-categories", { code, name });
+        toast({ title: "추가되었습니다" });
+      }
+      onSaved();
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "저장 실패";
+      toast({ title: "저장 실패", description: message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{editing ? "분류 수정" : "분류 추가"}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="wc-code">코드</Label>
+            <Input
+              id="wc-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="feature"
+              maxLength={100}
+              disabled={!!editing}
+            />
+            <p className="text-xs text-muted-foreground">영문, 숫자, 하이픈, 언더스코어만 허용. 한 번 등록하면 변경 불가.</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="wc-name">이름</Label>
+            <Input
+              id="wc-name"
+              autoFocus={!!editing}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="기능개발"
+              maxLength={100}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>취소</Button>
+            <Button type="submit" disabled={submitting || !code.trim() || !name.trim()}>
+              {submitting ? "저장 중…" : "저장"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ───────────────────────────── 시스템 코드 탭 ───────────────────────────── */
 
 type WorkSystemDialogState =
   | { mode: "closed" }

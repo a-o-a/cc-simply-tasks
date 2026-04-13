@@ -16,6 +16,7 @@ import type {
   CalendarEvent,
   ListResponse,
   Member,
+  WorkCategory,
   WorkItemListItem,
 } from "@/lib/client/types";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ export function DashboardClient() {
 
   const [items, setItems] = React.useState<WorkItemListItem[] | null>(null);
   const [members, setMembers] = React.useState<Member[]>([]);
+  const [categories, setCategories] = React.useState<WorkCategory[]>([]);
   const [logs, setLogs] = React.useState<AuditLog[] | null>(null);
   const [calEvents, setCalEvents] = React.useState<CalendarEvent[] | null>(null);
 
@@ -85,12 +87,14 @@ export function DashboardClient() {
         },
       }),
       api.get<ListResponse<Member>>("/api/team-members"),
+      api.get<{ items: WorkCategory[] }>("/api/work-categories"),
     ])
-      .then(([itemsRes, logsRes, calRes, membersRes]) => {
+      .then(([itemsRes, logsRes, calRes, membersRes, catRes]) => {
         if (cancelled) return;
         setItems(itemsRes.items);
         setLogs(logsRes.items.slice(0, 10));
         setMembers(membersRes.items);
+        setCategories(catRes.items);
         // 종일 우선 → 카테고리 순 → 제목 asc
         const sorted = calRes.items.slice().sort((a, b) => {
           if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
@@ -123,7 +127,7 @@ export function DashboardClient() {
         const d = utcMsToKstDateString(new Date(item.transferDate).getTime());
         return d >= weekStart && d <= weekEnd
           && item.status !== "TRANSFERRED"
-          && item.status !== "CANCELED";
+          && item.status !== "HOLDING";
       })
       .sort((a, b) => {
         const ad = utcMsToKstDateString(new Date(a.transferDate!).getTime());
@@ -351,6 +355,7 @@ export function DashboardClient() {
         open={formOpen}
         editing={editing}
         members={members}
+        categories={categories}
         onClose={() => setFormOpen(false)}
         onSaved={() => {
           setFormOpen(false);

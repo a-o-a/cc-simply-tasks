@@ -31,15 +31,15 @@ model TeamMember {
   @@index([deletedAt])
 }
 
-/// category 허용값: lib/enums.ts > CATEGORIES
+/// category: WorkCategory.code 참조 (동적). 빈 문자열이면 미분류.
 /// status   허용값: lib/enums.ts > STATUSES
 /// priority 허용값: lib/enums.ts > PRIORITIES
 model WorkItem {
   id           String    @id @default(cuid())
   title        String
   description  String?
-  category     String    @default("ETC")
-  status       String    @default("DRAFT")
+  category     String    @default("")
+  status       String    @default("WAITING")
   priority     String    @default("NORMAL")
   // 같은 담당자 내 수동 정렬 순서. 낮을수록 상단.
   order        Int       @default(0)
@@ -115,6 +115,18 @@ model Setting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+/// 작업 분류 코드 마스터. WorkItem.category 의 허용값 소스.
+model WorkCategory {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([deletedAt])
 }
 
 /// 작업 티켓 시스템 코드 마스터 (ex: ppx-channel-api → 채널API)

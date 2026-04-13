@@ -46,11 +46,14 @@
     --radius: 0.5rem;
 
     /* status semantic */
-    --status-draft: 240 3.8% 46.1%;        /* zinc-500 */
-    --status-in-progress: 221 83% 53%;     /* blue-600 */
-    --status-ready: 38 92% 50%;            /* amber-500 */
-    --status-transferred: 142 71% 45%;     /* emerald-500 */
-    --status-canceled: 0 72% 51%;          /* rose-600 */
+    --status-waiting: 240 3.8% 46.1%;        /* zinc-500 */
+    --status-in-progress: 221 83% 53%;       /* blue-600 */
+    --status-internal-test: 262 83% 58%;     /* violet-500 */
+    --status-business-test: 38 92% 50%;      /* amber-500 */
+    --status-qa-test: 25 95% 53%;            /* orange-500 */
+    --status-transfer-ready: 187 85% 43%;    /* cyan-500 */
+    --status-transferred: 142 71% 45%;       /* emerald-500 */
+    --status-holding: 0 72% 51%;             /* rose-600 */
   }
 
   .dark {
@@ -83,11 +86,14 @@
     --ring: 217 91% 60%;
 
     /* status semantic — 다크에서도 같은 hue 살짝 밝게 */
-    --status-draft: 240 5% 64.9%;
+    --status-waiting: 240 5% 64.9%;
     --status-in-progress: 217 91% 60%;
-    --status-ready: 38 92% 55%;
-    --status-transferred: 142 71% 50%;
-    --status-canceled: 0 72% 56%;
+    --status-internal-test: 262 83% 68%;
+    --status-business-test: 38 92% 58%;
+    --status-qa-test: 25 95% 60%;
+    --status-transfer-ready: 187 85% 52%;
+    --status-transferred: 142 71% 52%;
+    --status-holding: 0 72% 58%;
   }
 }
 

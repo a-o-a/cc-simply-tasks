@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { CATEGORIES, PRIORITIES, STATUSES } from "../enums";
+import { PRIORITIES, STATUSES } from "../enums";
 import { cuidSchema, optionalIsoDateTimeSchema } from "./common";
 
 export const workItemCreateSchema = z
   .object({
     title: z.string().min(1).max(300),
     description: z.string().max(10_000).optional().nullable(),
-    category: z.enum(CATEGORIES).default("ETC"),
-    status: z.enum(STATUSES).default("DRAFT"),
+    category: z.string().max(100).default(""),
+    status: z.enum(STATUSES).default("WAITING"),
     priority: z.enum(PRIORITIES).default("NORMAL"),
     order: z.number().int().default(0),
     assigneeId: cuidSchema.optional().nullable(),
@@ -27,7 +27,7 @@ export const workItemUpdateSchema = z
   .object({
     title: z.string().min(1).max(300).optional(),
     description: z.string().max(10_000).nullable().optional(),
-    category: z.enum(CATEGORIES).optional(),
+    category: z.string().max(100).optional(),
     status: z.enum(STATUSES).optional(),
     priority: z.enum(PRIORITIES).optional(),
     order: z.number().int().optional(),
@@ -62,7 +62,11 @@ export const workItemListQuerySchema = z.object({
     .optional()
     .transform((v) => (v ? v.split(",").filter(Boolean) : undefined))
     .pipe(z.array(z.string()).optional()),
-  category: csvEnum(CATEGORIES),
+  category: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(",").filter(Boolean) : undefined))
+    .pipe(z.array(z.string()).optional()),
   priority: csvEnum(PRIORITIES),
   ticket: z.string().min(1).optional(),
   transferDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

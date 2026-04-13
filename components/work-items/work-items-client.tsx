@@ -18,19 +18,17 @@ import { toast } from "@/lib/client/use-toast";
 import type {
   ListResponse,
   Member,
+  WorkCategory,
   WorkItemDetail,
   WorkItemListItem,
 } from "@/lib/client/types";
 import {
-  CATEGORIES,
   PRIORITIES,
   STATUSES,
-  type Category,
   type Priority,
   type Status,
 } from "@/lib/enums";
 import {
-  CATEGORY_LABELS,
   PRIORITY_LABELS,
   STATUS_LABELS,
 } from "@/lib/enum-labels";
@@ -59,14 +57,14 @@ const VIEW_KEY = "cc-simply-tasks:work-items-view";
 interface Filters {
   status: Status[];
   assigneeId: string[];
-  category: Category[];
+  category: string[];
   priority: Priority[];
   ticket: string;
   transferDate: string;
 }
 
 const EMPTY_FILTERS: Filters = {
-  status: ["DRAFT", "IN_PROGRESS", "READY_TO_TRANSFER"],
+  status: ["WAITING", "IN_PROGRESS", "INTERNAL_TEST", "BUSINESS_TEST", "QA_TEST", "TRANSFER_READY"],
   assigneeId: [],
   category: [],
   priority: [],
@@ -79,6 +77,7 @@ export function WorkItemsClient() {
   const [filters, setFilters] = React.useState<Filters>(EMPTY_FILTERS);
   const [items, setItems] = React.useState<WorkItemListItem[]>([]);
   const [members, setMembers] = React.useState<Member[]>([]);
+  const [categories, setCategories] = React.useState<WorkCategory[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -104,12 +103,20 @@ export function WorkItemsClient() {
       const res = await api.get<ListResponse<Member>>("/api/team-members");
       setMembers(res.items);
     } catch (err) {
-      // 멤버 조회 실패는 치명적이지 않음 — 토스트만
       toast({
         title: "멤버 목록 조회 실패",
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
+    }
+  }, []);
+
+  const loadCategories = React.useCallback(async () => {
+    try {
+      const res = await api.get<{ items: WorkCategory[] }>("/api/work-categories");
+      setCategories(res.items);
+    } catch {
+      // 분류 조회 실패는 치명적이지 않음 — 조용히 무시
     }
   }, []);
 
@@ -146,7 +153,8 @@ export function WorkItemsClient() {
 
   React.useEffect(() => {
     void loadMembers();
-  }, [loadMembers]);
+    void loadCategories();
+  }, [loadMembers, loadCategories]);
 
   React.useEffect(() => {
     void loadItems();
@@ -236,6 +244,7 @@ export function WorkItemsClient() {
       <FilterBar
         filters={filters}
         members={members}
+        categories={categories}
         onChange={setFilters}
         onReset={() => setFilters(EMPTY_FILTERS)}
       />
@@ -265,6 +274,7 @@ export function WorkItemsClient() {
         open={formOpen}
         editing={editing}
         members={members}
+        categories={categories}
         onClose={() => setFormOpen(false)}
         onSaved={() => {
           setFormOpen(false);
@@ -352,11 +362,13 @@ function ToggleButton({
 function FilterBar({
   filters,
   members,
+  categories,
   onChange,
   onReset,
 }: {
   filters: Filters;
   members: Member[];
+  categories: WorkCategory[];
   onChange: (next: Filters) => void;
   onReset: () => void;
 }) {
@@ -378,10 +390,10 @@ function FilterBar({
     set("assigneeId", newAssignee);
   }
 
-  function toggleCategory(category: Category) {
-    const newCategory = filters.category.includes(category)
-      ? filters.category.filter((c) => c !== category)
-      : [...filters.category, category];
+  function toggleCategory(code: string) {
+    const newCategory = filters.category.includes(code)
+      ? filters.category.filter((c) => c !== code)
+      : [...filters.category, code];
     set("category", newCategory);
   }
 
@@ -442,20 +454,24 @@ function FilterBar({
       <div className="space-y-1.5">
         <Label className="text-xs">분류</Label>
         <div className="flex flex-wrap gap-1">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => toggleCategory(c)}
-              className={cn(
-                "inline-flex items-center rounded px-2 py-1 text-xs",
-                filters.category.includes(c)
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-              )}
-            >
-              {CATEGORY_LABELS[c]}
-            </button>
-          ))}
+          {categories.length === 0 ? (
+            <span className="text-xs text-muted-foreground">설정에서 분류를 추가하세요</span>
+          ) : (
+            categories.map((c) => (
+              <button
+                key={c.code}
+                onClick={() => toggleCategory(c.code)}
+                className={cn(
+                  "inline-flex items-center rounded px-2 py-1 text-xs",
+                  filters.category.includes(c.code)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+                )}
+              >
+                {c.name}
+              </button>
+            ))
+          )}
         </div>
       </div>
       <div className="space-y-1.5">

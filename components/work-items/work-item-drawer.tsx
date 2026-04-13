@@ -31,7 +31,6 @@ import type {
   WorkTicket,
 } from "@/lib/client/types";
 import {
-  CATEGORY_LABELS,
   MEMBER_ROLE_LABELS,
   PRIORITY_LABELS,
 } from "@/lib/enum-labels";
@@ -189,7 +188,7 @@ function DrawerBody({
         <div className="flex items-center gap-2">
           <StatusBadge status={detail.status} />
           <span className="text-xs text-muted-foreground">
-            {CATEGORY_LABELS[detail.category]} · {PRIORITY_LABELS[detail.priority]}
+            {detail.category || "미분류"} · {PRIORITY_LABELS[detail.priority]}
           </span>
         </div>
         <SheetTitle className="text-xl">{detail.title}</SheetTitle>

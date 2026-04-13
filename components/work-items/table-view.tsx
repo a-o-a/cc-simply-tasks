@@ -3,10 +3,7 @@
 import * as React from "react";
 import { formatDate } from "@/lib/client/format";
 import type { WorkItemListItem } from "@/lib/client/types";
-import {
-  CATEGORY_LABELS,
-  PRIORITY_LABELS,
-} from "@/lib/enum-labels";
+import { PRIORITY_LABELS } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
 
@@ -54,7 +51,7 @@ export function TableView({
                 {item.assignee?.name ?? "미배정"}
               </td>
               <td className="px-4 py-3 text-muted-foreground">
-                {CATEGORY_LABELS[item.category]}
+                {item.category || "—"}
               </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {PRIORITY_LABELS[item.priority]}

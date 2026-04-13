@@ -5,29 +5,23 @@
  * UI에서 enum 값을 그대로 렌더링하지 말고 항상 이 라벨을 거치게 한다.
  */
 
-import type { Category, MemberRole, Priority, Status } from "./enums";
+import type { MemberRole, Priority, Status } from "./enums";
 
 export const STATUS_LABELS: Record<Status, string> = {
-  DRAFT: "초안",
+  WAITING: "대기",
   IN_PROGRESS: "진행 중",
-  READY_TO_TRANSFER: "이관 준비",
-  TRANSFERRED: "이관 완료",
-  CANCELED: "취소",
+  INTERNAL_TEST: "내부테스트",
+  BUSINESS_TEST: "현업테스트",
+  QA_TEST: "QA테스트",
+  TRANSFER_READY: "이관대기",
+  TRANSFERRED: "이관완료",
+  HOLDING: "홀딩",
 };
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
   LOW: "낮음",
   NORMAL: "보통",
   HIGH: "높음",
-};
-
-export const CATEGORY_LABELS: Record<Category, string> = {
-  FEATURE: "기능",
-  BUGFIX: "버그 수정",
-  IMPROVEMENT: "개선",
-  REFACTOR: "리팩터링",
-  OPS: "운영",
-  ETC: "기타",
 };
 
 export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {

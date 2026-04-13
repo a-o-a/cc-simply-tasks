@@ -30,11 +30,14 @@ type ScheduledItem = WorkItemListItem & {
 };
 
 const STATUS_BG: Record<string, string> = {
-  DRAFT: "var(--status-draft)",
+  WAITING: "var(--status-waiting)",
   IN_PROGRESS: "var(--status-in-progress)",
-  READY_TO_TRANSFER: "var(--status-ready)",
+  INTERNAL_TEST: "var(--status-internal-test)",
+  BUSINESS_TEST: "var(--status-business-test)",
+  QA_TEST: "var(--status-qa-test)",
+  TRANSFER_READY: "var(--status-transfer-ready)",
   TRANSFERRED: "var(--status-transferred)",
-  CANCELED: "var(--status-canceled)",
+  HOLDING: "var(--status-holding)",
 };
 
 export function GanttView({

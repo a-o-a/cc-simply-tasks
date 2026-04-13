@@ -10,26 +10,19 @@
  */
 
 export const STATUSES = [
-  "DRAFT",
+  "WAITING",
   "IN_PROGRESS",
-  "READY_TO_TRANSFER",
+  "INTERNAL_TEST",
+  "BUSINESS_TEST",
+  "QA_TEST",
+  "TRANSFER_READY",
   "TRANSFERRED",
-  "CANCELED",
+  "HOLDING",
 ] as const;
 export type Status = (typeof STATUSES)[number];
 
 export const PRIORITIES = ["LOW", "NORMAL", "HIGH"] as const;
 export type Priority = (typeof PRIORITIES)[number];
-
-export const CATEGORIES = [
-  "FEATURE",
-  "BUGFIX",
-  "IMPROVEMENT",
-  "REFACTOR",
-  "OPS",
-  "ETC",
-] as const;
-export type Category = (typeof CATEGORIES)[number];
 
 export const MEMBER_ROLES = [
   "WEB_DEV",
@@ -61,5 +54,6 @@ export const AUDIT_ENTITY_TYPES = [
   "CalendarEvent",
   "TeamMember",
   "WorkSystem",
+  "WorkCategory",
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

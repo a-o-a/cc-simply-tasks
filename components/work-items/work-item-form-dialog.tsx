@@ -18,17 +18,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { ApiError, api } from "@/lib/client/api";
 import { fromDateInputValue, toDateInputValue } from "@/lib/client/format";
 import { toast } from "@/lib/client/use-toast";
-import type { Member, WorkItemListItem } from "@/lib/client/types";
+import type { Member, WorkCategory, WorkItemListItem } from "@/lib/client/types";
 import {
-  CATEGORIES,
   PRIORITIES,
   STATUSES,
-  type Category,
   type Priority,
   type Status,
 } from "@/lib/enums";
 import {
-  CATEGORY_LABELS,
   PRIORITY_LABELS,
   STATUS_LABELS,
 } from "@/lib/enum-labels";
@@ -39,14 +36,13 @@ import {
  * - editing이 null이면 생성, 있으면 수정
  * - 수정 시 `If-Match: editing.updatedAt` 자동 처리
  * - 날짜 필드는 KST 자정 → UTC ISO로 직렬화 (`fromDateInputValue`)
- *
- * 1차 범위에서는 reorder/order는 다루지 않음 (모든 신규 0, 추후 Step 4 후속).
  */
 
 type Props = {
   open: boolean;
   editing: WorkItemListItem | null;
   members: Member[];
+  categories: WorkCategory[];
   onClose: () => void;
   onSaved: () => void;
 };
@@ -54,7 +50,7 @@ type Props = {
 interface FormState {
   title: string;
   description: string;
-  category: Category;
+  category: string;
   status: Status;
   priority: Priority;
   assigneeId: string;
@@ -66,8 +62,8 @@ interface FormState {
 const EMPTY: FormState = {
   title: "",
   description: "",
-  category: "ETC",
-  status: "DRAFT",
+  category: "",
+  status: "WAITING",
   priority: "NORMAL",
   assigneeId: "",
   startDate: "",
@@ -93,6 +89,7 @@ export function WorkItemFormDialog({
   open,
   editing,
   members,
+  categories,
   onClose,
   onSaved,
 }: Props) {
@@ -113,7 +110,6 @@ export function WorkItemFormDialog({
     const title = state.title.trim();
     if (!title) return;
 
-    // 클라이언트에서도 날짜 정합성 한 번 (서버에서 zod refine으로 다시 검증)
     if (state.startDate && state.endDate && state.startDate > state.endDate) {
       toast({
         title: "날짜를 확인해주세요",
@@ -156,7 +152,7 @@ export function WorkItemFormDialog({
           description: "최신 정보를 다시 불러옵니다.",
           variant: "destructive",
         });
-        onSaved(); // 충돌해도 목록은 새로고침
+        onSaved();
         return;
       }
       toast({
@@ -225,11 +221,12 @@ export function WorkItemFormDialog({
               <Select
                 id="wi-category"
                 value={state.category}
-                onChange={(e) => update("category", e.target.value as Category)}
+                onChange={(e) => update("category", e.target.value)}
               >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {CATEGORY_LABELS[c]}
+                <option value="">미분류</option>
+                {categories.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name}
                   </option>
                 ))}
               </Select>

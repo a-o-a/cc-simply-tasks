@@ -6,7 +6,6 @@
  */
 
 import type {
-  Category,
   MemberRole,
   Priority,
   Status,
@@ -37,7 +36,7 @@ export type WorkItemListItem = {
   id: string;
   title: string;
   description: string | null;
-  category: Category;
+  category: string;
   status: Status;
   priority: Priority;
   order: number;
@@ -85,6 +84,14 @@ export type AuditLog = {
 };
 
 export type WorkSystem = {
+  id: string;
+  code: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkCategory = {
   id: string;
   code: string;
   name: string;
