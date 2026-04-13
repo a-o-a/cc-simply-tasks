@@ -15,7 +15,7 @@ import type { WorkItemListItem } from "@/lib/client/types";
 import { STATUSES, type Status } from "@/lib/enums";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
-import { PriorityBadge } from "./priority-badge";
+import { PriorityBadge } from "./status-badge";
 
 /**
  * 칸반 보기 — 상태별 컬럼.

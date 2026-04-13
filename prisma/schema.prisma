@@ -110,6 +110,25 @@ model CalendarEventMember {
   @@index([memberId])
 }
 
+/// key 허용값: "service_name"
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/// 작업 티켓 시스템 코드 마스터 (ex: ppx-channel-api → 채널API)
+model WorkSystem {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([deletedAt])
+}
+
 /// entityType 허용값: lib/enums.ts > AUDIT_ENTITY_TYPES
 /// action    허용값: lib/enums.ts > AUDIT_ACTIONS
 /// actorType 허용값: lib/enums.ts > ACTOR_TYPES

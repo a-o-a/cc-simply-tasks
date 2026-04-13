@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
  * Hydration mismatch 방지를 위해 마운트 전에는 placeholder 렌더.
  */
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -25,7 +25,7 @@ export function ThemeToggle() {
     );
   }
 
-  const isDark = theme === "dark";
+  const isDark = resolvedTheme === "dark";
   return (
     <Button
       variant="ghost"

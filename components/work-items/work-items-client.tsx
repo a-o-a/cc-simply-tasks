@@ -9,6 +9,7 @@ import {
   Table as TableIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -65,7 +66,7 @@ interface Filters {
 }
 
 const EMPTY_FILTERS: Filters = {
-  status: ["DRAFT", "IN_PROGRESS", "INTERNAL_TEST", "EXTERNAL_TEST", "READY_TO_TRANSFER"],
+  status: ["DRAFT", "IN_PROGRESS", "READY_TO_TRANSFER"],
   assigneeId: [],
   category: [],
   priority: [],
@@ -247,7 +248,7 @@ export function WorkItemsClient() {
         ) : items.length === 0 ? (
           <EmptyState onCreate={openCreate} />
         ) : view === "table" ? (
-          <TableView items={items} onOpen={openDrawer} onUpdate={updateItemStatus} />
+          <TableView items={items} onOpen={openDrawer} />
         ) : view === "kanban" ? (
           <KanbanView
             items={items}
@@ -499,10 +500,10 @@ function FilterBar({
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs">이관일 (부터)</Label>
-        <Input
-          type="date"
+        <DatePicker
           value={filters.transferDate}
-          onChange={(e) => set("transferDate", e.target.value)}
+          onChange={(v) => set("transferDate", v)}
+          placeholder="날짜 선택"
         />
       </div>
     </div>

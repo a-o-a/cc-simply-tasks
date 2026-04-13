@@ -32,12 +32,11 @@ export const CATEGORIES = [
 export type Category = (typeof CATEGORIES)[number];
 
 export const MEMBER_ROLES = [
-  "BACKEND",
-  "FRONTEND",
-  "FULLSTACK",
-  "PM",
-  "QA",
-  "DESIGNER",
+  "WEB_DEV",
+  "APP_DEV",
+  "UI_DEV",
+  "PLANNING",
+  "DESIGN",
   "ETC",
 ] as const;
 export type MemberRole = (typeof MEMBER_ROLES)[number];
@@ -61,5 +60,6 @@ export const AUDIT_ENTITY_TYPES = [
   "WorkTicket",
   "CalendarEvent",
   "TeamMember",
+  "WorkSystem",
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

@@ -9,12 +9,25 @@ import {
   ChevronRight,
   LayoutDashboard,
   ListChecks,
-  Users,
+  Settings,
   UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ACTOR_NAME_STORAGE_KEY } from "@/lib/client/api";
+import {
+  ACTOR_NAME_STORAGE_KEY,
+  DEFAULT_SERVICE_NAME,
+  SERVICE_NAME_STORAGE_KEY,
+} from "@/lib/client/api";
 import { cn } from "@/lib/utils";
 
 /**
@@ -38,7 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "홈", icon: LayoutDashboard, exact: true },
   { href: "/work-items", label: "작업", icon: ListChecks },
   { href: "/calendar", label: "캘린더", icon: Calendar },
-  { href: "/members", label: "멤버", icon: Users },
+  { href: "/settings", label: "설정", icon: Settings },
 ];
 
 const COLLAPSED_KEY = "cc-simply-tasks:sidebar-collapsed";
@@ -47,17 +60,47 @@ export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = React.useState(false);
   const [actorName, setActorName] = React.useState<string>("");
+  const [serviceName, setServiceName] = React.useState<string>(DEFAULT_SERVICE_NAME);
   const [mounted, setMounted] = React.useState(false);
+  const [nameDialogOpen, setNameDialogOpen] = React.useState(false);
+  const [nameDraft, setNameDraft] = React.useState("");
 
   React.useEffect(() => {
     setMounted(true);
     setCollapsed(window.localStorage.getItem(COLLAPSED_KEY) === "1");
-    const sync = () => {
+
+    // 캐시된 서비스명 즉시 반영
+    const cached = window.localStorage.getItem(SERVICE_NAME_STORAGE_KEY);
+    if (cached) setServiceName(cached);
+
+    // API에서 최신 서비스명 동기화
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        const name = data.service_name ?? DEFAULT_SERVICE_NAME;
+        setServiceName(name);
+        window.localStorage.setItem(SERVICE_NAME_STORAGE_KEY, name);
+      })
+      .catch(() => {/* 실패 시 캐시값 유지 */});
+
+    const syncActorName = () => {
       setActorName(window.localStorage.getItem(ACTOR_NAME_STORAGE_KEY) ?? "");
     };
-    sync();
-    window.addEventListener("storage", sync);
-    return () => window.removeEventListener("storage", sync);
+    syncActorName();
+
+    const syncServiceName = () => {
+      const name = window.localStorage.getItem(SERVICE_NAME_STORAGE_KEY) ?? DEFAULT_SERVICE_NAME;
+      setServiceName(name);
+    };
+
+    window.addEventListener("storage", syncActorName);
+    window.addEventListener("actor-name-changed", syncActorName);
+    window.addEventListener("settings-changed", syncServiceName);
+    return () => {
+      window.removeEventListener("storage", syncActorName);
+      window.removeEventListener("actor-name-changed", syncActorName);
+      window.removeEventListener("settings-changed", syncServiceName);
+    };
   }, []);
 
   function toggleCollapsed() {
@@ -66,13 +109,19 @@ export function Sidebar() {
     window.localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
   }
 
-  function changeActorName() {
-    const current = window.localStorage.getItem(ACTOR_NAME_STORAGE_KEY) ?? "";
-    const next = window.prompt("표시 이름을 입력하세요", current)?.trim();
-    if (next) {
-      window.localStorage.setItem(ACTOR_NAME_STORAGE_KEY, next);
-      setActorName(next);
-    }
+  function openNameDialog() {
+    setNameDraft(window.localStorage.getItem(ACTOR_NAME_STORAGE_KEY) ?? "");
+    setNameDialogOpen(true);
+  }
+
+  function handleNameSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return;
+    window.localStorage.setItem(ACTOR_NAME_STORAGE_KEY, trimmed);
+    window.dispatchEvent(new CustomEvent("actor-name-changed", { detail: trimmed }));
+    setActorName(trimmed);
+    setNameDialogOpen(false);
   }
 
   return (
@@ -85,14 +134,11 @@ export function Sidebar() {
       {/* 헤더 */}
       <div className="flex h-14 items-center justify-between border-b px-3">
         {!collapsed ? (
-          <Link
-            href="/"
-            className="text-sm font-semibold tracking-tight"
-          >
-            cc-simply-tasks
+          <Link href="/" className="truncate text-sm font-semibold tracking-tight">
+            {serviceName}
           </Link>
         ) : (
-          <span className="sr-only">cc-simply-tasks</span>
+          <span className="sr-only">{serviceName}</span>
         )}
         <Button
           variant="ghost"
@@ -140,7 +186,7 @@ export function Sidebar() {
         {!collapsed ? (
           <div className="flex items-center justify-between gap-2">
             <button
-              onClick={changeActorName}
+              onClick={openNameDialog}
               className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent"
               title="이름 변경"
             >
@@ -156,7 +202,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={changeActorName}
+              onClick={openNameDialog}
               aria-label="이름 변경"
               title={mounted ? actorName || "이름 미설정" : undefined}
             >
@@ -166,6 +212,35 @@ export function Sidebar() {
           </div>
         )}
       </div>
+
+      <Dialog open={nameDialogOpen} onOpenChange={setNameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>이름 변경</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleNameSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="sidebar-name-input">표시 이름</Label>
+              <Input
+                id="sidebar-name-input"
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                placeholder="예: 김지원"
+                maxLength={32}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setNameDialogOpen(false)}>
+                취소
+              </Button>
+              <Button type="submit" disabled={!nameDraft.trim()}>
+                저장
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }

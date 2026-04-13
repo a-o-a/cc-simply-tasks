@@ -77,21 +77,18 @@ export function MembersClient() {
   }, [load]);
 
   return (
-    <div className="px-8 py-10">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">멤버</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            팀원 정보를 관리합니다. 작업/캘린더의 담당자로 사용됩니다.
-          </p>
-        </div>
-        <Button onClick={() => setDialog({ mode: "create" })}>
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          팀원 정보를 관리합니다. 작업/캘린더의 담당자로 사용됩니다.
+        </p>
+        <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
           <Plus className="mr-2 h-4 w-4" />
           멤버 추가
         </Button>
-      </header>
+      </div>
 
-      <section className="mt-6 rounded-lg border bg-card">
+      <section className="rounded-lg border bg-card">
         {loading ? (
           <SkeletonRows />
         ) : error ? (
@@ -197,7 +194,7 @@ function MemberFormDialog({
   const editing = state.mode === "edit" ? state.member : null;
 
   const [name, setName] = React.useState("");
-  const [role, setRole] = React.useState<MemberRole>("BACKEND");
+  const [role, setRole] = React.useState<MemberRole>("WEB_DEV");
   const [submitting, setSubmitting] = React.useState(false);
 
   // 다이얼로그가 열릴 때마다 초기값 세팅
@@ -207,7 +204,7 @@ function MemberFormDialog({
       setRole(state.member.role);
     } else if (state.mode === "create") {
       setName("");
-      setRole("BACKEND");
+      setRole("WEB_DEV");
     }
   }, [state]);
 

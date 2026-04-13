@@ -11,6 +11,8 @@
  */
 
 export const ACTOR_NAME_STORAGE_KEY = "cc-simply-tasks:actor-name";
+export const SERVICE_NAME_STORAGE_KEY = "cc-simply-tasks:service-name";
+export const DEFAULT_SERVICE_NAME = "cc-simply-tasks";
 
 export type ApiErrorCode =
   | "VALIDATION_ERROR"

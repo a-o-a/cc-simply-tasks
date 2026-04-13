@@ -31,11 +31,10 @@ export const CATEGORY_LABELS: Record<Category, string> = {
 };
 
 export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
-  BACKEND: "백엔드",
-  FRONTEND: "프론트엔드",
-  FULLSTACK: "풀스택",
-  PM: "PM",
-  QA: "QA",
-  DESIGNER: "디자인",
+  WEB_DEV: "웹개발",
+  APP_DEV: "앱개발",
+  UI_DEV: "UI개발",
+  PLANNING: "기획",
+  DESIGN: "디자인",
   ETC: "기타",
 };

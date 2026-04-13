@@ -26,10 +26,10 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const rows = await prisma.workItem.findMany({
     where: {
       deletedAt: null,
-      ...(filters.status ? { status: filters.status } : {}),
-      ...(filters.assigneeId ? { assigneeId: filters.assigneeId } : {}),
-      ...(filters.category ? { category: filters.category } : {}),
-      ...(filters.priority ? { priority: filters.priority } : {}),
+      ...(filters.status?.length ? { status: { in: filters.status } } : {}),
+      ...(filters.assigneeId?.length ? { assigneeId: { in: filters.assigneeId } } : {}),
+      ...(filters.category?.length ? { category: { in: filters.category } } : {}),
+      ...(filters.priority?.length ? { priority: { in: filters.priority } } : {}),
       ...(filters.ticket
         ? {
             tickets: {
@@ -37,6 +37,13 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
                 deletedAt: null,
                 ticketNumber: { contains: filters.ticket },
               },
+            },
+          }
+        : {}),
+      ...(filters.transferDate
+        ? {
+            transferDate: {
+              gte: new Date(`${filters.transferDate}T00:00:00+09:00`),
             },
           }
         : {}),

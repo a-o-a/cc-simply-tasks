@@ -41,6 +41,7 @@ export function ActorNameGate() {
     const trimmed = draft.trim();
     if (!trimmed) return;
     window.localStorage.setItem(ACTOR_NAME_STORAGE_KEY, trimmed);
+    window.dispatchEvent(new CustomEvent("actor-name-changed", { detail: trimmed }));
     setName(trimmed);
     setDraft("");
   }

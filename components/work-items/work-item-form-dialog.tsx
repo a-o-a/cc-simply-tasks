@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -254,29 +255,26 @@ export function WorkItemFormDialog({
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label htmlFor="wi-start">시작일</Label>
-              <Input
+              <DatePicker
                 id="wi-start"
-                type="date"
                 value={state.startDate}
-                onChange={(e) => update("startDate", e.target.value)}
+                onChange={(v) => update("startDate", v)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="wi-end">종료일</Label>
-              <Input
+              <DatePicker
                 id="wi-end"
-                type="date"
                 value={state.endDate}
-                onChange={(e) => update("endDate", e.target.value)}
+                onChange={(v) => update("endDate", v)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="wi-transfer">이관일</Label>
-              <Input
+              <DatePicker
                 id="wi-transfer"
-                type="date"
                 value={state.transferDate}
-                onChange={(e) => update("transferDate", e.target.value)}
+                onChange={(v) => update("transferDate", v)}
               />
             </div>
           </div>

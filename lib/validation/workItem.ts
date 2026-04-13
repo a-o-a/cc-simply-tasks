@@ -44,12 +44,28 @@ export const workItemUpdateSchema = z
     { message: "endDate는 startDate 이후여야 합니다", path: ["endDate"] },
   );
 
+/** 쉼표 구분 문자열 → 배열 변환 헬퍼 */
+function csvEnum<T extends string>(values: readonly [T, ...T[]]) {
+  return z
+    .string()
+    .optional()
+    .transform((v) =>
+      v ? (v.split(",").filter((s) => (values as readonly string[]).includes(s)) as T[]) : undefined,
+    )
+    .pipe(z.array(z.enum(values)).optional());
+}
+
 export const workItemListQuerySchema = z.object({
-  status: z.enum(STATUSES).optional(),
-  assigneeId: cuidSchema.optional(),
-  category: z.enum(CATEGORIES).optional(),
-  priority: z.enum(PRIORITIES).optional(),
+  status: csvEnum(STATUSES),
+  assigneeId: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(",").filter(Boolean) : undefined))
+    .pipe(z.array(z.string()).optional()),
+  category: csvEnum(CATEGORIES),
+  priority: csvEnum(PRIORITIES),
   ticket: z.string().min(1).optional(),
+  transferDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export type WorkItemCreateInput = z.infer<typeof workItemCreateSchema>;

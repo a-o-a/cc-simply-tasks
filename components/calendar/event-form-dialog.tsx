@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -349,20 +350,20 @@ export function EventFormDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="ce-start-date">시작일</Label>
-                  <Input
+                  <DatePicker
                     id="ce-start-date"
-                    type="date"
                     value={state.startDate}
-                    onChange={(e) => update("startDate", e.target.value)}
+                    onChange={(v) => update("startDate", v)}
+                    clearable={false}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ce-end-date">종료일</Label>
-                  <Input
+                  <DatePicker
                     id="ce-end-date"
-                    type="date"
                     value={state.endDate}
-                    onChange={(e) => update("endDate", e.target.value)}
+                    onChange={(v) => update("endDate", v)}
+                    clearable={false}
                   />
                 </div>
               </div>
@@ -370,20 +371,20 @@ export function EventFormDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="ce-start-dt">시작 시각</Label>
-                  <Input
+                  <DateTimePicker
                     id="ce-start-dt"
-                    type="datetime-local"
                     value={state.startDateTime}
-                    onChange={(e) => update("startDateTime", e.target.value)}
+                    onChange={(v) => update("startDateTime", v)}
+                    clearable={false}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ce-end-dt">종료 시각</Label>
-                  <Input
+                  <DateTimePicker
                     id="ce-end-dt"
-                    type="datetime-local"
                     value={state.endDateTime}
-                    onChange={(e) => update("endDateTime", e.target.value)}
+                    onChange={(v) => update("endDateTime", v)}
+                    clearable={false}
                   />
                 </div>
               </div>
