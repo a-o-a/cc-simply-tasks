@@ -19,7 +19,8 @@ import {
   kstWeekFetchRange,
 } from "@/lib/client/calendar";
 import { toast } from "@/lib/client/use-toast";
-import type { CalendarEvent, Member } from "@/lib/client/types";
+import type { CalendarEvent, Member, WorkItemListItem } from "@/lib/client/types";
+import { utcMsToKstDateString } from "@/lib/client/calendar";
 import { cn } from "@/lib/utils";
 import { MemberFilter } from "@/components/member-filter";
 import { EventFormDialog } from "./event-form-dialog";
@@ -52,6 +53,7 @@ export function CalendarClient() {
 
   const [events, setEvents] = React.useState<CalendarEvent[]>([]);
   const [members, setMembers] = React.useState<Member[]>([]);
+  const [transferItems, setTransferItems] = React.useState<WorkItemListItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [selectedMemberIds, setSelectedMemberIds] = React.useState(
     new Set<string>(),
@@ -79,13 +81,21 @@ export function CalendarClient() {
   const loadEvents = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<ListResponse>("/api/calendar-events", {
-        query: {
-          from: new Date(gridFromMs).toISOString(),
-          to: new Date(gridToMs).toISOString(),
-        },
-      });
-      setEvents(res.items);
+      const fromDate = utcMsToKstDateString(gridFromMs);
+      const toDate = utcMsToKstDateString(gridToMs - 1);
+      const [eventsRes, workRes] = await Promise.all([
+        api.get<ListResponse>("/api/calendar-events", {
+          query: {
+            from: new Date(gridFromMs).toISOString(),
+            to: new Date(gridToMs).toISOString(),
+          },
+        }),
+        api.get<{ items: WorkItemListItem[]; nextCursor: string | null }>("/api/work-items", {
+          query: { transferDate: fromDate, transferDateTo: toDate, pageSize: "500" },
+        }),
+      ]);
+      setEvents(eventsRes.items);
+      setTransferItems(workRes.items);
     } catch (err) {
       toast({
         title: "캘린더 조회 실패",
@@ -134,6 +144,16 @@ export function CalendarClient() {
     }
     return map;
   }, [filteredEvents]);
+
+  const transfersByDay = React.useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of transferItems) {
+      if (!item.transferDate) continue;
+      const key = utcMsToKstDateString(new Date(item.transferDate).getTime());
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [transferItems]);
 
   // ── 그리드 / 주 계산 ────────────────────────────────────────────────────────
 
@@ -325,6 +345,7 @@ export function CalendarClient() {
                 cursor={cursor}
                 today={today}
                 eventsByDay={eventsByDay}
+                transfersByDay={transfersByDay}
                 onAddClick={(dayKey) =>
                   setDialogState({ mode: "create", defaultDate: dayKey })
                 }
@@ -337,6 +358,7 @@ export function CalendarClient() {
                 weekDates={weekDates}
                 today={today}
                 eventsByDay={eventsByDay}
+                transfersByDay={transfersByDay}
                 onAddClick={(dayKey) =>
                   setDialogState({ mode: "create", defaultDate: dayKey })
                 }

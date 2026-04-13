@@ -70,6 +70,7 @@ export const workItemListQuerySchema = z.object({
   priority: csvEnum(PRIORITIES),
   ticket: z.string().min(1).optional(),
   transferDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  transferDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export type WorkItemCreateInput = z.infer<typeof workItemCreateSchema>;

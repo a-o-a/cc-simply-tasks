@@ -70,6 +70,7 @@ type Props = {
   cursor: { year: number; month0: number };
   today: string;
   eventsByDay: Map<string, CalendarEvent[]>;
+  transfersByDay: Map<string, number>;
   onAddClick: (dayKey: string) => void;
   onEventClick: (event: CalendarEvent) => void;
 };
@@ -164,6 +165,7 @@ export function MonthView({
   cursor,
   today,
   eventsByDay,
+  transfersByDay,
   onAddClick,
   onEventClick,
 }: Props) {
@@ -197,6 +199,7 @@ export function MonthView({
             const isToday = dayKey === today;
             const rawEvents = eventsByDay.get(dayKey) ?? [];
             const dayEvents = sortEvents(rawEvents);
+            const transferCount = transfersByDay.get(dayKey) ?? 0;
             const dayNum = Number(dayKey.slice(8, 10));
             const colIdx = idx % 7;
             const isSunday = colIdx === 0;
@@ -252,6 +255,16 @@ export function MonthView({
                       onClick={() => onEventClick(event)}
                     />
                   ))}
+                  {transferCount > 0 && (
+                    <div className="flex w-full items-center gap-1 rounded bg-emerald-500/10 px-1 py-0.5">
+                      <span className="shrink-0 rounded px-1 text-[9px] font-semibold leading-[14px] bg-emerald-500/20 text-emerald-500">
+                        이관
+                      </span>
+                      <span className="text-[11px] font-medium leading-tight text-emerald-600 dark:text-emerald-400">
+                        {transferCount}건
+                      </span>
+                    </div>
+                  )}
                 </div>
               </DroppableCell>
             );

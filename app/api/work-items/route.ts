@@ -40,10 +40,15 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
             },
           }
         : {}),
-      ...(filters.transferDate
+      ...(filters.transferDate || filters.transferDateTo
         ? {
             transferDate: {
-              gte: new Date(`${filters.transferDate}T00:00:00+09:00`),
+              ...(filters.transferDate
+                ? { gte: new Date(`${filters.transferDate}T00:00:00+09:00`) }
+                : {}),
+              ...(filters.transferDateTo
+                ? { lte: new Date(`${filters.transferDateTo}T23:59:59+09:00`) }
+                : {}),
             },
           }
         : {}),
