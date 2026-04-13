@@ -249,12 +249,10 @@ export function WorkItemsClient() {
         onReset={() => setFilters(EMPTY_FILTERS)}
       />
 
-      <section className="mt-4">
-        {loading ? (
-          <SkeletonBlock />
-        ) : error ? (
+      <section className={cn("mt-4", loading && "pointer-events-none opacity-60")}>
+        {error ? (
           <ErrorState message={error} onRetry={() => void loadItems()} />
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && !loading ? (
           <EmptyState onCreate={openCreate} />
         ) : view === "table" ? (
           <TableView items={items} onOpen={openDrawer} />
