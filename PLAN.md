@@ -60,21 +60,26 @@
 > Postgres 이관 시 String → enum 타입으로 교체.
 
 - [x] enum 값(`lib/enums.ts`):
-  - Status: `DRAFT / IN_PROGRESS / READY_TO_TRANSFER / TRANSFERRED / CANCELED`
+  - Status: `WAITING / IN_PROGRESS / INTERNAL_TEST / BUSINESS_TEST / QA_TEST / TRANSFER_READY / TRANSFERRED / HOLDING`
   - Priority: `LOW / NORMAL / HIGH`
-  - Category: `FEATURE / BUGFIX / IMPROVEMENT / REFACTOR / OPS / ETC`
-  - MemberRole: `BACKEND / FRONTEND / FULLSTACK / PM / QA / DESIGNER / ETC`
+  - Category: **제거** — `WorkCategory` 모델로 동적 관리 (`/api/work-categories`)
+  - MemberRole: `WEB_DEV / APP_DEV / UI_DEV / PLANNING / DESIGN / ETC`
   - ActorType: `ANONYMOUS` (추후 `USER`)
   - AuditAction: `CREATE / UPDATE / DELETE / RESTORE`
-  - AuditEntityType: `WorkItem / WorkTicket / CalendarEvent / TeamMember`
+  - AuditEntityType: `WorkItem / WorkTicket / CalendarEvent / TeamMember / WorkSystem / WorkCategory`
 - [x] `TeamMember { id, name, role, createdAt, updatedAt, deletedAt }`
-- [x] `WorkItem { id, title, description, category, status, priority, order, assigneeId?, startDate?, endDate?, transferDate?, createdAt, updatedAt, deletedAt }`
+- [x] `WorkItem { id, title, description, category(String), status, priority, order, assigneeId?, startDate?, endDate?, transferDate?, createdAt, updatedAt, deletedAt }`
+  - `category`는 `WorkCategory.code` 참조 (String, 동적). 기본값 `""` (미분류).
   - 인덱스: `[assigneeId, status]`, `[transferDate]`, `[startDate, endDate]`, `[deletedAt]`, `[status]`
 - [x] `WorkTicket { id, workItemId, systemName, ticketNumber, ticketUrl?, createdAt, updatedAt, deletedAt }`
   - `@@unique([workItemId, systemName, ticketNumber])` + `[workItemId]`, `[ticketNumber]` 인덱스
-- [x] `CalendarEvent { id, title, memberId?, startDateTime, endDateTime, allDay, note?, createdAt, updatedAt, deletedAt }`
-  - 인덱스: `[startDateTime, endDateTime]`, `[memberId]`, `[deletedAt]`
+- [x] `CalendarEvent { id, title, category, startDateTime, endDateTime, allDay, note?, createdAt, updatedAt, deletedAt }`
+  - `CalendarEventMember` 조인 테이블로 다대다 담당자 연결
+  - 인덱스: `[startDateTime, endDateTime]`, `[deletedAt]`
   - 규칙: `allDay=true`면 `[start, end)` 반열림 + 00:00 UTC 정규화 (`lib/time.ts`)
+- [x] `Setting { key String @id, value String, updatedAt }` — `service_name` 키 저장
+- [x] `WorkSystem { id, code @unique, name, createdAt, updatedAt, deletedAt }` — 티켓 시스템 코드 마스터
+- [x] `WorkCategory { id, code @unique, name, createdAt, updatedAt, deletedAt }` — 작업 분류 코드 마스터
 - [x] `AuditLog { id, entityType, entityId, action, beforeJson?, afterJson?, actorType, actorName?, actorIp?, userAgent?, createdAt }`
   - 인덱스: `[entityType, entityId, createdAt]`, `[createdAt]`
   - `beforeJson`/`afterJson`은 **변경 필드만** 담는 diff (String, JSON stringified)
@@ -100,7 +105,7 @@
 레퍼런스 구현: `app/api/work-items/*`.
 
 - [x] **`work-items`**
-  - [x] GET(list): `?status&assigneeId&category&priority&ticket&cursor&pageSize`
+  - [x] GET(list): `?status&assigneeId&category&priority&ticket&transferDate&transferDateTo&cursor&pageSize`
   - [x] POST / GET(:id) / PATCH(:id, If-Match) / DELETE(:id, soft)
 - [x] **`work-items/:id/tickets`**
   - [x] GET / POST / PATCH(:ticketId) / DELETE(:ticketId)
@@ -108,8 +113,16 @@
   - [x] GET(list): `?role&cursor&pageSize`
   - [x] POST / GET(:id) / PATCH(:id, If-Match) / DELETE(:id, soft)
 - [x] **`calendar-events`**
-  - [x] GET(range): `?from&to&memberId` (반열림 [from, to) overlap, 페이지네이션 없음)
+  - [x] GET(range): `?from&to&memberId` (반열림 [from, to) overlap)
   - [x] POST / GET(:id) / PATCH(:id, If-Match) / DELETE(:id, soft)
+- [x] **`work-systems`**
+  - [x] GET(list) / POST / PATCH(:id, If-Match) / DELETE(:id, soft)
+- [x] **`work-categories`**
+  - [x] GET(list) / POST / PATCH(:id, If-Match) / DELETE(:id, soft)
+- [x] **`settings`**
+  - [x] GET / PATCH (service_name)
+- [x] **`backup`**
+  - [x] GET — SQLite DB 파일 다운로드
 - [x] **`audit-logs`** (읽기 전용)
   - [x] GET: `?entityType&entityId&action&actorName&cursor&pageSize`
 
@@ -182,12 +195,23 @@
   - 클라이언트(`lib/client/api.ts`): `encodeURIComponent(actorName)` 적용
   - 서버(`lib/actor.ts`): `decodeURIComponent(rawName)` 적용
 
-### Phase 5 — 폴리싱 (2차, 진행 중)
-- [ ] **작업 탭 개선** (예정)
-- [ ] 대시보드 전체 카운트용 dedicated count API (`/api/work-items/count`) — 현재는 첫 페이지 50건 기준
+### Phase 5 — 폴리싱 ✅ 완료
+
+- [x] **설정 페이지** (`/settings`) — 서비스명 / 멤버 / 코드관리(분류+시스템코드) / 백업 4탭
+- [x] **서비스명 동적화** — `Setting` 모델 DB 저장, 사이드바 실시간 반영
+- [x] **DB 백업** — `GET /api/backup` SQLite 파일 직접 다운로드
+- [x] **WorkSystem CRUD** — 티켓 시스템 코드 마스터
+- [x] **WorkCategory CRUD** — 작업 분류 동적화. `CATEGORIES` enum 완전 제거.
+- [x] **Status 8종 개편** — 대기/진행중/내부테스트/현업테스트/QA테스트/이관대기/이관완료/홀딩
+- [x] **MemberRole 정비** — WEB_DEV/APP_DEV/UI_DEV/PLANNING/DESIGN/ETC
+- [x] **멤버 탭 통합** — `/members` → `/settings` 리다이렉트
+- [x] **DatePicker / DateTimePicker** — Radix Popover 기반 커스텀 날짜 선택기
+- [x] **사이드바 개선** — 이름 변경 Dialog, 다크모드 resolvedTheme 수정, 액터 이름 즉시 반영
+- [x] **캘린더 이관 건수 표시** — 월/주 보기 셀 최상단 `[이관] N건` emerald 칩
+- [x] **칸반 개선** — PointerSensor(distance:8), 연속 드래그 CONFLICT 수정, 상태 필터 컬럼 연동
+- [ ] 대시보드 전체 카운트용 dedicated count API
 - [ ] CSV export (`/api/work-items/export.csv`)
-- [ ] WorkItem priority별 색상/정렬
-- [ ] Audit log 보존 정책 (예: 1년 이후 archive)
+- [ ] Audit log 보존 정책
 
 ### Phase 6 — Postgres 이관 대비 체크
 - [ ] raw SQL 금지 규칙 (schema.prisma로만)
@@ -214,11 +238,11 @@
 ---
 
 ## 5. 확정된 결정사항
-1. **Node 버전**: **Node 16 고정** (사내 제약). `engines` 명시 + 의존성 버전을 16 호환으로 핀 고정. Next.js 13.5 / Prisma 버전 선정 시 Node 16.14+ 호환 여부 체크.
-2. **category**: **enum 관리**. 1차 값: `FEATURE / BUGFIX / IMPROVEMENT / REFACTOR / OPS / ETC` (개발팀 중심, 추후 개선 예정).
+1. **Node 버전**: **Node 16 고정** (사내 제약). `engines` 명시 + 의존성 버전을 16 호환으로 핀 고정.
+2. **category**: **동적 관리**. `WorkCategory` 모델 + `/api/work-categories` CRUD. 설정 > 코드관리 탭에서 등록.
 3. **TeamMember 멀티롤**: **1차는 단일 role**. 멀티롤은 추후 조인 테이블로 확장.
-4. **CSV export**: **2차로 분리** (1차 제외).
-5. **감사 로그 보존 정책**: **추후 결정** (1차는 무제한 + diff 저장으로 진행).
+4. **CSV export**: **후속 작업** (Phase 6 또는 선택).
+5. **감사 로그 보존 정책**: **추후 결정** (1차는 무제한 + diff 저장).
 
 ## 6. 1차 범위 재조정
 - 대시보드(상태별 카운트, 오늘 이관 예정)는 이전 논의대로 **1차 포함** 유지 — 필요 없으면 알려주세요.
