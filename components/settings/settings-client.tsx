@@ -31,8 +31,7 @@ export function SettingsClient() {
         <TabsList>
           <TabsTrigger value="service">서비스</TabsTrigger>
           <TabsTrigger value="members">멤버</TabsTrigger>
-          <TabsTrigger value="categories">분류 관리</TabsTrigger>
-          <TabsTrigger value="codes">시스템 코드</TabsTrigger>
+          <TabsTrigger value="codes">코드 관리</TabsTrigger>
           <TabsTrigger value="backup">백업</TabsTrigger>
         </TabsList>
 
@@ -41,9 +40,6 @@ export function SettingsClient() {
         </TabsContent>
         <TabsContent value="members" className="mt-6">
           <MembersClient />
-        </TabsContent>
-        <TabsContent value="categories" className="mt-6">
-          <CategoriesTab />
         </TabsContent>
         <TabsContent value="codes" className="mt-6">
           <CodesTab />
@@ -342,14 +338,23 @@ function WorkCategoryDialog({
   );
 }
 
-/* ───────────────────────────── 시스템 코드 탭 ───────────────────────────── */
+/* ───────────────────────────── 코드 관리 탭 (분류 + 시스템) ───────────────────────────── */
+
+function CodesTab() {
+  return (
+    <div className="space-y-10">
+      <CategoriesTab />
+      <WorkSystemsSection />
+    </div>
+  );
+}
 
 type WorkSystemDialogState =
   | { mode: "closed" }
   | { mode: "create" }
   | { mode: "edit"; item: WorkSystem };
 
-function CodesTab() {
+function WorkSystemsSection() {
   const [items, setItems] = React.useState<WorkSystem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialog, setDialog] = React.useState<WorkSystemDialogState>({ mode: "closed" });
