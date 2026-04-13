@@ -153,6 +153,12 @@ function AllDayCell({
 }) {
   return (
     <div className="group relative min-h-[2.5rem] border-r last:border-r-0 p-1 space-y-0.5">
+      {transferCount > 0 && (
+        <div className="flex items-center gap-1 rounded bg-emerald-500/10 px-1 py-0.5">
+          <span className="shrink-0 rounded px-0.5 text-[8px] font-semibold leading-[13px] bg-emerald-500/20 text-emerald-500">이관</span>
+          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">{transferCount}건</span>
+        </div>
+      )}
       {events.map((ev) => {
         const badge = getCategoryBadge(ev.category);
         return (
@@ -169,12 +175,6 @@ function AllDayCell({
           </button>
         );
       })}
-      {transferCount > 0 && (
-        <div className="flex items-center gap-1 rounded bg-emerald-500/10 px-1 py-0.5">
-          <span className="shrink-0 rounded px-0.5 text-[8px] font-semibold leading-[13px] bg-emerald-500/20 text-emerald-500">이관</span>
-          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">{transferCount}건</span>
-        </div>
-      )}
       <button
         onClick={onAddClick}
         className="absolute right-0.5 top-0.5 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"

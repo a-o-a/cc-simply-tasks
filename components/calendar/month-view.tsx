@@ -247,14 +247,6 @@ export function MonthView({
                   </button>
                 </div>
                 <div className="mt-1 space-y-0.5">
-                  {chipEvents.map((event) => (
-                    <DraggableChip
-                      key={`${event.id}__${dayKey}`}
-                      event={event}
-                      dayKey={dayKey}
-                      onClick={() => onEventClick(event)}
-                    />
-                  ))}
                   {transferCount > 0 && (
                     <div className="flex w-full items-center gap-1 rounded bg-emerald-500/10 px-1 py-0.5">
                       <span className="shrink-0 rounded px-1 text-[9px] font-semibold leading-[14px] bg-emerald-500/20 text-emerald-500">
@@ -265,6 +257,14 @@ export function MonthView({
                       </span>
                     </div>
                   )}
+                  {chipEvents.map((event) => (
+                    <DraggableChip
+                      key={`${event.id}__${dayKey}`}
+                      event={event}
+                      dayKey={dayKey}
+                      onClick={() => onEventClick(event)}
+                    />
+                  ))}
                 </div>
               </DroppableCell>
             );
