@@ -150,10 +150,11 @@ export function KanbanView({
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <div className="overflow-x-auto pb-2">
       <div
         className="grid gap-3"
         style={{
-          gridTemplateColumns: `repeat(${Math.max(visibleStatuses.length, 1)}, minmax(0, 1fr))`,
+          gridTemplateColumns: `repeat(${Math.max(visibleStatuses.length, 1)}, 220px)`,
         }}
       >
         {visibleStatuses.map((status) => {
@@ -167,6 +168,7 @@ export function KanbanView({
             />
           );
         })}
+      </div>
       </div>
     </DndContext>
   );
