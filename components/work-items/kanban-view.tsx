@@ -14,6 +14,7 @@ import { formatDate } from "@/lib/client/format";
 import type { WorkItemListItem } from "@/lib/client/types";
 import { STATUSES, type Status } from "@/lib/enums";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/enum-labels";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PriorityBadge } from "./status-badge";
 
@@ -122,12 +123,63 @@ export function KanbanView({
   onUpdate: (id: string, status: Status) => void;
 }) {
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
+
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = React.useState(false);
+  const [canRight, setCanRight] = React.useState(false);
+  const isDragging = React.useRef(false);
+  const dragStartX = React.useRef(0);
+  const dragStartLeft = React.useRef(0);
+
+  // 스크롤 위치에 따라 화살표 표시 여부 갱신
+  const updateArrows = React.useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 2);
+    setCanRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 2);
+  }, []);
+
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateArrows();
+    el.addEventListener("scroll", updateArrows, { passive: true });
+    const ro = new ResizeObserver(updateArrows);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateArrows);
+      ro.disconnect();
+    };
+  }, [updateArrows]);
+
+  // 배경 클릭-드래그 스크롤
+  function handleMouseDown(e: React.MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (target.closest("button")) return; // 카드/컬럼 버튼은 제외
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragStartLeft.current = scrollRef.current?.scrollLeft ?? 0;
+  }
+
+  React.useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !scrollRef.current) return;
+      scrollRef.current.scrollLeft = dragStartLeft.current - (e.clientX - dragStartX.current);
+    };
+    const onMouseUp = () => { isDragging.current = false; };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  function scrollBy(px: number) {
+    scrollRef.current?.scrollBy({ left: px, behavior: "smooth" });
+  }
 
   const grouped = React.useMemo(() => {
     const map = new Map<Status, WorkItemListItem[]>();
@@ -150,25 +202,53 @@ export function KanbanView({
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <div className="overflow-x-auto px-1 pb-3">
-      <div
-        className="grid gap-3"
-        style={{
-          gridTemplateColumns: `repeat(${Math.max(visibleStatuses.length, 1)}, 300px)`,
-        }}
-      >
-        {visibleStatuses.map((status) => {
-          const list = grouped.get(status) ?? [];
-          return (
-            <KanbanColumn
-              key={status}
-              status={status}
-              items={list}
-              onOpen={onOpen}
-            />
-          );
-        })}
-      </div>
+      <div className="relative">
+        {/* 좌측 화살표 */}
+        {canLeft && (
+          <button
+            onClick={() => scrollBy(-320)}
+            className="absolute left-0 top-0 bottom-0 z-10 flex items-center pl-1 pr-4 bg-gradient-to-r from-background via-background/70 to-transparent"
+          >
+            <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+          </button>
+        )}
+
+        {/* 우측 화살표 */}
+        {canRight && (
+          <button
+            onClick={() => scrollBy(320)}
+            className="absolute right-0 top-0 bottom-0 z-10 flex items-center pr-1 pl-4 bg-gradient-to-l from-background via-background/70 to-transparent"
+          >
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </button>
+        )}
+
+        {/* 스크롤 컨테이너 (스크롤바 숨김) */}
+        <div
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          className="overflow-x-auto px-1 pb-3 cursor-grab active:cursor-grabbing"
+          style={{ scrollbarWidth: "none" }}
+        >
+          <div
+            className="grid gap-3"
+            style={{
+              gridTemplateColumns: `repeat(${Math.max(visibleStatuses.length, 1)}, 300px)`,
+            }}
+          >
+            {visibleStatuses.map((status) => {
+              const list = grouped.get(status) ?? [];
+              return (
+                <KanbanColumn
+                  key={status}
+                  status={status}
+                  items={list}
+                  onOpen={onOpen}
+                />
+              );
+            })}
+          </div>
+        </div>
       </div>
     </DndContext>
   );

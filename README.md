@@ -51,7 +51,8 @@
 │       │   └── [id]/route.ts    # GET, PATCH, DELETE
 │       ├── calendar-events/
 │       │   ├── route.ts         # GET(range ?from&to), POST
-│       │   └── [id]/route.ts    # GET, PATCH, DELETE
+│       │   ├── [id]/route.ts    # GET, PATCH, DELETE
+│       │   └── stream/route.ts  # GET — SSE (캘린더 변경 실시간 푸시)
 │       ├── work-systems/        # 티켓 시스템 코드 CRUD
 │       │   ├── route.ts
 │       │   └── [id]/route.ts
@@ -60,12 +61,13 @@
 │       │   └── [id]/route.ts
 │       ├── settings/route.ts    # GET / PATCH (service_name)
 │       ├── backup/route.ts      # GET — SQLite DB 파일 다운로드
+│       ├── db-stats/route.ts    # GET — 테이블별 레코드 수
 │       └── audit-logs/
 │           └── route.ts         # GET(read-only, ?entityType&entityId 등)
 ├── components/
 │   ├── app-shell.tsx            # 사이드바 + 게이트 + 토스터 셸 (h-screen 레이아웃)
 │   ├── sidebar.tsx              # 좌측 네비게이션 (240/64 collapsible, 서비스명 동적 표시)
-│   ├── member-filter.tsx        # 재사용 팀원 필터 (Radix Popover)
+│   ├── member-filter.tsx        # 재사용 팀원 필터 드롭다운 (Radix Popover, 캘린더·작업 공용)
 │   ├── actor-name-gate.tsx      # 액터 이름 강제 모달 (ESC/바깥 차단)
 │   ├── toaster.tsx
 │   ├── theme-provider.tsx / theme-toggle.tsx
@@ -74,7 +76,7 @@
 │   │   ├── date-picker.tsx      # DatePicker (yyyy-MM-dd) + DateTimePicker (yyyy-MM-ddTHH:mm)
 │   │   └── popover.tsx          # Radix Popover
 │   ├── work-items/
-│   │   ├── work-items-client.tsx  # 필터바 + 보기 토글 진입점
+│   │   ├── work-items-client.tsx  # 헤더(좌:타이틀/가운데:뷰토글/우:추가) + 필터바
 │   │   ├── table-view.tsx
 │   │   ├── kanban-view.tsx
 │   │   ├── gantt-view.tsx
@@ -82,24 +84,24 @@
 │   │   ├── work-item-form-dialog.tsx
 │   │   └── status-badge.tsx
 │   ├── calendar/
-│   │   ├── calendar-client.tsx    # 오케스트레이터 (DnD 컨텍스트, 이관 건수 fetch)
+│   │   ├── calendar-client.tsx    # 오케스트레이터 (DnD, SSE 구독, 이관 건수 fetch)
 │   │   ├── month-view.tsx         # 월 보기 그리드 (draggable 칩 + 이관 칩)
-│   │   ├── week-view.tsx          # 주 보기 타임그리드 (종일 스트립 + 이관 칩)
 │   │   ├── event-form-dialog.tsx  # 생성/수정/삭제 통합
 │   │   └── use-calendar-drag.ts   # @dnd-kit 드래그 훅 (낙관적 업데이트)
 │   ├── dashboard/
 │   │   └── dashboard-client.tsx   # 이번주 이관 예정 | 진행중인 작업 | 오늘 일정 + 최근 활동
 │   ├── settings/
-│   │   └── settings-client.tsx    # 설정 탭 (서비스 / 멤버 / 코드관리 / 백업)
+│   │   └── settings-client.tsx    # 설정 탭 (서비스 / 멤버 / 코드관리 / 백업+DB현황)
 │   └── (members-client.tsx → app/members/ 아래)
 ├── lib/
 │   ├── client/
 │   │   ├── api.ts               # fetch wrapper (If-Match, x-actor-name, SERVICE_NAME_STORAGE_KEY)
 │   │   ├── use-toast.ts
 │   │   ├── types.ts             # 클라이언트용 도메인 타입 (WorkCategory, WorkSystem, AppSettings 포함)
-│   │   ├── format.ts            # KST 날짜/시간 포맷 + date input ↔ ISO 변환
-│   │   └── calendar.ts          # KST 월 그리드, eventDayKeys, weekdayLabel
+│   │   ├── format.ts            # KST 날짜/시간 포맷 — formatDate(yyyy-mm-dd) / formatDateTime(yyyy-mm-dd hh:mm:ss)
+│   │   └── calendar.ts          # KST 월 그리드, eventDayKeys, kstWeekContaining
 │   ├── db.ts                    # Prisma 싱글톤 + SQLite PRAGMA
+│   ├── calendar-bus.ts          # SSE용 서버 싱글톤 EventEmitter (globalThis 보관)
 │   ├── enums.ts                 # enum 소스 오브 트루스 (Status 8종, Priority, MemberRole 등)
 │   ├── enum-labels.ts           # enum → 한글 라벨 (표시 전용, CATEGORY_LABELS 제거됨)
 │   ├── time.ts / actor.ts / diff.ts / audit.ts / http.ts
@@ -188,6 +190,8 @@ curl -O http://localhost:3000/api/backup
 | **4+** | 캘린더 개선 (주 보기, 드래그 이동, 팀원 필터, 카테고리 정리, 다중 담당자) | ✅ 완료 |
 | **4++** | 대시보드 개편 (3열 레이아웃, 진행중인 작업, 작업 드로어 연동) | ✅ 완료 |
 | **5** | 폴리싱 (설정 페이지, 상태값 개편, 분류 동적화, DatePicker, 캘린더 이관 표시 등) | ✅ 완료 |
+| **5+** | UI 통일 · 캘린더 SSE · 필터 개선 · 날짜 포맷 통일 · DB 현황 등 | ✅ 완료 |
+| **5++** | 칸반/간트 스크롤 UX · 간트 크로스헤어 · 날짜 컬러링 · 휴일 연동 | ✅ 완료 |
 | **6** | Postgres 이관 준비 런북 | ⏳ 대기 |
 
 ---
@@ -196,7 +200,7 @@ curl -O http://localhost:3000/api/backup
 
 ### 현재 상태 (2026-04-13)
 
-Phase 0–5 완료. `tsc --noEmit` 통과.
+Phase 0–5+ 완료. `tsc --noEmit` 통과.
 
 ### 알아야 할 결정사항
 
@@ -218,16 +222,52 @@ Phase 0–5 완료. `tsc --noEmit` 통과.
 | 캘린더 카테고리 | 4종: HOLIDAY/WORK/ABSENCE/ETC. HOLIDAY는 팀원 필터 무관 항상 노출, 셀 핑크 배경. |
 | 서비스명 | `Setting` 모델 DB 저장 (`key="service_name"`). 사이드바·설정에서 동기화, localStorage 캐시. |
 | DatePicker | `components/ui/date-picker.tsx` — `DatePicker`(날짜 전용) + `DateTimePicker`(날짜+시간). 캘린더 팝오버 방식. |
+| 날짜 포맷 | `formatDate` → `yyyy-mm-dd`, `formatDateTime` → `yyyy-mm-dd hh:mm:ss` (24h KST). `lib/client/format.ts` 단일화. |
+| 캘린더 SSE | `GET /api/calendar-events/stream` — EventSource로 실시간 구독. POST/PATCH/DELETE 시 `emitCalendarChanged()` 호출. 단일 서버 한정. |
+| 캘린더 주 보기 | 제거됨. 월 보기 전용으로 단순화. (`week-view.tsx` 삭제, `kstAddDays`/`kstWeekFetchRange` 제거) |
+| 작업 필터 | 순서: 분류→상태→담당자(MemberFilter 드롭다운)→우선순위→이관일. 티켓번호 필터 제거. 초기화 버튼 항상 표시. |
+| 헤더 레이아웃 통일 | 모든 페이지 `text-xl font-semibold` + `py-6`. 작업/캘린더: 좌(타이틀)/가운데(컨트롤)/우(추가버튼) 3분할. |
+| DB 현황 | `GET /api/db-stats` — 테이블별 전체 레코드 수. 설정→백업 탭 상단에 표시. |
+| 코드 관리 복원 | 소프트 딜리트된 코드를 같은 코드로 재등록 시 `create` 대신 복원(`deletedAt=null`). |
+| 칸반 스크롤 UX | 스크롤바 숨김(`scrollbarWidth:none`), 좌우 그라디언트 화살표(ResizeObserver로 가시 제어), 배경 클릭드래그 스크롤(카드 버튼은 제외). |
+| 간트 담당자 고정 | 담당자 열 `sticky left-0 z-10 bg-card` — 가로 스크롤 시 항상 고정. |
+| 간트 스크롤 UX | 좌측 화살표: 담당자 열 우측에 원형 버튼. 우측: 그라디언트 화살표. 배경 클릭드래그 스크롤. |
+| 간트 크로스헤어 | 마우스 호버 시 해당 날짜 열(파란 틴트)과 담당자 행(accent bg) 동시 하이라이트. 교차점은 더 진하게. |
+| 간트 날짜 컬러링 | 토요일: 연한 파랑, 일요일: 연한 레드, 오늘: 연한 회색(`bg-gray-200`). |
+| 간트 휴일 연동 | 간트 마운트 시 윈도우 범위의 `HOLIDAY` 캘린더 이벤트 fetch → 일요일과 동일한 연한 레드로 표시. |
 
 ### 남은 작업 (Phase 6, 선택)
 
 - `[ ]` 대시보드 전체 카운트용 dedicated count API (`/api/work-items/count`)
 - `[ ]` CSV export (`/api/work-items/export.csv`)
 - `[ ]` Gantt 드래그 reorder / 바 리사이즈
+- `[ ]` 이관완료 내역 별도 탭/페이지 (날짜 범위 필터 + 페이지네이션)
 - `[ ]` Audit log 보존 정책 / archive
 - `[ ]` Postgres 이관 런북 (DATABASE_URL 교체 → `prisma migrate` → seed)
 
 ---
+
+### Phase 5++ UX 개선 완료 내역 (2026-04-13)
+
+- **칸반 스크롤 UX** — 스크롤바 숨김, 좌측/우측 그라디언트 화살표(ResizeObserver로 동적 표시), 배경 클릭드래그 스크롤(카드 버튼 제외)
+- **간트 담당자 컬럼 고정** — `sticky left-0` 처리로 가로 스크롤 시에도 담당자 항상 표시
+- **간트 스크롤 UX** — 좌측 원형 화살표 버튼(담당자 열 바로 우측), 우측 그라디언트 화살표, 배경 클릭드래그 스크롤
+- **간트 크로스헤어 호버** — 마우스 위치 기준으로 날짜 열(열 전체 파란 틴트 + 헤더 강조)과 담당자 행(accent 배경) 동시 하이라이트. 교차점은 더 진하게 표시. 마우스 이탈 시 초기화.
+- **간트 날짜 컬러링** — 토요일: 연한 파랑, 일요일: 연한 레드, 오늘: 연한 회색(헤더 bg-gray-200 + 회색 세로선)
+- **간트 휴일 연동** — 윈도우 범위의 `HOLIDAY` 캘린더 이벤트 자동 fetch → 일요일과 동일한 연한 레드로 표시(다일 휴일도 날짜별 전개)
+
+### Phase 5+ 완료 내역 (2026-04-13)
+
+- **UI 헤더 통일** — 모든 페이지(홈/작업/캘린더/설정) `text-xl font-semibold` + `py-6` 통일
+- **캘린더 헤더 재배치** — 좌(타이틀) / 가운데(월네비+오늘+팀원필터) / 우(이벤트추가) 3분할
+- **작업 헤더 재배치** — 좌(타이틀) / 가운데(테이블·칸반·간트 뷰토글) / 우(작업추가) 3분할
+- **캘린더 주 보기 제거** — `week-view.tsx` 삭제, 관련 유틸(`kstAddDays`, `kstWeekFetchRange`) 제거, 월 보기 전용으로 단순화
+- **작업 필터 개선** — 순서 재정렬(분류→상태→담당자→우선순위→이관일), 티켓번호 필터 제거, 담당자를 `MemberFilter` 드롭다운으로 교체, 초기화 버튼 항상 표시
+- **날짜/시간 포맷 통일** — `formatDate`→`yyyy-mm-dd`, `formatDateTime`→`yyyy-mm-dd hh:mm:ss` (24h KST). `lib/client/format.ts` 단일화, members-client 로컬 함수 제거
+- **캘린더 SSE 실시간 동기화** — `lib/calendar-bus.ts` 서버 싱글톤 EventEmitter, `GET /api/calendar-events/stream` SSE 엔드포인트(25초 heartbeat), 캘린더 CRUD API에 `emitCalendarChanged()` 연동, `calendar-client.tsx`에 `EventSource` 구독 추가
+- **설정 백업 탭 DB 현황** — `GET /api/db-stats`로 테이블별 레코드 수 조회, 백업 탭 상단 표 형태로 표시(새로고침 버튼 포함)
+- **설정 멤버 탭 너비 제한** — `max-w-xl` 적용(다른 탭과 통일)
+- **코드 관리 소프트 딜리트 복원 버그 수정** — 삭제 후 동일 코드 재등록 시 unique 제약 오류 → 소프트 딜리트 레코드 복원으로 처리 (WorkCategory, WorkSystem 공통)
 
 ### Phase 5 폴리싱 완료 내역 (2026-04-13)
 
