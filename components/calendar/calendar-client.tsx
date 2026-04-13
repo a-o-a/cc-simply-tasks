@@ -91,7 +91,7 @@ export function CalendarClient() {
           },
         }),
         api.get<{ items: WorkItemListItem[]; nextCursor: string | null }>("/api/work-items", {
-          query: { transferDate: fromDate, transferDateTo: toDate, pageSize: "500" },
+          query: { transferDate: fromDate, transferDateTo: toDate },
         }),
       ]);
       setEvents(eventsRes.items);
