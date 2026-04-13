@@ -269,7 +269,7 @@ export function CalendarClient() {
     >
       <div className="flex h-full flex-col overflow-hidden">
         {/* ── 헤더 ── */}
-        <header className="flex shrink-0 items-center gap-3 border-b px-6 py-3">
+        <header className="flex shrink-0 items-center gap-3 px-8 py-4">
           {/* 년월 네비게이션 */}
           <div className="flex items-center rounded-md border bg-card">
             <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전">
@@ -338,7 +338,7 @@ export function CalendarClient() {
         </header>
 
           {/* 캘린더 영역 */}
-          <div className="flex-1 overflow-hidden p-4">
+          <div className="flex-1 overflow-hidden px-8 py-6">
             {viewMode === "month" ? (
               <MonthView
                 grid={grid}
