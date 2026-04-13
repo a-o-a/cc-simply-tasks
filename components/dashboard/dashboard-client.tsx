@@ -19,6 +19,8 @@ import type {
   WorkCategory,
   WorkItemListItem,
 } from "@/lib/client/types";
+import { STATUSES, type Status } from "@/lib/enums";
+import { STATUS_LABELS } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/work-items/status-badge";
 import { WorkItemDrawer } from "@/components/work-items/work-item-drawer";
@@ -161,6 +163,9 @@ export function DashboardClient() {
           {todayKst} · {weekDates[0].slice(5).replace("-", "/")} – {weekDates[6].slice(5).replace("-", "/")} 주
         </p>
       </header>
+
+      {/* 작업 현황 통계 */}
+      <StatusStats items={items} />
 
       {/* 3열: 이번주 이관 예정 | 진행중인 작업 | 오늘 일정 */}
       <div className="grid gap-4 lg:grid-cols-3">
@@ -362,6 +367,73 @@ export function DashboardClient() {
           void loadItems();
         }}
       />
+    </div>
+  );
+}
+
+// ── 작업 현황 통계 ────────────────────────────────────────────────────────────
+
+const STATUS_STYLE: Record<Status, { bar: string; text: string }> = {
+  WAITING:        { bar: "bg-muted-foreground/30",   text: "text-muted-foreground" },
+  IN_PROGRESS:    { bar: "bg-blue-500",              text: "text-blue-500" },
+  INTERNAL_TEST:  { bar: "bg-violet-500",            text: "text-violet-500" },
+  BUSINESS_TEST:  { bar: "bg-amber-500",             text: "text-amber-500" },
+  QA_TEST:        { bar: "bg-orange-500",            text: "text-orange-500" },
+  TRANSFER_READY: { bar: "bg-cyan-500",              text: "text-cyan-500" },
+  TRANSFERRED:    { bar: "bg-emerald-500",           text: "text-emerald-500" },
+  HOLDING:        { bar: "bg-red-500",               text: "text-red-500" },
+};
+
+function StatusStats({ items }: { items: WorkItemListItem[] | null }) {
+  const counts = React.useMemo(() => {
+    const map = new Map<Status, number>();
+    for (const s of STATUSES) map.set(s, 0);
+    for (const item of items ?? []) {
+      map.set(item.status as Status, (map.get(item.status as Status) ?? 0) + 1);
+    }
+    return map;
+  }, [items]);
+
+  const total = items?.length ?? 0;
+
+  return (
+    <div className="rounded-lg border bg-card px-4 py-3">
+      <div className="mb-3 flex items-baseline gap-2">
+        <span className="text-2xl font-bold tabular-nums">{items === null ? "—" : total}</span>
+        <span className="text-sm text-muted-foreground">건 전체</span>
+      </div>
+      {/* 진행 바 */}
+      {items !== null && total > 0 && (
+        <div className="mb-4 flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          {STATUSES.map((s) => {
+            const cnt = counts.get(s) ?? 0;
+            if (cnt === 0) return null;
+            return (
+              <div
+                key={s}
+                className={cn("h-full transition-all", STATUS_STYLE[s].bar)}
+                style={{ width: `${(cnt / total) * 100}%` }}
+                title={`${STATUS_LABELS[s]}: ${cnt}건`}
+              />
+            );
+          })}
+        </div>
+      )}
+      {/* 상태별 카드 */}
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+        {STATUSES.map((s) => {
+          const cnt = counts.get(s) ?? 0;
+          const style = STATUS_STYLE[s];
+          return (
+            <div key={s} className="flex flex-col gap-1 rounded-md bg-muted/40 px-2 py-2">
+              <span className="text-[10px] text-muted-foreground leading-tight">{STATUS_LABELS[s]}</span>
+              <span className={cn("text-lg font-bold tabular-nums leading-none", items === null ? "text-muted-foreground" : style.text)}>
+                {items === null ? "—" : cnt}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
