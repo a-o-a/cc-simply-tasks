@@ -3,6 +3,7 @@ import { prisma, ensureSqlitePragma } from "@/lib/db";
 import { withErrorHandler } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
+import { emitCalendarChanged } from "@/lib/calendar-bus";
 import {
   calendarEventCreateSchema,
   calendarEventRangeQuerySchema,
@@ -73,5 +74,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return row;
   });
 
+  emitCalendarChanged();
   return NextResponse.json(created, { status: 201 });
 });

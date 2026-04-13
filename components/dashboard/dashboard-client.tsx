@@ -155,10 +155,10 @@ export function DashboardClient() {
   }
 
   return (
-    <div className="px-8 py-10 space-y-6">
+    <div className="px-8 py-6 space-y-6">
       {/* 헤더 */}
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">홈</h1>
+        <h1 className="text-xl font-semibold">홈</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {todayKst} · {weekDates[0].slice(5).replace("-", "/")} – {weekDates[6].slice(5).replace("-", "/")} 주
         </p>
@@ -308,9 +308,6 @@ export function DashboardClient() {
             <ListChecks className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-sm font-semibold">최근 활동</h2>
           </div>
-          <Link href="/work-items" className="text-xs text-muted-foreground hover:text-foreground">
-            전체 보기
-          </Link>
         </header>
         <div className="p-2">
           {logs === null ? (

@@ -4,6 +4,7 @@ import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { assertIfMatch } from "@/lib/optimisticLock";
+import { emitCalendarChanged } from "@/lib/calendar-bus";
 import { calendarEventUpdateSchema } from "@/lib/validation/calendarEvent";
 
 type Params = { params: { id: string } };
@@ -74,6 +75,7 @@ export const PATCH = withErrorHandler(
       return after;
     });
 
+    emitCalendarChanged();
     return NextResponse.json(updated);
   },
 );
@@ -108,6 +110,7 @@ export const DELETE = withErrorHandler(
       });
     });
 
+    emitCalendarChanged();
     return new NextResponse(null, { status: 204 });
   },
 );

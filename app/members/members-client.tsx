@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { ApiError, api } from "@/lib/client/api";
 import { toast } from "@/lib/client/use-toast";
+import { formatDate } from "@/lib/client/format";
 import { MEMBER_ROLES, type MemberRole } from "@/lib/enums";
 import { MEMBER_ROLE_LABELS } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
@@ -77,7 +78,7 @@ export function MembersClient() {
   }, [load]);
 
   return (
-    <div>
+    <div className="max-w-xl">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
           팀원 정보를 관리합니다. 작업/캘린더의 담당자로 사용됩니다.
@@ -357,15 +358,6 @@ function handleApiError(err: unknown, fallbackTitle: string) {
   toast({ title: fallbackTitle, variant: "destructive" });
 }
 
-function formatDate(iso: string): string {
-  // KST 표시. Phase 4 후반에 lib/client/format.ts로 일원화 예정.
-  return new Date(iso).toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-}
 
 function SkeletonRows() {
   return (

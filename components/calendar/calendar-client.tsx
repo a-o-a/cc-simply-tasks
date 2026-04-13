@@ -13,10 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/client/api";
 import {
   eventDayKeys,
-  kstAddDays,
   kstMonthGrid,
-  kstWeekContaining,
-  kstWeekFetchRange,
 } from "@/lib/client/calendar";
 import { toast } from "@/lib/client/use-toast";
 import type { CalendarEvent, Member, WorkItemListItem } from "@/lib/client/types";
@@ -25,11 +22,9 @@ import { cn } from "@/lib/utils";
 import { MemberFilter } from "@/components/member-filter";
 import { EventFormDialog } from "./event-form-dialog";
 import { MonthView, getCategoryBadge } from "./month-view";
-import { WeekView } from "./week-view";
 import { useCalendarDrag, type DragData } from "./use-calendar-drag";
 
 type ListResponse = { items: CalendarEvent[] };
-type ViewMode = "month" | "week";
 
 // ── 오늘 KST 날짜 ──────────────────────────────────────────────────────────────
 
@@ -49,7 +44,6 @@ export function CalendarClient() {
 
   const [cursor, setCursor] = React.useState(() => cursorFromDateStr(today));
   const [selectedDate, setSelectedDate] = React.useState(today);
-  const [viewMode, setViewMode] = React.useState<ViewMode>("month");
 
   const [events, setEvents] = React.useState<CalendarEvent[]>([]);
   const [members, setMembers] = React.useState<Member[]>([]);
@@ -71,10 +65,9 @@ export function CalendarClient() {
   // ── 패치 범위 ───────────────────────────────────────────────────────────────
 
   const { fromMs: gridFromMs, toMs: gridToMs } = React.useMemo(() => {
-    if (viewMode === "week") return kstWeekFetchRange(selectedDate);
     const grid = kstMonthGrid(cursor.year, cursor.month0);
     return { fromMs: grid[0], toMs: grid[41] + 24 * 60 * 60 * 1000 };
-  }, [viewMode, selectedDate, cursor]);
+  }, [cursor]);
 
   // ── 데이터 로드 ─────────────────────────────────────────────────────────────
 
@@ -123,6 +116,16 @@ export function CalendarClient() {
     void loadEvents();
   }, [loadEvents]);
 
+  // ── SSE: 다른 클라이언트의 변경을 실시간으로 반영 ────────────────────────────
+  React.useEffect(() => {
+    const es = new EventSource("/api/calendar-events/stream");
+    es.onmessage = () => void loadEvents();
+    es.onerror = () => {
+      // EventSource는 에러 시 자동 재연결. 별도 처리 불필요.
+    };
+    return () => es.close();
+  }, [loadEvents]);
+
   // ── 필터링 & dayMap ─────────────────────────────────────────────────────────
 
   const filteredEvents = React.useMemo(() => {
@@ -155,45 +158,28 @@ export function CalendarClient() {
     return map;
   }, [transferItems]);
 
-  // ── 그리드 / 주 계산 ────────────────────────────────────────────────────────
+  // ── 그리드 계산 ─────────────────────────────────────────────────────────────
 
   const grid = React.useMemo(
     () => kstMonthGrid(cursor.year, cursor.month0),
     [cursor],
   );
 
-  const weekDates = React.useMemo(
-    () => kstWeekContaining(selectedDate),
-    [selectedDate],
-  );
-
   // ── 네비게이션 ──────────────────────────────────────────────────────────────
 
   function gotoPrev() {
-    if (viewMode === "month") {
-      setCursor((c) =>
-        c.month0 === 0
-          ? { year: c.year - 1, month0: 11 }
-          : { year: c.year, month0: c.month0 - 1 },
-      );
-    } else {
-      const d = kstAddDays(selectedDate, -7);
-      setSelectedDate(d);
-      setCursor(cursorFromDateStr(d));
-    }
+    setCursor((c) =>
+      c.month0 === 0
+        ? { year: c.year - 1, month0: 11 }
+        : { year: c.year, month0: c.month0 - 1 },
+    );
   }
   function gotoNext() {
-    if (viewMode === "month") {
-      setCursor((c) =>
-        c.month0 === 11
-          ? { year: c.year + 1, month0: 0 }
-          : { year: c.year, month0: c.month0 + 1 },
-      );
-    } else {
-      const d = kstAddDays(selectedDate, 7);
-      setSelectedDate(d);
-      setCursor(cursorFromDateStr(d));
-    }
+    setCursor((c) =>
+      c.month0 === 11
+        ? { year: c.year + 1, month0: 0 }
+        : { year: c.year, month0: c.month0 + 1 },
+    );
   }
   function gotoToday() {
     setSelectedDate(today);
@@ -202,9 +188,6 @@ export function CalendarClient() {
   function handleDateSelect(dayKey: string) {
     setSelectedDate(dayKey);
     setCursor(cursorFromDateStr(dayKey));
-  }
-  function switchView(mode: ViewMode) {
-    setViewMode(mode);
   }
 
   // ── 팀원 필터 ───────────────────────────────────────────────────────────────
@@ -238,20 +221,7 @@ export function CalendarClient() {
 
   // ── 헤더 라벨 ──────────────────────────────────────────────────────────────
 
-  const headerLabel = React.useMemo(() => {
-    if (viewMode === "month") {
-      return `${cursor.year}년 ${cursor.month0 + 1}월`;
-    }
-    const startDay = Number(weekDates[0].slice(8, 10));
-    const endDay = Number(weekDates[6].slice(8, 10));
-    const startMonth = Number(weekDates[0].slice(5, 7));
-    const endMonth = Number(weekDates[6].slice(5, 7));
-    const year = Number(weekDates[3].slice(0, 4));
-    if (startMonth === endMonth) {
-      return `${year}년 ${startMonth}월 ${startDay}일 – ${endDay}일`;
-    }
-    return `${year}년 ${startMonth}월 ${startDay}일 – ${endMonth}월 ${endDay}일`;
-  }, [viewMode, cursor, weekDates]);
+  const headerLabel = `${cursor.year}년 ${cursor.month0 + 1}월`;
 
   // ── 렌더 ────────────────────────────────────────────────────────────────────
 
@@ -269,105 +239,68 @@ export function CalendarClient() {
     >
       <div className="flex h-full flex-col overflow-hidden">
         {/* ── 헤더 ── */}
-        <header className="flex shrink-0 items-center gap-3 px-8 py-4">
-          {/* 년월 네비게이션 */}
-          <div className="flex items-center rounded-md border bg-card">
-            <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전">
-              <ChevronLeft className="h-4 w-4" />
+        <header className="flex shrink-0 items-center px-8 py-6">
+          {/* 왼쪽: 타이틀 */}
+          <h1 className="text-xl font-semibold">캘린더</h1>
+
+          {/* 가운데: 월 선택 + 오늘 + 팀원 필터 */}
+          <div className="flex flex-1 items-center justify-center gap-3">
+            <div className="flex items-center rounded-md border bg-card">
+              <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[10rem] px-3 text-center text-sm font-medium tabular-nums">
+                {headerLabel}
+              </span>
+              <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <Button variant="outline" onClick={gotoToday}>
+              오늘
             </Button>
-            <span className="min-w-[13rem] px-3 text-center text-sm font-medium tabular-nums">
-              {headerLabel}
-            </span>
-            <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+
+            <MemberFilter
+              members={members}
+              selectedIds={selectedMemberIds}
+              onToggle={toggleMember}
+              onClear={clearMembers}
+            />
           </div>
 
-          {/* 팀원 필터 */}
-          <MemberFilter
-            members={members}
-            selectedIds={selectedMemberIds}
-            onToggle={toggleMember}
-            onClear={clearMembers}
-          />
-
-          <div className="flex-1" />
-
-          {/* 뷰 토글 */}
-          <div className="flex overflow-hidden rounded-md border text-sm">
-            <button
-              onClick={() => switchView("month")}
-              className={cn(
-                "px-3 py-1.5 transition-colors",
-                viewMode === "month"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-accent",
-              )}
+          {/* 오른쪽: 로딩 + 이벤트 추가 */}
+          <div className="flex items-center gap-3">
+            {loading && (
+              <span className="text-xs text-muted-foreground">불러오는 중…</span>
+            )}
+            <Button
+              onClick={() =>
+                setDialogState({ mode: "create", defaultDate: selectedDate })
+              }
             >
-              월
-            </button>
-            <button
-              onClick={() => switchView("week")}
-              className={cn(
-                "border-l px-3 py-1.5 transition-colors",
-                viewMode === "week"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-accent",
-              )}
-            >
-              주
-            </button>
+              <Plus className="mr-2 h-4 w-4" />
+              이벤트 추가
+            </Button>
           </div>
-
-          <Button variant="outline" onClick={gotoToday}>
-            오늘
-          </Button>
-
-          {loading && (
-            <span className="text-xs text-muted-foreground">불러오는 중…</span>
-          )}
-
-          <Button
-            onClick={() =>
-              setDialogState({ mode: "create", defaultDate: selectedDate })
-            }
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            이벤트 추가
-          </Button>
         </header>
 
-          {/* 캘린더 영역 */}
-          <div className="flex-1 overflow-hidden px-8 py-6">
-            {viewMode === "month" ? (
-              <MonthView
-                grid={grid}
-                cursor={cursor}
-                today={today}
-                eventsByDay={eventsByDay}
-                transfersByDay={transfersByDay}
-                onAddClick={(dayKey) =>
-                  setDialogState({ mode: "create", defaultDate: dayKey })
-                }
-                onEventClick={(event) =>
-                  setDialogState({ mode: "edit", event })
-                }
-              />
-            ) : (
-              <WeekView
-                weekDates={weekDates}
-                today={today}
-                eventsByDay={eventsByDay}
-                transfersByDay={transfersByDay}
-                onAddClick={(dayKey) =>
-                  setDialogState({ mode: "create", defaultDate: dayKey })
-                }
-                onEventClick={(event) =>
-                  setDialogState({ mode: "edit", event })
-                }
-              />
-            )}
-          </div>
+        {/* 캘린더 영역 */}
+        <div className="flex-1 overflow-hidden px-8 py-6">
+          <MonthView
+            grid={grid}
+            cursor={cursor}
+            today={today}
+            eventsByDay={eventsByDay}
+            transfersByDay={transfersByDay}
+            onAddClick={(dayKey) =>
+              setDialogState({ mode: "create", defaultDate: dayKey })
+            }
+            onEventClick={(event) =>
+              setDialogState({ mode: "edit", event })
+            }
+          />
+        </div>
       </div>
 
       {/* ── 드래그 오버레이 ── */}

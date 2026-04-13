@@ -10,9 +10,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { MemberFilter } from "@/components/member-filter";
 import { ApiError, api } from "@/lib/client/api";
 import { toast } from "@/lib/client/use-toast";
 import type {
@@ -59,7 +58,6 @@ interface Filters {
   assigneeId: string[];
   category: string[];
   priority: Priority[];
-  ticket: string;
   transferDate: string;
 }
 
@@ -68,7 +66,6 @@ const EMPTY_FILTERS: Filters = {
   assigneeId: [],
   category: [],
   priority: [],
-  ticket: "",
   transferDate: "",
 };
 
@@ -132,7 +129,6 @@ export function WorkItemsClient() {
             assigneeId: filters.assigneeId.length > 0 ? filters.assigneeId.join(",") : undefined,
             category: filters.category.length > 0 ? filters.category.join(",") : undefined,
             priority: filters.priority.length > 0 ? filters.priority.join(",") : undefined,
-            ticket: filters.ticket.trim() || undefined,
             transferDate: filters.transferDate || undefined,
           },
         },
@@ -226,19 +222,15 @@ export function WorkItemsClient() {
 
   return (
     <div className="px-8 py-6">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            담당자별/이관일별로 작업을 관리합니다. 카드/행을 클릭하면 상세가 열립니다.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <header className="flex items-center">
+        <h1 className="text-xl font-semibold">작업</h1>
+        <div className="flex flex-1 justify-center">
           <ViewToggle value={view} onChange={changeView} />
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            작업 추가
-          </Button>
         </div>
+        <Button onClick={openCreate}>
+          <Plus className="mr-2 h-4 w-4" />
+          작업 추가
+        </Button>
       </header>
 
       <FilterBar
@@ -381,14 +373,7 @@ function FilterBar({
     set("status", newStatus);
   }
 
-  function toggleAssignee(id: string) {
-    const newAssignee = filters.assigneeId.includes(id)
-      ? filters.assigneeId.filter((a) => a !== id)
-      : [...filters.assigneeId, id];
-    set("assigneeId", newAssignee);
-  }
-
-  function toggleCategory(code: string) {
+function toggleCategory(code: string) {
     const newCategory = filters.category.includes(code)
       ? filters.category.filter((c) => c !== code)
       : [...filters.category, code];
@@ -402,123 +387,109 @@ function FilterBar({
     set("priority", newPriority);
   }
 
-  const hasAny =
-    filters.status.length > 0 ||
-    filters.assigneeId.length > 0 ||
-    filters.category.length > 0 ||
-    filters.priority.length > 0 ||
-    filters.ticket;
-
   return (
-    <div className="mt-4 grid gap-3 rounded-lg border bg-card p-3 md:grid-cols-5">
-      <div className="space-y-1.5">
-        <Label className="text-xs">상태</Label>
-        <div className="flex flex-wrap gap-1">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              onClick={() => toggleStatus(s)}
-              className={cn(
-                "inline-flex items-center rounded px-2 py-1 text-xs",
-                filters.status.includes(s)
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-              )}
-            >
-              {STATUS_LABELS[s]}
-            </button>
-          ))}
+    <div className="mt-4 rounded-lg border bg-card p-3">
+      <div className="grid gap-3 md:grid-cols-5">
+        {/* 분류 */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">분류</Label>
+          <div className="flex flex-wrap gap-1">
+            {categories.length === 0 ? (
+              <span className="text-xs text-muted-foreground">설정에서 분류를 추가하세요</span>
+            ) : (
+              categories.map((c) => (
+                <button
+                  key={c.code}
+                  onClick={() => toggleCategory(c.code)}
+                  className={cn(
+                    "inline-flex items-center rounded px-2 py-1 text-xs",
+                    filters.category.includes(c.code)
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+                  )}
+                >
+                  {c.name}
+                </button>
+              ))
+            )}
+          </div>
         </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs">담당자</Label>
-        <div className="flex flex-wrap gap-1">
-          {members.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => toggleAssignee(m.id)}
-              className={cn(
-                "inline-flex items-center rounded px-2 py-1 text-xs",
-                filters.assigneeId.includes(m.id)
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-              )}
-            >
-              {m.name}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs">분류</Label>
-        <div className="flex flex-wrap gap-1">
-          {categories.length === 0 ? (
-            <span className="text-xs text-muted-foreground">설정에서 분류를 추가하세요</span>
-          ) : (
-            categories.map((c) => (
+
+        {/* 상태 */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">상태</Label>
+          <div className="flex flex-wrap gap-1">
+            {STATUSES.map((s) => (
               <button
-                key={c.code}
-                onClick={() => toggleCategory(c.code)}
+                key={s}
+                onClick={() => toggleStatus(s)}
                 className={cn(
                   "inline-flex items-center rounded px-2 py-1 text-xs",
-                  filters.category.includes(c.code)
+                  filters.status.includes(s)
                     ? "bg-primary text-primary-foreground"
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
                 )}
               >
-                {c.name}
+                {STATUS_LABELS[s]}
               </button>
-            ))
-          )}
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs">우선순위</Label>
-        <div className="flex flex-wrap gap-1">
-          {PRIORITIES.map((p) => (
-            <button
-              key={p}
-              onClick={() => togglePriority(p)}
-              className={cn(
-                "inline-flex items-center rounded px-2 py-1 text-xs",
-                filters.priority.includes(p)
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-              )}
-            >
-              {PRIORITY_LABELS[p]}
-            </button>
-          ))}
+
+        {/* 담당자 */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">담당자</Label>
+          <div className="flex flex-wrap gap-1">
+            <MemberFilter
+              members={members}
+              selectedIds={new Set(filters.assigneeId)}
+              onToggle={(id) => {
+                const next = filters.assigneeId.includes(id)
+                  ? filters.assigneeId.filter((a) => a !== id)
+                  : [...filters.assigneeId, id];
+                set("assigneeId", next);
+              }}
+              onClear={() => set("assigneeId", [])}
+            />
+          </div>
         </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs">티켓 번호</Label>
-        <div className="flex gap-2">
-          <Input
-            value={filters.ticket}
-            onChange={(e) => set("ticket", e.target.value)}
-            placeholder="ABC-1234"
+
+        {/* 우선순위 */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">우선순위</Label>
+          <div className="flex flex-wrap gap-1">
+            {PRIORITIES.map((p) => (
+              <button
+                key={p}
+                onClick={() => togglePriority(p)}
+                className={cn(
+                  "inline-flex items-center rounded px-2 py-1 text-xs",
+                  filters.priority.includes(p)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+                )}
+              >
+                {PRIORITY_LABELS[p]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 이관일 */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">이관일</Label>
+          <DatePicker
+            value={filters.transferDate}
+            onChange={(v) => set("transferDate", v)}
+            placeholder="날짜 선택"
           />
-          {hasAny ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onReset}
-              className="shrink-0"
-            >
-              초기화
-            </Button>
-          ) : null}
         </div>
       </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs">이관일 (부터)</Label>
-        <DatePicker
-          value={filters.transferDate}
-          onChange={(v) => set("transferDate", v)}
-          placeholder="날짜 선택"
-        />
+
+      <div className="mt-3 flex justify-end">
+        <Button type="button" variant="outline" size="sm" onClick={onReset}>
+          초기화
+        </Button>
       </div>
     </div>
   );

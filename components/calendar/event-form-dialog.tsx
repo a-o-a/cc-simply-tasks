@@ -22,6 +22,7 @@ import {
 } from "@/lib/client/calendar";
 import { toast } from "@/lib/client/use-toast";
 import type { CalendarEvent, CalendarEventCategory, Member } from "@/lib/client/types";
+import { MemberFilter } from "@/components/member-filter";
 
 /**
  * 캘린더 이벤트 생성/수정 다이얼로그.
@@ -308,33 +309,22 @@ export function EventFormDialog({
                 value={state.title}
                 onChange={(e) => update("title", e.target.value)}
                 maxLength={300}
-                placeholder="예: 결제팀 워크샵"
+                placeholder="예: 대시보드에 요약정보 표시 영역 추가"
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>담당자</Label>
-              <div className="max-h-32 overflow-y-auto rounded-md border border-input bg-background p-2 space-y-1">
-                {members.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">등록된 팀원이 없습니다</p>
-                ) : (
-                  members.map((m) => (
-                    <label key={m.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-accent">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 rounded border-input"
-                        checked={state.memberIds.includes(m.id)}
-                        onChange={(e) => {
-                          const next = e.target.checked
-                            ? [...state.memberIds, m.id]
-                            : state.memberIds.filter((id) => id !== m.id);
-                          update("memberIds", next);
-                        }}
-                      />
-                      {m.name}
-                    </label>
-                  ))
-                )}
-              </div>
+              <MemberFilter
+                members={members}
+                selectedIds={new Set(state.memberIds)}
+                onToggle={(id) => {
+                  const next = state.memberIds.includes(id)
+                    ? state.memberIds.filter((i) => i !== id)
+                    : [...state.memberIds, id];
+                  update("memberIds", next);
+                }}
+                onClear={() => update("memberIds", [])}
+              />
             </div>
             <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input

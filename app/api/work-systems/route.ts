@@ -27,7 +27,15 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const input = workSystemCreateSchema.parse(await req.json());
 
   const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.workSystem.create({ data: input });
+    // 같은 코드가 소프트 딜리트 상태로 남아있으면 복원
+    const deleted = await tx.workSystem.findFirst({ where: { code: input.code } });
+    const row = deleted
+      ? await tx.workSystem.update({
+          where: { id: deleted.id },
+          data: { name: input.name, deletedAt: null },
+        })
+      : await tx.workSystem.create({ data: input });
+
     await withAudit(tx, {
       entityType: "WorkSystem",
       entityId: row.id,

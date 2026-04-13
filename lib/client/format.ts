@@ -9,25 +9,22 @@ const KST = "Asia/Seoul";
 export function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return "";
   const d = typeof iso === "string" ? new Date(iso) : iso;
-  return d.toLocaleDateString("ko-KR", {
-    timeZone: KST,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+  // en-CA → yyyy-mm-dd
+  return d.toLocaleDateString("en-CA", { timeZone: KST });
 }
 
 export function formatDateTime(iso: string | Date | null | undefined): string {
   if (!iso) return "";
   const d = typeof iso === "string" ? new Date(iso) : iso;
-  return d.toLocaleString("ko-KR", {
+  const date = d.toLocaleDateString("en-CA", { timeZone: KST }); // yyyy-mm-dd
+  const time = d.toLocaleTimeString("en-GB", {  // hh:mm:ss (24h)
     timeZone: KST,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    hour12: false,
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
   });
+  return `${date} ${time}`;
 }
 
 /**

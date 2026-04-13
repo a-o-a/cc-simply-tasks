@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,6 @@ export function SettingsClient() {
     <div className="px-8 py-6">
       <header className="mb-6">
         <h1 className="text-xl font-semibold">설정</h1>
-        <p className="mt-1 text-sm text-muted-foreground">서비스 전반의 설정을 관리합니다.</p>
       </header>
 
       <Tabs defaultValue="service">
@@ -116,19 +115,82 @@ function ServiceTab() {
 
 /* ───────────────────────────── 백업 탭 ───────────────────────────── */
 
+type DbTable = { name: string; label: string; count: number };
+
 function BackupTab() {
+  const [tables, setTables] = React.useState<DbTable[] | null>(null);
+  const [statsLoading, setStatsLoading] = React.useState(true);
+
+  const loadStats = React.useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const data = await api.get<{ tables: DbTable[] }>("/api/db-stats");
+      setTables(data.tables);
+    } catch {
+      toast({ title: "DB 현황 조회 실패", variant: "destructive" });
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => { void loadStats(); }, [loadStats]);
+
   return (
-    <div className="max-w-md rounded-lg border bg-card p-6">
-      <h2 className="mb-2 text-sm font-semibold">데이터베이스 백업</h2>
-      <p className="mb-4 text-sm text-muted-foreground">
-        현재 SQLite DB 파일을 그대로 다운로드합니다. 복구 시 <code className="rounded bg-muted px-1 py-0.5 text-xs">prisma/dev.db</code>에 덮어쓰면 됩니다.
-      </p>
-      <a href="/api/backup" download>
-        <Button variant="outline">
-          <Download className="mr-2 h-4 w-4" />
-          DB 파일 다운로드
-        </Button>
-      </a>
+    <div className="max-w-xl space-y-6">
+      {/* DB 현황 */}
+      <div className="rounded-lg border bg-card">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">DB 현황</h2>
+          <button
+            onClick={() => void loadStats()}
+            disabled={statsLoading}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-40"
+            aria-label="새로고침"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${statsLoading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+        {statsLoading && !tables ? (
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-8 animate-pulse rounded bg-muted" />
+            ))}
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="border-b text-left text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 font-medium">테이블</th>
+                <th className="px-4 py-2 font-medium">모델명</th>
+                <th className="px-4 py-2 text-right font-medium">레코드 수</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(tables ?? []).map((t) => (
+                <tr key={t.name} className="border-b last:border-0 hover:bg-accent/30">
+                  <td className="px-4 py-2 text-muted-foreground">{t.label}</td>
+                  <td className="px-4 py-2 font-mono text-xs">{t.name}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{t.count.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* 백업 */}
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="mb-2 text-sm font-semibold">데이터베이스 백업</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          현재 SQLite DB 파일을 그대로 다운로드합니다. 복구 시 <code className="rounded bg-muted px-1 py-0.5 text-xs">prisma/dev.db</code>에 덮어쓰면 됩니다.
+        </p>
+        <a href="/api/backup" download>
+          <Button variant="outline">
+            <Download className="mr-2 h-4 w-4" />
+            DB 파일 다운로드
+          </Button>
+        </a>
+      </div>
     </div>
   );
 }
@@ -180,7 +242,7 @@ function CategoriesTab() {
         <div>
           <h2 className="text-sm font-semibold">작업 분류 코드</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            작업을 등록할 때 선택 가능한 분류 목록입니다. (예: feature → 기능개발)
+            작업을 등록할 때 선택 가능한 분류 목록입니다.
           </p>
         </div>
         <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
@@ -309,7 +371,7 @@ function WorkCategoryDialog({
               id="wc-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="feature"
+              placeholder="a-service"
               maxLength={100}
               disabled={!!editing}
             />
@@ -322,7 +384,7 @@ function WorkCategoryDialog({
               autoFocus={!!editing}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="기능개발"
+              placeholder="A 서비스"
               maxLength={100}
             />
           </div>
@@ -394,7 +456,7 @@ function WorkSystemsSection() {
         <div>
           <h2 className="text-sm font-semibold">작업 시스템 코드</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            티켓을 등록할 때 선택 가능한 시스템 목록입니다. (예: ppx-channel-api → 채널API)
+            티켓을 등록할 때 선택 가능한 시스템 목록입니다.
           </p>
         </div>
         <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
@@ -523,7 +585,7 @@ function WorkSystemDialog({
               id="ws-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="ppx-channel-api"
+              placeholder="xxx-channel-api"
               maxLength={100}
               disabled={!!editing}
             />

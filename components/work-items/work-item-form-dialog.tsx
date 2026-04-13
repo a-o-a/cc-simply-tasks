@@ -183,7 +183,7 @@ export function WorkItemFormDialog({
               value={state.title}
               onChange={(e) => update("title", e.target.value)}
               maxLength={300}
-              placeholder="예: 결제 모듈 PG사 추가"
+              placeholder="예: 대시보드에 요약정보 표시 영역 추가"
             />
           </div>
 
