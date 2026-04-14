@@ -288,8 +288,7 @@ export function WorkItemsClient() {
       try {
         const updated = await api.patch<WorkItemListItem>(
           `/api/work-items/${id}`,
-          { status },
-          originalItem.updatedAt,
+          { status }
         );
         setItems((prev) =>
           prev.map((item) =>

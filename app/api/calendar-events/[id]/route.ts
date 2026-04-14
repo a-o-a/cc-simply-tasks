@@ -3,7 +3,6 @@ import { prisma, ensureSqlitePragma } from "@/lib/db";
 import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { assertIfMatch } from "@/lib/optimisticLock";
 import { emitCalendarChanged } from "@/lib/calendar-bus";
 import { calendarEventUpdateSchema } from "@/lib/validation/calendarEvent";
 
@@ -38,7 +37,6 @@ export const PATCH = withErrorHandler(
         where: { id: params.id, deletedAt: null },
       });
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
-      assertIfMatch(req, before.updatedAt);
 
       // memberIds가 제공된 경우 기존 멤버 교체
       if (input.memberIds !== undefined) {
@@ -94,7 +92,6 @@ export const DELETE = withErrorHandler(
         where: { id: params.id, deletedAt: null },
       });
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
-      assertIfMatch(req, before.updatedAt);
 
       const after = await tx.calendarEvent.update({
         where: { id: params.id },

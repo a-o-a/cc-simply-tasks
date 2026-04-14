@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ArrowRightFromLine,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -50,6 +51,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "홈", icon: LayoutDashboard, exact: true },
   { href: "/work-items", label: "작업", icon: ListChecks },
+  { href: "/transfer", label: "이관", icon: ArrowRightFromLine },
   { href: "/calendar", label: "캘린더", icon: Calendar },
   { href: "/settings", label: "설정", icon: Settings },
 ];

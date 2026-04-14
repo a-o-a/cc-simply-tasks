@@ -229,8 +229,7 @@ export function EventFormDialog({
       if (editing) {
         await api.patch(
           `/api/calendar-events/${editing.id}`,
-          payload,
-          editing.updatedAt,
+          payload
         );
         toast({ title: "이벤트를 수정했습니다" });
       } else {
@@ -239,17 +238,13 @@ export function EventFormDialog({
       }
       onSaved();
     } catch (err) {
-      const conflict = err instanceof ApiError && err.code === "CONFLICT";
       toast({
-        title: conflict
-          ? "다른 사용자가 먼저 수정했습니다"
-          : editing
-            ? "수정 실패"
-            : "추가 실패",
-        description: !conflict && err instanceof ApiError ? err.message : undefined,
+        title: editing
+          ? "수정 실패"
+          : "추가 실패",
+        description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
-      if (conflict) onSaved();
     } finally {
       setSubmitting(false);
     }
@@ -259,8 +254,7 @@ export function EventFormDialog({
     if (!editing) return;
     try {
       await api.delete(
-        `/api/calendar-events/${editing.id}`,
-        editing.updatedAt,
+        `/api/calendar-events/${editing.id}`
       );
       toast({ title: "이벤트를 삭제했습니다" });
       setConfirmDelete(false);

@@ -59,8 +59,7 @@ export function useCalendarDrag(
       try {
         await api.patch(
           `/api/calendar-events/${data.eventId}`,
-          { startDateTime: newStart, endDateTime: newEnd },
-          data.updatedAt,
+          { startDateTime: newStart, endDateTime: newEnd }
         );
         onRefresh();
       } catch (err) {

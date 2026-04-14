@@ -3,7 +3,6 @@ import { prisma, ensureSqlitePragma } from "@/lib/db";
 import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { assertIfMatch } from "@/lib/optimisticLock";
 import { workItemUpdateSchema } from "@/lib/validation/workItem";
 
 type Params = { params: { id: string } };
@@ -46,7 +45,6 @@ export const PATCH = withErrorHandler(
         where: { id: params.id, deletedAt: null },
       });
       if (!before) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
-      assertIfMatch(req, before.updatedAt);
 
       const after = await tx.workItem.update({
         where: { id: params.id },
@@ -54,6 +52,9 @@ export const PATCH = withErrorHandler(
           ...(input.title !== undefined ? { title: input.title } : {}),
           ...(input.description !== undefined
             ? { description: input.description }
+            : {}),
+          ...(input.additionalNotes !== undefined
+            ? { additionalNotes: input.additionalNotes }
             : {}),
           ...(input.category !== undefined ? { category: input.category } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
@@ -132,7 +133,6 @@ export const DELETE = withErrorHandler(
         where: { id: params.id, deletedAt: null },
       });
       if (!before) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
-      assertIfMatch(req, before.updatedAt);
 
       const after = await tx.workItem.update({
         where: { id: params.id },

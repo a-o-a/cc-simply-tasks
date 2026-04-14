@@ -3,7 +3,6 @@ import { prisma, ensureSqlitePragma } from "@/lib/db";
 import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { assertIfMatch } from "@/lib/optimisticLock";
 import { workSystemUpdateSchema } from "@/lib/validation/workSystem";
 
 type Params = { params: { id: string } };
@@ -18,7 +17,6 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
       where: { id: params.id, deletedAt: null },
     });
     if (!before) throw new HttpError("NOT_FOUND", "작업 시스템을 찾을 수 없습니다");
-    assertIfMatch(req, before.updatedAt);
 
     const after = await tx.workSystem.update({ where: { id: params.id }, data: input });
     await withAudit(tx, {
@@ -44,7 +42,6 @@ export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Para
       where: { id: params.id, deletedAt: null },
     });
     if (!before) throw new HttpError("NOT_FOUND", "작업 시스템을 찾을 수 없습니다");
-    assertIfMatch(req, before.updatedAt);
 
     const after = await tx.workSystem.update({
       where: { id: params.id },

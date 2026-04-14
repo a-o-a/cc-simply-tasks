@@ -72,7 +72,7 @@ function ServiceTab() {
     if (!trimmed) return;
     setSaving(true);
     try {
-      const data = await api.patch<AppSettings>("/api/settings", { service_name: trimmed }, "");
+      const data = await api.patch<AppSettings>("/api/settings", { service_name: trimmed });
       window.localStorage.setItem(SERVICE_NAME_STORAGE_KEY, data.service_name);
       window.dispatchEvent(new CustomEvent("settings-changed"));
       toast({ title: "서비스명이 저장되었습니다" });
@@ -224,7 +224,7 @@ function CategoriesTab() {
   async function handleDelete(item: WorkCategory) {
     if (!confirm(`"${item.name}" 분류를 삭제할까요?`)) return;
     try {
-      await api.delete(`/api/work-categories/${item.id}`, item.updatedAt);
+      await api.delete(`/api/work-categories/${item.id}`);
       toast({ title: "삭제되었습니다" });
       void load();
     } catch (err) {
@@ -343,7 +343,7 @@ function WorkCategoryDialog({
     setSubmitting(true);
     try {
       if (editing) {
-        await api.patch(`/api/work-categories/${editing.id}`, { name }, editing.updatedAt);
+        await api.patch(`/api/work-categories/${editing.id}`, { name });
         toast({ title: "수정되었습니다" });
       } else {
         await api.post("/api/work-categories", { code, name });
@@ -438,7 +438,7 @@ function WorkSystemsSection() {
   async function handleDelete(item: WorkSystem) {
     if (!confirm(`"${item.name}" 시스템을 삭제할까요?`)) return;
     try {
-      await api.delete(`/api/work-systems/${item.id}`, item.updatedAt);
+      await api.delete(`/api/work-systems/${item.id}`);
       toast({ title: "삭제되었습니다" });
       void load();
     } catch (err) {
@@ -557,7 +557,7 @@ function WorkSystemDialog({
     setSubmitting(true);
     try {
       if (editing) {
-        await api.patch(`/api/work-systems/${editing.id}`, { code, name }, editing.updatedAt);
+        await api.patch(`/api/work-systems/${editing.id}`, { code, name });
         toast({ title: "수정되었습니다" });
       } else {
         await api.post("/api/work-systems", { code, name });

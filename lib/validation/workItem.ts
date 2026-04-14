@@ -13,6 +13,7 @@ export const workItemCreateSchema = z
   .object({
     title: z.string().min(1).max(300),
     description: z.string().max(10_000).optional().nullable(),
+    additionalNotes: z.string().max(10_000).optional().nullable(),
     category: z.string().max(100).default(""),
     status: z.enum(STATUSES).default("WAITING"),
     priority: z.enum(PRIORITIES).default("NORMAL"),
@@ -41,6 +42,7 @@ export const workItemUpdateSchema = z
   .object({
     title: z.string().min(1).max(300).optional(),
     description: z.string().max(10_000).nullable().optional(),
+    additionalNotes: z.string().max(10_000).nullable().optional(),
     category: z.string().max(100).optional(),
     status: z.enum(STATUSES).optional(),
     priority: z.enum(PRIORITIES).optional(),
@@ -104,6 +106,12 @@ export const workItemListQuerySchema = z.object({
     .optional()
     .transform((v) => (v ? v.split(",").filter(Boolean) : undefined))
     .pipe(z.array(z.string()).optional()),
+  // 이관일 있는 항목만 조회
+  hasTransferDate: z
+    .string()
+    .optional()
+    .transform((v) => v === "true")
+    .pipe(z.boolean().optional()),
 });
 
 export type WorkItemCreateInput = z.infer<typeof workItemCreateSchema>;

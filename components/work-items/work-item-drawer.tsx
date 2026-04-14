@@ -97,22 +97,17 @@ export function WorkItemDrawer({
   async function handleDelete() {
     if (!detail) return;
     try {
-      await api.delete(`/api/work-items/${detail.id}`, detail.updatedAt);
+      await api.delete(`/api/work-items/${detail.id}`);
       toast({ title: "작업을 삭제했습니다" });
       setConfirmDelete(false);
       onDeleted();
       onMutated();
     } catch (err) {
-      const conflict = err instanceof ApiError && err.code === "CONFLICT";
       toast({
-        title: conflict
-          ? "다른 사용자가 먼저 수정했습니다"
-          : "작업 삭제 실패",
-        description:
-          err instanceof ApiError && !conflict ? err.message : undefined,
+        title: "작업 삭제 실패",
+        description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
-      if (conflict && workItemId) await loadDetail(workItemId);
     }
   }
 
@@ -256,7 +251,7 @@ function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: Wor
           modifier: updateLog?.actorName ?? null,
         });
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelled = true;
     };
@@ -327,6 +322,15 @@ function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: Wor
           </ul>
         </Section>
       )}
+
+      {/* 추가 사항 */}
+      <Section title="추가 사항">
+        {detail.additionalNotes ? (
+          <div className="whitespace-pre-wrap text-sm">{detail.additionalNotes}</div>
+        ) : (
+          <p className="text-sm text-muted-foreground">추가 사항 없음</p>
+        )}
+      </Section>
 
       {/* 설명 */}
       <Section title="설명">

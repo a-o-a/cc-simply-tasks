@@ -3,7 +3,6 @@ import { prisma, ensureSqlitePragma } from "@/lib/db";
 import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { assertIfMatch } from "@/lib/optimisticLock";
 import { teamMemberUpdateSchema } from "@/lib/validation/teamMember";
 
 type Params = { params: { id: string } };
@@ -36,7 +35,6 @@ export const PATCH = withErrorHandler(
         where: { id: params.id, deletedAt: null },
       });
       if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
-      assertIfMatch(req, before.updatedAt);
 
       const after = await tx.teamMember.update({
         where: { id: params.id },
@@ -76,7 +74,6 @@ export const DELETE = withErrorHandler(
         where: { id: params.id, deletedAt: null },
       });
       if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
-      assertIfMatch(req, before.updatedAt);
 
       const after = await tx.teamMember.update({
         where: { id: params.id },

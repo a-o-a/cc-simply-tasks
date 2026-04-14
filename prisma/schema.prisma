@@ -38,6 +38,7 @@ model WorkItem {
   id            String    @id @default(cuid())
   title         String
   description   String?
+  additionalNotes String?
   category      String    @default("")
   status        String    @default("WAITING")
   priority      String    @default("NORMAL")
@@ -77,8 +78,6 @@ model WorkTicket {
   deletedAt    DateTime?
 
   workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
-
-  @@unique([workItemId, systemName])
   @@index([workItemId])
   @@index([deletedAt])
 }

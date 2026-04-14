@@ -218,8 +218,7 @@ function MemberFormDialog({
       if (editing) {
         await api.patch(
           `/api/team-members/${editing.id}`,
-          { name: trimmed, role },
-          editing.updatedAt,
+          { name: trimmed, role }
         );
         toast({ title: "멤버를 수정했습니다" });
       } else {
@@ -300,7 +299,7 @@ function DeleteMemberDialog({
     if (!member) return;
     setSubmitting(true);
     try {
-      await api.delete(`/api/team-members/${member.id}`, member.updatedAt);
+      await api.delete(`/api/team-members/${member.id}`);
       toast({ title: "멤버를 삭제했습니다" });
       onDeleted();
     } catch (err) {
@@ -340,14 +339,6 @@ function DeleteMemberDialog({
 
 function handleApiError(err: unknown, fallbackTitle: string) {
   if (err instanceof ApiError) {
-    if (err.code === "CONFLICT") {
-      toast({
-        title: "다른 사용자가 먼저 수정했습니다",
-        description: "최신 정보를 다시 불러옵니다.",
-        variant: "destructive",
-      });
-      return;
-    }
     toast({
       title: fallbackTitle,
       description: err.message,

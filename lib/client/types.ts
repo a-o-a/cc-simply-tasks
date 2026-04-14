@@ -35,6 +35,7 @@ export type WorkItemListItem = {
   id: string;
   title: string;
   description: string | null;
+  additionalNotes: string | null;
   category: string;
   status: Status;
   priority: Priority;
@@ -50,7 +51,7 @@ export type WorkItemListItem = {
   createdAt: string;
   updatedAt: string;
   assignee: Member | null;
-  tickets: { systemName: string }[];
+  tickets: { systemName: string; ticketNumber: string }[];
 };
 
 /** 상세 응답: tickets를 WorkTicket[] 전체 필드로 오버라이드. */

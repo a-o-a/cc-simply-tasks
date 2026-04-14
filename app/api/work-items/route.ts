@@ -70,6 +70,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
             },
           }
         : {}),
+      ...(filters.hasTransferDate ? { transferDate: { not: null } } : {}),
       ...(filters.transferDate || filters.transferDateTo
         ? {
             transferDate: {
@@ -87,7 +88,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       assignee: true,
       tickets: {
         where: { deletedAt: null },
-        select: { systemName: true },
+        select: { systemName: true, ticketNumber: true },
         orderBy: { createdAt: "asc" as const },
       },
     },
@@ -114,6 +115,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       data: {
         title: input.title,
         description: input.description ?? null,
+        additionalNotes: input.additionalNotes ?? null,
         category: input.category,
         status: input.status,
         priority: input.priority,

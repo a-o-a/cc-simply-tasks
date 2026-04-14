@@ -3,8 +3,7 @@
  *
  * 책임:
  *  1. `x-actor-name` 헤더를 localStorage에서 자동 주입
- *  2. PATCH/DELETE 호출 시 호출자가 전달한 `ifMatch`를 `If-Match` 헤더로 변환
- *  3. 표준 에러 응답 `{ error: { code, message, details? } }` 파싱 → `ApiError` throw
+ *  2. 표준 에러 응답 `{ error: { code, message, details? } }` 파싱 → `ApiError` throw
  *  4. JSON 직렬화/역직렬화
  *
  * 서버 사이드(SSR/RSC)에서 호출하면 안 됨 — `localStorage` 접근이 필요하기 때문.
@@ -37,8 +36,6 @@ export class ApiError extends Error {
 interface RequestOptions {
   /** 본문(객체). JSON.stringify 후 전송. */
   body?: unknown;
-  /** PATCH/DELETE 시 사용할 낙관적 락 토큰 (이전 GET의 updatedAt). */
-  ifMatch?: string;
   /** 추가 헤더. */
   headers?: Record<string, string>;
   /** 쿼리 파라미터. undefined 값은 자동 제외. */
@@ -80,7 +77,6 @@ async function request<T>(
   }
   const actorName = readActorName();
   if (actorName) headers["x-actor-name"] = encodeURIComponent(actorName);
-  if (options.ifMatch) headers["If-Match"] = options.ifMatch;
 
   let res: Response;
   try {
@@ -131,19 +127,17 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T>(path: string, options?: Omit<RequestOptions, "body" | "ifMatch">) =>
+  get: <T>(path: string, options?: Omit<RequestOptions, "body">) =>
     request<T>("GET", path, options),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, "body">) =>
     request<T>("POST", path, { ...options, body }),
   patch: <T>(
     path: string,
     body: unknown,
-    ifMatch: string,
-    options?: Omit<RequestOptions, "body" | "ifMatch">,
-  ) => request<T>("PATCH", path, { ...options, body, ifMatch }),
+    options?: Omit<RequestOptions, "body">,
+  ) => request<T>("PATCH", path, { ...options, body }),
   delete: <T>(
     path: string,
-    ifMatch: string,
-    options?: Omit<RequestOptions, "body" | "ifMatch">,
-  ) => request<T>("DELETE", path, { ...options, ifMatch }),
+    options?: Omit<RequestOptions, "body">,
+  ) => request<T>("DELETE", path, options),
 };

@@ -14,7 +14,7 @@ import { z } from "zod";
  */
 
 export const DEFAULT_PAGE_SIZE = 50;
-export const MAX_PAGE_SIZE = 200;
+export const MAX_PAGE_SIZE = 10000;
 
 const querySchema = z.object({
   cursor: z.string().min(1).optional(),

@@ -65,6 +65,7 @@ interface TicketRow {
 interface FormState {
   title: string;
   description: string;
+  additionalNotes: string;
   category: string;
   status: Status;
   priority: Priority;
@@ -81,6 +82,7 @@ interface FormState {
 const EMPTY: FormState = {
   title: "",
   description: "",
+  additionalNotes: "",
   category: "",
   status: "WAITING",
   priority: "NORMAL",
@@ -98,6 +100,7 @@ function fromWorkItem(w: WorkItemListItem | WorkItemDetail): FormState {
   return {
     title: w.title,
     description: w.description ?? "",
+    additionalNotes: w.additionalNotes ?? "",
     category: w.category,
     status: w.status,
     priority: w.priority,
@@ -128,8 +131,6 @@ export function WorkItemFormDialog({
   const [state, setState] = React.useState<FormState>(EMPTY);
   const [tickets, setTickets] = React.useState<TicketRow[]>([]);
   const [submitting, setSubmitting] = React.useState(false);
-  // If-Match 토큰을 별도 상태로 관리: CONFLICT 시 서버 응답의 serverUpdatedAt으로 갱신됨
-  const [ifMatchToken, setIfMatchToken] = React.useState<string>("");
 
   // 수정 시 detail의 tickets를 가져오기 위해 필요하면 별도 fetch
   const [loadingTickets, setLoadingTickets] = React.useState(false);
@@ -139,11 +140,9 @@ export function WorkItemFormDialog({
     if (!editing) {
       setState(EMPTY);
       setTickets([]);
-      setIfMatchToken("");
       return;
     }
     setState(fromWorkItem(editing));
-    setIfMatchToken(editing.updatedAt);
 
     if (hasTickets(editing)) {
       // DrawerBody에서 넘겨준 경우 — tickets 포함
@@ -235,6 +234,7 @@ export function WorkItemFormDialog({
     const payload = {
       title,
       description: state.description.trim() || null,
+      additionalNotes: state.additionalNotes.trim() || null,
       category: state.category,
       status: state.status,
       priority: state.priority,
@@ -254,8 +254,7 @@ export function WorkItemFormDialog({
       if (editing) {
         const updated = await api.patch<WorkItemListItem>(
           `/api/work-items/${editing.id}`,
-          payload,
-          ifMatchToken,
+          payload
         );
         toast({ title: "작업을 수정했습니다" });
         onSaved(updated);
@@ -265,33 +264,6 @@ export function WorkItemFormDialog({
         onSaved();
       }
     } catch (err) {
-      if (err instanceof ApiError && err.code === "CONFLICT") {
-        // 서버가 응답한 최신 updatedAt으로 1회 자동 재시도 (사용자 입력 보존)
-        const serverUpdatedAt = (err.details as { serverUpdatedAt?: string } | null)
-          ?.serverUpdatedAt;
-        if (serverUpdatedAt && editing) {
-          try {
-            const updated = await api.patch<WorkItemListItem>(
-              `/api/work-items/${editing.id}`,
-              payload,
-              serverUpdatedAt,
-            );
-            setIfMatchToken(serverUpdatedAt);
-            toast({ title: "작업을 수정했습니다" });
-            onSaved(updated);
-            return;
-          } catch {
-            // 재시도도 실패 — 아래 공통 에러 처리로 fall-through
-          }
-        }
-        toast({
-          title: "다른 사용자가 먼저 수정했습니다",
-          description: "최신 정보를 다시 불러옵니다.",
-          variant: "destructive",
-        });
-        onSaved();
-        return;
-      }
       toast({
         title: editing ? "작업 수정 실패" : "작업 추가 실패",
         description: err instanceof ApiError ? err.message : undefined,
@@ -482,7 +454,7 @@ export function WorkItemFormDialog({
                       onChange={(e) =>
                         updateTicketRow(index, "systemName", e.target.value)
                       }
-                      className="w-40 shrink-0"
+                      className="w-60 shrink-0"
                     >
                       <option value="">시스템 선택</option>
                       {systems.map((s) => (
@@ -548,6 +520,19 @@ export function WorkItemFormDialog({
                 onChange={(v) => update("transferDate", v)}
               />
             </div>
+          </div>
+
+          {/* 추가 사항 */}
+          <div className="grid gap-1.5">
+            <Label htmlFor="wi-additional-notes">추가 사항</Label>
+            <Textarea
+              id="wi-additional-notes"
+              className="resize-none"
+              rows={3}
+              value={state.additionalNotes}
+              onChange={(e) => update("additionalNotes", e.target.value)}
+              placeholder="추가 사항을 자유롭게 적어주세요."
+            />
           </div>
 
           {/* 설명 */}
