@@ -2,6 +2,11 @@ import { z } from "zod";
 import { PRIORITIES, STATUSES } from "../enums";
 import { cuidSchema, optionalIsoDateTimeSchema } from "./common";
 
+const ticketRowSchema = z.object({
+  systemName: z.string().min(1).max(100),
+  ticketNumber: z.string().min(1).max(100),
+});
+
 export const workItemCreateSchema = z
   .object({
     title: z.string().min(1).max(300),
@@ -14,6 +19,13 @@ export const workItemCreateSchema = z
     startDate: optionalIsoDateTimeSchema,
     endDate: optionalIsoDateTimeSchema,
     transferDate: optionalIsoDateTimeSchema,
+    // 요청 정보
+    requestType: z.string().max(200).optional().nullable(),
+    requestor: z.string().max(200).optional().nullable(),
+    requestNumber: z.string().max(200).optional().nullable(),
+    requestContent: z.string().max(10_000).optional().nullable(),
+    // 시스템 연동 티켓 (생성 시 함께 처리)
+    tickets: z.array(ticketRowSchema).optional(),
   })
   .refine(
     (v) =>
@@ -35,6 +47,13 @@ export const workItemUpdateSchema = z
     startDate: optionalIsoDateTimeSchema,
     endDate: optionalIsoDateTimeSchema,
     transferDate: optionalIsoDateTimeSchema,
+    // 요청 정보
+    requestType: z.string().max(200).nullable().optional(),
+    requestor: z.string().max(200).nullable().optional(),
+    requestNumber: z.string().max(200).nullable().optional(),
+    requestContent: z.string().max(10_000).nullable().optional(),
+    // 시스템 연동 티켓 (수정 시 전체 대체)
+    tickets: z.array(ticketRowSchema).optional(),
   })
   .refine(
     (v) =>

@@ -26,7 +26,6 @@ export type WorkTicket = {
   workItemId: string;
   systemName: string;
   ticketNumber: string;
-  ticketUrl: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -44,6 +43,10 @@ export type WorkItemListItem = {
   startDate: string | null;
   endDate: string | null;
   transferDate: string | null;
+  requestType: string | null;
+  requestor: string | null;
+  requestNumber: string | null;
+  requestContent: string | null;
   createdAt: string;
   updatedAt: string;
   assignee: Member | null;

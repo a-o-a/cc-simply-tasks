@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,8 +11,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -28,7 +26,6 @@ import type {
   AuditLog,
   ListResponse,
   WorkItemDetail,
-  WorkTicket,
 } from "@/lib/client/types";
 import {
   MEMBER_ROLE_LABELS,
@@ -40,25 +37,23 @@ import { StatusBadge } from "./status-badge";
  * 작업 상세 드로어 — 우측 슬라이드 패널.
  *
  * 탭:
- *  - 상세: 메타데이터(상태/담당자/기간/이관일/설명)
- *  - 티켓: 외부 시스템 티켓 추가/삭제
- *  - 활동: AuditLog 타임라인 (`/api/audit-logs?entityType=WorkItem&entityId=...`)
- *
- * 외부에서는 `workItemId`만 넘기고, 드로어 내부에서 GET /api/work-items/:id 로
- * 상세를 별도 fetch한다 (목록의 부분 데이터를 신뢰하지 않음).
+ *  - 상세: 요청정보 + 메타데이터 + 시스템 연동 + 설명
+ *  - 활동: AuditLog 타임라인
  */
 
 type Props = {
   workItemId: string | null;
+  /** 이 값이 바뀌면 현재 열린 상세를 다시 fetch한다. 폼 저장 후 드로어 갱신용. */
+  reloadKey?: number;
   onClose: () => void;
   onEdit: (item: WorkItemDetail) => void;
   onDeleted: () => void;
-  /** 상세에서 수정/삭제가 일어나면 부모 목록도 다시 불러오게 한다. */
   onMutated: () => void;
 };
 
 export function WorkItemDrawer({
   workItemId,
+  reloadKey,
   onClose,
   onEdit,
   onDeleted,
@@ -91,7 +86,7 @@ export function WorkItemDrawer({
       return;
     }
     void loadDetail(workItemId);
-  }, [workItemId, loadDetail]);
+  }, [workItemId, reloadKey, loadDetail]);
 
   async function handleDelete() {
     if (!detail) return;
@@ -139,10 +134,6 @@ export function WorkItemDrawer({
               detail={detail}
               onEdit={() => onEdit(detail)}
               onRequestDelete={() => setConfirmDelete(true)}
-              onTicketsChanged={() => {
-                void loadDetail(detail.id);
-                onMutated();
-              }}
             />
           ) : null}
         </SheetContent>
@@ -154,7 +145,7 @@ export function WorkItemDrawer({
             <DialogTitle>작업 삭제</DialogTitle>
             <DialogDescription>
               <span className="font-medium text-foreground">{detail?.title}</span>
-              {" "}작업을 삭제하시겠습니까? 연결된 티켓도 함께 숨겨집니다 (soft delete).
+              {" "}작업을 삭제하시겠습니까? (soft delete)
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -175,12 +166,10 @@ function DrawerBody({
   detail,
   onEdit,
   onRequestDelete,
-  onTicketsChanged,
 }: {
   detail: WorkItemDetail;
   onEdit: () => void;
   onRequestDelete: () => void;
-  onTicketsChanged: () => void;
 }) {
   return (
     <>
@@ -208,16 +197,12 @@ function DrawerBody({
       <Tabs defaultValue="detail" className="mt-6 flex min-h-0 flex-1 flex-col">
         <TabsList>
           <TabsTrigger value="detail">상세</TabsTrigger>
-          <TabsTrigger value="tickets">티켓 ({detail.tickets.length})</TabsTrigger>
           <TabsTrigger value="activity">활동</TabsTrigger>
         </TabsList>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           <TabsContent value="detail">
             <DetailPanel detail={detail} />
-          </TabsContent>
-          <TabsContent value="tickets">
-            <TicketsPanel detail={detail} onChanged={onTicketsChanged} />
           </TabsContent>
           <TabsContent value="activity">
             <ActivityPanel workItemId={detail.id} />
@@ -229,37 +214,95 @@ function DrawerBody({
 }
 
 function DetailPanel({ detail }: { detail: WorkItemDetail }) {
-  return (
-    <dl className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
-      <Field label="담당자">
-        {detail.assignee ? (
-          <span>
-            {detail.assignee.name}
-            <span className="ml-2 text-xs text-muted-foreground">
-              {MEMBER_ROLE_LABELS[detail.assignee.role]}
-            </span>
-          </span>
-        ) : (
-          <span className="text-muted-foreground">미배정</span>
-        )}
-      </Field>
-      <Field label="시작일">{formatDate(detail.startDate) || "—"}</Field>
-      <Field label="종료일">{formatDate(detail.endDate) || "—"}</Field>
-      <Field label="이관일">{formatDate(detail.transferDate) || "—"}</Field>
-      <Field label="생성">{formatDateTime(detail.createdAt)}</Field>
-      <Field label="수정">{formatDateTime(detail.updatedAt)}</Field>
+  const hasRequestInfo =
+    detail.requestType || detail.requestor || detail.requestNumber || detail.requestContent;
 
-      <div className="col-span-3">
-        <dt className="mb-1 text-xs font-medium uppercase text-muted-foreground">
+  return (
+    <div className="space-y-5">
+      {/* 요청 정보 */}
+      {hasRequestInfo && (
+        <section className="rounded-md border bg-muted/30 p-3 space-y-3">
+          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
+            요청 정보
+          </p>
+          <dl className="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
+            {detail.requestType && (
+              <Field label="요청구분">{detail.requestType}</Field>
+            )}
+            {detail.requestor && (
+              <Field label="요청자">{detail.requestor}</Field>
+            )}
+            {detail.requestNumber && (
+              <Field label="요청번호">{detail.requestNumber}</Field>
+            )}
+            {detail.requestContent && (
+              <div className="col-span-3">
+                <dt className="mb-1 text-xs font-medium uppercase text-muted-foreground">
+                  요청내용
+                </dt>
+                <dd className="whitespace-pre-wrap text-sm">
+                  {detail.requestContent}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </section>
+      )}
+
+      {/* 메타데이터 */}
+      <dl className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
+        <Field label="담당자">
+          {detail.assignee ? (
+            <span>
+              {detail.assignee.name}
+              <span className="ml-2 text-xs text-muted-foreground">
+                {MEMBER_ROLE_LABELS[detail.assignee.role]}
+              </span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">미배정</span>
+          )}
+        </Field>
+        <Field label="시작일">{formatDate(detail.startDate) || "—"}</Field>
+        <Field label="종료일">{formatDate(detail.endDate) || "—"}</Field>
+        <Field label="이관일">{formatDate(detail.transferDate) || "—"}</Field>
+        <Field label="생성">{formatDateTime(detail.createdAt)}</Field>
+        <Field label="수정">{formatDateTime(detail.updatedAt)}</Field>
+      </dl>
+
+      {/* 시스템 연동 */}
+      {detail.tickets.length > 0 && (
+        <section className="space-y-1.5">
+          <p className="text-xs font-medium uppercase text-muted-foreground">
+            시스템 연동
+          </p>
+          <ul className="space-y-1">
+            {detail.tickets.map((t) => (
+              <li
+                key={t.id}
+                className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm"
+              >
+                <span className="font-medium shrink-0">{t.systemName}</span>
+                <span className="text-muted-foreground">·</span>
+                <span>{t.ticketNumber}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* 설명 */}
+      <section className="space-y-1.5">
+        <p className="text-xs font-medium uppercase text-muted-foreground">
           설명
-        </dt>
-        <dd className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">
+        </p>
+        <div className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">
           {detail.description?.trim() || (
             <span className="text-muted-foreground">설명 없음</span>
           )}
-        </dd>
-      </div>
-    </dl>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -276,159 +319,6 @@ function Field({
         {label}
       </dt>
       <dd className="mt-1">{children}</dd>
-    </div>
-  );
-}
-
-function TicketsPanel({
-  detail,
-  onChanged,
-}: {
-  detail: WorkItemDetail;
-  onChanged: () => void;
-}) {
-  const [systemName, setSystemName] = React.useState("");
-  const [ticketNumber, setTicketNumber] = React.useState("");
-  const [ticketUrl, setTicketUrl] = React.useState("");
-  const [submitting, setSubmitting] = React.useState(false);
-
-  async function addTicket(e: React.FormEvent) {
-    e.preventDefault();
-    if (!systemName.trim() || !ticketNumber.trim()) return;
-    setSubmitting(true);
-    try {
-      await api.post(`/api/work-items/${detail.id}/tickets`, {
-        systemName: systemName.trim(),
-        ticketNumber: ticketNumber.trim(),
-        ticketUrl: ticketUrl.trim() || null,
-      });
-      toast({ title: "티켓을 추가했습니다" });
-      setSystemName("");
-      setTicketNumber("");
-      setTicketUrl("");
-      onChanged();
-    } catch (err) {
-      const conflict = err instanceof ApiError && err.code === "CONFLICT";
-      toast({
-        title: conflict ? "이미 등록된 티켓입니다" : "티켓 추가 실패",
-        description:
-          !conflict && err instanceof ApiError ? err.message : undefined,
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function deleteTicket(t: WorkTicket) {
-    try {
-      await api.delete(
-        `/api/work-items/${detail.id}/tickets/${t.id}`,
-        t.updatedAt,
-      );
-      toast({ title: "티켓을 삭제했습니다" });
-      onChanged();
-    } catch (err) {
-      toast({
-        title: "티켓 삭제 실패",
-        description: err instanceof ApiError ? err.message : undefined,
-        variant: "destructive",
-      });
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      {detail.tickets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          연결된 외부 티켓이 없습니다.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {detail.tickets.map((t) => (
-            <li
-              key={t.id}
-              className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"
-            >
-              <div className="min-w-0">
-                <div className="font-medium">
-                  {t.systemName} · {t.ticketNumber}
-                </div>
-                {t.ticketUrl ? (
-                  <a
-                    href={t.ticketUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    <span className="truncate">{t.ticketUrl}</span>
-                  </a>
-                ) : null}
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="티켓 삭제"
-                onClick={() => deleteTicket(t)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <form
-        onSubmit={addTicket}
-        className="space-y-3 rounded-md border bg-muted/30 p-3"
-      >
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="t-sys" className="text-xs">시스템</Label>
-            <Input
-              id="t-sys"
-              value={systemName}
-              onChange={(e) => setSystemName(e.target.value)}
-              placeholder="Jira"
-              maxLength={50}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="t-num" className="text-xs">티켓 번호</Label>
-            <Input
-              id="t-num"
-              value={ticketNumber}
-              onChange={(e) => setTicketNumber(e.target.value)}
-              placeholder="ABC-1234"
-              maxLength={100}
-            />
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="t-url" className="text-xs">URL (선택)</Label>
-          <Input
-            id="t-url"
-            type="url"
-            value={ticketUrl}
-            onChange={(e) => setTicketUrl(e.target.value)}
-            placeholder="https://..."
-            maxLength={1000}
-          />
-        </div>
-        <div className="flex justify-end">
-          <Button
-            type="submit"
-            size="sm"
-            disabled={
-              submitting || !systemName.trim() || !ticketNumber.trim()
-            }
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            {submitting ? "추가 중..." : "티켓 추가"}
-          </Button>
-        </div>
-      </form>
     </div>
   );
 }

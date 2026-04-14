@@ -25,14 +25,11 @@
 ```
 app/api/<resource>/route.ts          # collection: GET(list) / POST
 app/api/<resource>/[id]/route.ts     # item: GET / PATCH / DELETE
-app/api/<resource>/[id]/<sub>/...    # sub-resource
 ```
 
 - **예시**:
   - `app/api/work-items/route.ts` — list/create
   - `app/api/work-items/[id]/route.ts` — get/patch/delete
-  - `app/api/work-items/[id]/tickets/route.ts` — 서브 리소스 list/create
-  - `app/api/work-items/[id]/tickets/[ticketId]/route.ts` — 서브 리소스 item
 
 - 라우트 파일 안에 **비즈니스 로직을 직접 쓰지 말 것.** 복잡한 로직은 `lib/services/<resource>.ts`로 추출. 라우트는 "파싱 → 서비스 호출 → 응답"만.
 
@@ -67,10 +64,10 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const rows = await prisma.workItem.findMany({
     where: {
       deletedAt: null,
-      ...(filters.status ? { status: filters.status } : {}),
-      ...(filters.assigneeId ? { assigneeId: filters.assigneeId } : {}),
-      ...(filters.category ? { category: filters.category } : {}),
-      ...(filters.priority ? { priority: filters.priority } : {}),
+      ...(filters.status?.length ? { status: { in: filters.status } } : {}),
+      ...(filters.assigneeId?.length ? { assigneeId: { in: filters.assigneeId } } : {}),
+      ...(filters.category?.length ? { category: { in: filters.category } } : {}),
+      ...(filters.priority?.length ? { priority: { in: filters.priority } } : {}),
       ...(filters.ticket
         ? {
             tickets: {
@@ -84,7 +81,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+    orderBy: [{ order: "asc" }, { createdAt: "desc" }, { id: "desc" }],
   });
 
   const { items, nextCursor } = toPage(rows, take);
@@ -97,7 +94,35 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const input = workItemCreateSchema.parse(await req.json());
 
   const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.workItem.create({ data: input });
+    const row = await tx.workItem.create({
+      data: {
+        title: input.title,
+        description: input.description ?? null,
+        category: input.category,
+        status: input.status,
+        priority: input.priority,
+        order: input.order,
+        assigneeId: input.assigneeId ?? null,
+        startDate: input.startDate ?? null,
+        endDate: input.endDate ?? null,
+        transferDate: input.transferDate ?? null,
+        requestType: input.requestType ?? null,
+        requestor: input.requestor ?? null,
+        requestNumber: input.requestNumber ?? null,
+        requestContent: input.requestContent ?? null,
+      },
+    });
+    if (input.tickets?.length) {
+      for (const t of input.tickets) {
+        await tx.workTicket.create({
+          data: {
+            workItemId: row.id,
+            systemName: t.systemName,
+            ticketNumber: t.ticketNumber,
+          },
+        });
+      }
+    }
     await withAudit(tx, {
       entityType: "WorkItem",
       entityId: row.id,
@@ -152,8 +177,54 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
 
     const after = await tx.workItem.update({
       where: { id: params.id },
-      data: input,
+      data: {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.description !== undefined
+          ? { description: input.description }
+          : {}),
+        ...(input.category !== undefined ? { category: input.category } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+        ...(input.order !== undefined ? { order: input.order } : {}),
+        ...(input.assigneeId !== undefined
+          ? { assigneeId: input.assigneeId }
+          : {}),
+        ...(input.startDate !== undefined
+          ? { startDate: input.startDate }
+          : {}),
+        ...(input.endDate !== undefined ? { endDate: input.endDate } : {}),
+        ...(input.transferDate !== undefined
+          ? { transferDate: input.transferDate }
+          : {}),
+        ...(input.requestType !== undefined
+          ? { requestType: input.requestType }
+          : {}),
+        ...(input.requestor !== undefined
+          ? { requestor: input.requestor }
+          : {}),
+        ...(input.requestNumber !== undefined
+          ? { requestNumber: input.requestNumber }
+          : {}),
+        ...(input.requestContent !== undefined
+          ? { requestContent: input.requestContent }
+          : {}),
+      },
     });
+    if (input.tickets !== undefined) {
+      await tx.workTicket.updateMany({
+        where: { workItemId: params.id, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+      for (const t of input.tickets) {
+        await tx.workTicket.create({
+          data: {
+            workItemId: params.id,
+            systemName: t.systemName,
+            ticketNumber: t.ticketNumber,
+          },
+        });
+      }
+    }
     await withAudit(tx, {
       entityType: "WorkItem",
       entityId: after.id,
@@ -198,6 +269,14 @@ export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Para
 ```
 
 > **패턴 요약**: `ensureSqlitePragma` → `getActorContext` → zod parse → `$transaction(async tx => { findFirst + assertIfMatch → update → withAudit })` → NextResponse.
+
+### 3.3 WorkItem 확장 규칙
+
+- `WorkItem` payload는 요청 정보 필드(`requestType`, `requestor`, `requestNumber`, `requestContent`)를 포함할 수 있다.
+- 시스템 연동 번호는 별도 공개 서브 리소스 대신 `tickets` 배열로 함께 처리한다.
+- `PATCH`에서 `tickets`가 전달되면 부분 수정이 아니라 **전체 대체**로 해석한다.
+- `WorkTicket`은 `workItemId + systemName` 유니크다. 한 작업에 같은 시스템은 1개만 연결한다.
+- `ticketUrl`은 더 이상 저장하지 않는다. 현재 저장값은 `systemName`, `ticketNumber`뿐이다.
 
 ---
 

@@ -33,6 +33,7 @@ export const GET = withErrorHandler(
 /**
  * PATCH /api/work-items/:id
  * 부분 업데이트. If-Match 필수.
+ * tickets 배열이 있으면 기존 티켓을 soft delete 후 새로 생성(전체 대체).
  */
 export const PATCH = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
@@ -68,8 +69,39 @@ export const PATCH = withErrorHandler(
           ...(input.transferDate !== undefined
             ? { transferDate: input.transferDate }
             : {}),
+          ...(input.requestType !== undefined
+            ? { requestType: input.requestType }
+            : {}),
+          ...(input.requestor !== undefined
+            ? { requestor: input.requestor }
+            : {}),
+          ...(input.requestNumber !== undefined
+            ? { requestNumber: input.requestNumber }
+            : {}),
+          ...(input.requestContent !== undefined
+            ? { requestContent: input.requestContent }
+            : {}),
         },
       });
+
+      // tickets 배열이 전달된 경우: 기존 soft delete 후 전체 재생성
+      if (input.tickets !== undefined) {
+        await tx.workTicket.updateMany({
+          where: { workItemId: params.id, deletedAt: null },
+          data: { deletedAt: new Date() },
+        });
+        if (input.tickets.length > 0) {
+          for (const t of input.tickets) {
+            await tx.workTicket.create({
+              data: {
+                workItemId: params.id,
+                systemName: t.systemName,
+                ticketNumber: t.ticketNumber,
+              },
+            });
+          }
+        }
+      }
 
       await withAudit(tx, {
         entityType: "WorkItem",

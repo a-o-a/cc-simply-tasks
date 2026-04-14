@@ -58,7 +58,6 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    // tie-breaker로 id 포함: order/createdAt이 같아도 안정적 정렬.
     orderBy: [{ order: "asc" }, { createdAt: "desc" }, { id: "desc" }],
   });
 
@@ -68,6 +67,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
 /**
  * POST /api/work-items
+ * tickets 배열이 있으면 같은 트랜잭션에서 생성.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
@@ -87,8 +87,25 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         startDate: input.startDate ?? null,
         endDate: input.endDate ?? null,
         transferDate: input.transferDate ?? null,
+        requestType: input.requestType ?? null,
+        requestor: input.requestor ?? null,
+        requestNumber: input.requestNumber ?? null,
+        requestContent: input.requestContent ?? null,
       },
     });
+
+    if (input.tickets?.length) {
+      for (const t of input.tickets) {
+        await tx.workTicket.create({
+          data: {
+            workItemId: row.id,
+            systemName: t.systemName,
+            ticketNumber: t.ticketNumber,
+          },
+        });
+      }
+    }
+
     await withAudit(tx, {
       entityType: "WorkItem",
       entityId: row.id,

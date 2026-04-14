@@ -35,21 +35,26 @@ model TeamMember {
 /// status   허용값: lib/enums.ts > STATUSES
 /// priority 허용값: lib/enums.ts > PRIORITIES
 model WorkItem {
-  id           String    @id @default(cuid())
-  title        String
-  description  String?
-  category     String    @default("")
-  status       String    @default("WAITING")
-  priority     String    @default("NORMAL")
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  category      String    @default("")
+  status        String    @default("WAITING")
+  priority      String    @default("NORMAL")
   // 같은 담당자 내 수동 정렬 순서. 낮을수록 상단.
-  order        Int       @default(0)
-  assigneeId   String?
-  startDate    DateTime?
-  endDate      DateTime?
-  transferDate DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+  order         Int       @default(0)
+  assigneeId    String?
+  startDate     DateTime?
+  endDate       DateTime?
+  transferDate  DateTime?
+  // 요청 정보
+  requestType   String?
+  requestor     String?
+  requestNumber String?
+  requestContent String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   assignee TeamMember?  @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
   tickets  WorkTicket[]
@@ -61,21 +66,20 @@ model WorkItem {
   @@index([status])
 }
 
+/// systemName: WorkSystem.code 참조. workItem당 systemName 1개 제한.
 model WorkTicket {
   id           String    @id @default(cuid())
   workItemId   String
-  systemName   String // "Jira", "Redmine", "GitHub" 등
+  systemName   String    // WorkSystem.code 저장
   ticketNumber String
-  ticketUrl    String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
   workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
 
-  @@unique([workItemId, systemName, ticketNumber])
+  @@unique([workItemId, systemName])
   @@index([workItemId])
-  @@index([ticketNumber])
   @@index([deletedAt])
 }
 

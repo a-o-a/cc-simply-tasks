@@ -20,6 +20,7 @@ import type {
   WorkCategory,
   WorkItemDetail,
   WorkItemListItem,
+  WorkSystem,
 } from "@/lib/client/types";
 import {
   PRIORITIES,
@@ -75,12 +76,14 @@ export function WorkItemsClient() {
   const [items, setItems] = React.useState<WorkItemListItem[]>([]);
   const [members, setMembers] = React.useState<Member[]>([]);
   const [categories, setCategories] = React.useState<WorkCategory[]>([]);
+  const [systems, setSystems] = React.useState<WorkSystem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<WorkItemListItem | null>(null);
   const [drawerId, setDrawerId] = React.useState<string | null>(null);
+  const [drawerReloadKey, setDrawerReloadKey] = React.useState(0);
 
   // 보기 모드 복원
   React.useEffect(() => {
@@ -117,6 +120,15 @@ export function WorkItemsClient() {
     }
   }, []);
 
+  const loadSystems = React.useCallback(async () => {
+    try {
+      const res = await api.get<{ items: WorkSystem[] }>("/api/work-systems");
+      setSystems(res.items);
+    } catch {
+      // 시스템 조회 실패는 치명적이지 않음 — 조용히 무시
+    }
+  }, []);
+
   const loadItems = React.useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -150,7 +162,8 @@ export function WorkItemsClient() {
   React.useEffect(() => {
     void loadMembers();
     void loadCategories();
-  }, [loadMembers, loadCategories]);
+    void loadSystems();
+  }, [loadMembers, loadCategories, loadSystems]);
 
   React.useEffect(() => {
     void loadItems();
@@ -265,18 +278,21 @@ export function WorkItemsClient() {
         editing={editing}
         members={members}
         categories={categories}
+        systems={systems}
         onClose={() => setFormOpen(false)}
         onSaved={() => {
           setFormOpen(false);
           void loadItems();
+          // 드로어가 열려 있으면 최신 detail 재로드 (updatedAt 동기화)
+          if (drawerId) setDrawerReloadKey((k) => k + 1);
         }}
       />
 
       <WorkItemDrawer
         workItemId={drawerId}
+        reloadKey={drawerReloadKey}
         onClose={() => setDrawerId(null)}
         onEdit={(item) => {
-          // 드로어를 닫지 않고 수정 다이얼로그 오픈 (저장 후 둘 다 갱신)
           openEditFromDrawer(item);
         }}
         onDeleted={() => setDrawerId(null)}

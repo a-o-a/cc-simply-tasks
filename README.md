@@ -5,7 +5,7 @@
 ## 목적
 
 - 담당자별/이관일별로 작업(WorkItem)을 관리
-- 작업에 연결된 외부 티켓(WorkTicket) 추적
+- 작업별 요청 정보와 외부 시스템 연동 번호(WorkTicket) 추적
 - 팀원(TeamMember) 관리 및 캘린더 이벤트(CalendarEvent) 표시
 - 모든 쓰기(write)에 대한 감사 로그(AuditLog) 남기기 (익명 액터 기반)
 - 1차 범위: 내부망, 인증 없음 (추후 확장)
@@ -35,17 +35,13 @@
 │   ├── page.tsx                 # 홈 대시보드
 │   ├── globals.css
 │   ├── work-items/page.tsx      # 작업 목록 (테이블/칸반/간트 토글)
-│   ├── calendar/page.tsx        # 캘린더 (월/주 보기, 드래그 이동)
+│   ├── calendar/page.tsx        # 캘린더 (월 보기, 드래그 이동)
 │   ├── settings/page.tsx        # 설정 (서비스명/멤버/코드관리/백업)
 │   ├── members/page.tsx         # → /settings 리다이렉트
 │   └── api/
 │       ├── work-items/          # 레퍼런스 구현
-│       │   ├── route.ts         # GET(list+필터+범위), POST
-│       │   └── [id]/
-│       │       ├── route.ts     # GET, PATCH(If-Match), DELETE(soft)
-│       │       └── tickets/
-│       │           ├── route.ts             # GET, POST
-│       │           └── [ticketId]/route.ts  # PATCH, DELETE
+│       │   ├── route.ts         # GET(list+필터+범위), POST(+tickets)
+│       │   └── [id]/route.ts    # GET, PATCH(If-Match, tickets 전체대체), DELETE(soft)
 │       ├── team-members/
 │       │   ├── route.ts         # GET(list), POST
 │       │   └── [id]/route.ts    # GET, PATCH, DELETE
@@ -80,8 +76,8 @@
 │   │   ├── table-view.tsx
 │   │   ├── kanban-view.tsx
 │   │   ├── gantt-view.tsx
-│   │   ├── work-item-drawer.tsx   # 우측 sheet (상세/티켓/활동 탭)
-│   │   ├── work-item-form-dialog.tsx
+│   │   ├── work-item-drawer.tsx   # 우측 sheet (상세/활동 탭, 요청정보/시스템연동 표시)
+│   │   ├── work-item-form-dialog.tsx # 요청정보 + 시스템연동 포함 생성/수정 폼
 │   │   └── status-badge.tsx
 │   ├── calendar/
 │   │   ├── calendar-client.tsx    # 오케스트레이터 (DnD, SSE 구독, 이관 건수 fetch)
@@ -110,7 +106,7 @@
 │   ├── utils.ts
 │   └── validation/
 │       ├── common.ts / teamMember.ts / workTicket.ts / calendarEvent.ts
-│       ├── workItem.ts          # transferDateTo 범위 필터 포함
+│       ├── workItem.ts          # 요청정보 + tickets 배열 + transferDateTo 범위 필터 포함
 │       ├── workSystem.ts
 │       └── workCategory.ts
 ├── prisma/
@@ -185,7 +181,7 @@ curl -O http://localhost:3000/api/backup
 | **0** | 프로젝트 부트스트랩 (Next.js + Prisma + SQLite + TS) | ✅ 완료 |
 | **1** | Prisma 스키마 확정 (도메인 모델 + enum + 인덱스) | ✅ 완료 |
 | **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, SQLite PRAGMA) | ✅ 완료 |
-| **3** | API 라우트 (team-members, work-items, work-tickets, calendar-events, audit-logs) | ✅ 완료 |
+| **3** | API 라우트 (team-members, work-items, calendar-events, audit-logs 등) | ✅ 완료 |
 | **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더 + 대시보드) | ✅ 완료 |
 | **4+** | 캘린더 개선 (주 보기, 드래그 이동, 팀원 필터, 카테고리 정리, 다중 담당자) | ✅ 완료 |
 | **4++** | 대시보드 개편 (3열 레이아웃, 진행중인 작업, 작업 드로어 연동) | ✅ 완료 |
@@ -198,9 +194,9 @@ curl -O http://localhost:3000/api/backup
 
 ## 핸드오프 메모 (다음 에이전트용)
 
-### 현재 상태 (2026-04-13)
+### 현재 상태 (2026-04-14)
 
-Phase 0–5+ 완료. `tsc --noEmit` 통과.
+Phase 0–5++ 완료. 현재 작업 브랜치에는 작업 요청 정보 필드와 시스템 연동 단순화가 반영되어 있음.
 
 ### 알아야 할 결정사항
 
@@ -226,6 +222,11 @@ Phase 0–5+ 완료. `tsc --noEmit` 통과.
 | 캘린더 SSE | `GET /api/calendar-events/stream` — EventSource로 실시간 구독. POST/PATCH/DELETE 시 `emitCalendarChanged()` 호출. 단일 서버 한정. |
 | 캘린더 주 보기 | 제거됨. 월 보기 전용으로 단순화. (`week-view.tsx` 삭제, `kstAddDays`/`kstWeekFetchRange` 제거) |
 | 작업 필터 | 순서: 분류→상태→담당자(MemberFilter 드롭다운)→우선순위→이관일. 티켓번호 필터 제거. 초기화 버튼 항상 표시. |
+| 요청 정보 | `WorkItem`에 `requestType / requestor / requestNumber / requestContent` 저장. 생성/수정 폼과 상세 드로어에서 함께 노출. |
+| 시스템 연동 | 티켓 관리는 별도 서브 API/탭이 아니라 `WorkItem` 생성·수정 payload의 `tickets` 배열로 함께 처리. |
+| 티켓 유니크 제약 | `WorkTicket`은 `workItemId + systemName` 유니크. 작업당 같은 시스템은 1개만 연결 가능. |
+| 티켓 컬럼 변경 | `ticketUrl` 제거. 현재는 시스템 코드(`systemName`)와 작업번호(`ticketNumber`)만 저장. |
+| 작업 폼 담당자 선택 | `MemberFilter`는 `mode="single"` 지원. 작업 폼에서는 단일 선택 팝오버로 사용. |
 | 헤더 레이아웃 통일 | 모든 페이지 `text-xl font-semibold` + `py-6`. 작업/캘린더: 좌(타이틀)/가운데(컨트롤)/우(추가버튼) 3분할. |
 | DB 현황 | `GET /api/db-stats` — 테이블별 전체 레코드 수. 설정→백업 탭 상단에 표시. |
 | 코드 관리 복원 | 소프트 딜리트된 코드를 같은 코드로 재등록 시 `create` 대신 복원(`deletedAt=null`). |

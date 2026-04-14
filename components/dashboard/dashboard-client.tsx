@@ -18,6 +18,7 @@ import type {
   Member,
   WorkCategory,
   WorkItemListItem,
+  WorkSystem,
 } from "@/lib/client/types";
 import { STATUSES, type Status } from "@/lib/enums";
 import { STATUS_LABELS } from "@/lib/enum-labels";
@@ -61,11 +62,13 @@ export function DashboardClient() {
   const [items, setItems] = React.useState<WorkItemListItem[] | null>(null);
   const [members, setMembers] = React.useState<Member[]>([]);
   const [categories, setCategories] = React.useState<WorkCategory[]>([]);
+  const [systems, setSystems] = React.useState<WorkSystem[]>([]);
   const [logs, setLogs] = React.useState<AuditLog[] | null>(null);
   const [calEvents, setCalEvents] = React.useState<CalendarEvent[] | null>(null);
 
   // 드로어 + 수정 폼
   const [drawerId, setDrawerId] = React.useState<string | null>(null);
+  const [drawerReloadKey, setDrawerReloadKey] = React.useState(0);
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<WorkItemListItem | null>(null);
 
@@ -90,13 +93,15 @@ export function DashboardClient() {
       }),
       api.get<ListResponse<Member>>("/api/team-members"),
       api.get<{ items: WorkCategory[] }>("/api/work-categories"),
+      api.get<{ items: WorkSystem[] }>("/api/work-systems"),
     ])
-      .then(([itemsRes, logsRes, calRes, membersRes, catRes]) => {
+      .then(([itemsRes, logsRes, calRes, membersRes, catRes, sysRes]) => {
         if (cancelled) return;
         setItems(itemsRes.items);
         setLogs(logsRes.items.slice(0, 10));
         setMembers(membersRes.items);
         setCategories(catRes.items);
+        setSystems(sysRes.items);
         // 종일 우선 → 카테고리 순 → 제목 asc
         const sorted = calRes.items.slice().sort((a, b) => {
           if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
@@ -341,6 +346,7 @@ export function DashboardClient() {
       {/* 작업 상세 드로어 */}
       <WorkItemDrawer
         workItemId={drawerId}
+        reloadKey={drawerReloadKey}
         onClose={() => setDrawerId(null)}
         onEdit={(item) => {
           setEditing(item);
@@ -358,10 +364,12 @@ export function DashboardClient() {
         editing={editing}
         members={members}
         categories={categories}
+        systems={systems}
         onClose={() => setFormOpen(false)}
         onSaved={() => {
           setFormOpen(false);
           void loadItems();
+          if (drawerId) setDrawerReloadKey((k) => k + 1);
         }}
       />
     </div>
