@@ -41,7 +41,8 @@ type DateGroup = {
 
 type RequestGroup = {
   requestNumber: string | null; // null = 요청번호 없음
-  requestor: string | null;
+  requestTypes: string[]; // 고유 요청구분 목록
+  requestors: string[];  // 고유 요청자 목록
   items: WorkItemListItem[];
 };
 
@@ -99,9 +100,12 @@ function groupItems(items: WorkItemListItem[]): DateGroup[] {
 
     for (const key of numbered) {
       const groupItems = reqMap.get(key)!;
+      const requestTypes = [...new Set(groupItems.map((i) => i.requestType).filter(Boolean) as string[])];
+      const requestors = [...new Set(groupItems.map((i) => i.requestor).filter(Boolean) as string[])];
       reqGroups.push({
         requestNumber: key,
-        requestor: groupItems[0]?.requestor ?? null,
+        requestTypes,
+        requestors,
         items: groupItems,
       });
     }
@@ -109,7 +113,8 @@ function groupItems(items: WorkItemListItem[]): DateGroup[] {
       const groupItems = reqMap.get("__none__")!;
       reqGroups.push({
         requestNumber: null,
-        requestor: null,
+        requestTypes: [],
+        requestors: [],
         items: groupItems,
       });
     }
@@ -273,6 +278,7 @@ export function TransferClient() {
           <TransferTable
             dateGroups={dateGroups}
             systemNameByCode={systemNameByCode}
+            categoryNameByCode={Object.fromEntries(categories.map((c) => [c.code, c.name]))}
             onOpen={openDrawer}
           />
         )}
@@ -313,136 +319,143 @@ export function TransferClient() {
   );
 }
 
-// ─── 데이터 그리드 (테이블) ──────────────────────────────────────────────────
+// ─── 날짜별 테이블 목록 ────────────────────────────────────────────────────────
 
 function TransferTable({
   dateGroups,
   systemNameByCode,
+  categoryNameByCode,
   onOpen,
 }: {
   dateGroups: DateGroup[];
   systemNameByCode: Record<string, string>;
+  categoryNameByCode: Record<string, string>;
   onOpen: (item: WorkItemListItem) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
-      <table className="w-full text-sm text-left">
-        <thead className="border-b text-xs uppercase text-muted-foreground bg-muted/40">
-          <tr>
-            <th className="border-r px-4 py-3 font-medium w-[150px]">이관일</th>
-            <th className="border-r px-4 py-3 font-medium w-[160px]">요청번호</th>
-            <th className="border-r px-4 py-3 font-medium w-[100px]">요청자</th>
-            <th className="border-r px-4 py-3 font-medium w-[140px]">상태</th>
-            <th className="border-r px-4 py-3 font-medium">작업명</th>
-            <th className="border-r px-4 py-3 font-medium w-[120px]">담당자</th>
-            <th className="px-4 py-3 font-medium w-[180px]">이관 시스템</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {dateGroups.map((dateGroup, dId) =>
-            dateGroup.requestGroups.map((reqGroup, rId) =>
-              reqGroup.items.map((item, iId) => {
-                const isFirstDate = rId === 0 && iId === 0;
-                const isFirstReq = iId === 0;
+    <div className="space-y-6">
+      {dateGroups.map((dateGroup) => (
+        <DateTable
+          key={dateGroup.date}
+          dateGroup={dateGroup}
+          systemNameByCode={systemNameByCode}
+          categoryNameByCode={categoryNameByCode}
+          onOpen={onOpen}
+        />
+      ))}
+    </div>
+  );
+}
 
+function DateTable({
+  dateGroup,
+  systemNameByCode,
+  categoryNameByCode,
+  onOpen,
+}: {
+  dateGroup: DateGroup;
+  systemNameByCode: Record<string, string>;
+  categoryNameByCode: Record<string, string>;
+  onOpen: (item: WorkItemListItem) => void;
+}) {
+  return (
+    <div>
+      {/* 날짜 타이틀 */}
+      <div className="mb-2 flex items-center gap-2">
+        <h2
+          className={cn(
+            "text-base font-bold",
+            dateGroup.isToday
+              ? "text-blue-700 dark:text-blue-400"
+              : dateGroup.isPast
+                ? "text-muted-foreground"
+                : "text-foreground",
+          )}
+        >
+          {dateGroup.label}
+        </h2>
+        {dateGroup.isToday && (
+          <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            오늘
+          </span>
+        )}
+        {dateGroup.isPast && (
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            지난날
+          </span>
+        )}
+        <span className="text-xs text-muted-foreground">총 {dateGroup.totalCount}건</span>
+        {dateGroup.systems.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {dateGroup.systems.map((sysCode) => (
+              <span
+                key={sysCode}
+                className="inline-flex items-center rounded bg-foreground/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground/70"
+              >
+                {systemNameByCode[sysCode] ?? sysCode}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 테이블 */}
+      <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+        <table className="w-full text-sm text-left">
+          <thead className="border-b text-xs uppercase text-muted-foreground bg-muted/40">
+            <tr>
+              <th className="border-r px-4 py-3 font-medium w-[180px]">요청 정보</th>
+              <th className="border-r px-4 py-3 font-medium w-[130px]">상태</th>
+              <th className="border-r px-4 py-3 font-medium">작업명</th>
+              <th className="border-r px-4 py-3 font-medium w-[110px]">담당자</th>
+              <th className="px-4 py-3 font-medium w-[200px]">이관 시스템</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {dateGroup.requestGroups.map((reqGroup) =>
+              reqGroup.items.map((item, iId) => {
+                const isFirstReq = iId === 0;
                 return (
                   <tr
                     key={item.id}
-                    className={cn(
-                      "group cursor-pointer bg-background transition-colors hover:bg-accent/40",
-                      isFirstDate && dId > 0 && "!border-t-[3px] !border-double !border-muted-foreground/30"
-                    )}
-                    onClick={() => onOpen(item)}
+                    className="bg-background"
                   >
-                    {/* 1. 이관일 병합 (rowSpan) */}
-                    {isFirstDate && (
-                      <td
-                        rowSpan={dateGroup.totalCount}
-                        className={cn(
-                          "border-r px-4 py-3 align-top",
-                          dateGroup.isToday
-                            ? "bg-blue-50/50 dark:bg-blue-950/20"
-                            : dateGroup.isPast
-                              ? "bg-muted/10"
-                              : ""
-                        )}
-                      >
-                        <div className="flex flex-col gap-1">
-                          <span
-                            className={cn(
-                              "font-bold",
-                              dateGroup.isToday
-                                ? "text-blue-700 dark:text-blue-400"
-                                : dateGroup.isPast
-                                  ? "text-muted-foreground"
-                                  : "text-foreground"
-                            )}
-                          >
-                            {dateGroup.label}
+                    {/* 1. 요청 정보 병합 */}
+                    {isFirstReq && (
+                      <td rowSpan={reqGroup.items.length} className="border-r px-4 py-3 align-top">
+                        <div className="flex flex-col gap-0.5 text-sm">
+                          <span className="font-semibold">
+                            {reqGroup.requestNumber ? `# ${reqGroup.requestNumber}` : "—"}
                           </span>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            {dateGroup.isToday && (
-                              <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                                오늘
-                              </span>
-                            )}
-                            {dateGroup.isPast && (
-                              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                지난날
-                              </span>
-                            )}
-                            <span className="text-[11px] text-muted-foreground">
-                              총 {dateGroup.totalCount}건
+                          {(reqGroup.requestTypes.length > 0 || reqGroup.requestors.length > 0) && (
+                            <span className="text-xs text-muted-foreground">
+                              {[reqGroup.requestTypes.join(", "), reqGroup.requestors.join(", ")]
+                                .filter(Boolean)
+                                .join(" · ")}
                             </span>
-                          </div>
-                          {dateGroup.systems.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {dateGroup.systems.map((sysCode) => (
-                                <span
-                                  key={sysCode}
-                                  className="inline-flex items-center rounded bg-foreground/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground/70"
-                                >
-                                  {systemNameByCode[sysCode] ?? sysCode}
-                                </span>
-                              ))}
-                            </div>
                           )}
                         </div>
                       </td>
                     )}
 
-                    {/* 2. 요청번호 병합 (rowSpan) */}
-                    {isFirstReq && (
-                      <td
-                        rowSpan={reqGroup.items.length}
-                        className="border-r px-4 py-3 align-top"
-                      >
-                        <div className="font-semibold text-sm">
-                          {reqGroup.requestNumber ? `# ${reqGroup.requestNumber}` : "없음"}
-                        </div>
-                      </td>
-                    )}
-
-                    {/* 3. 요청자 병합 (rowSpan) */}
-                    {isFirstReq && (
-                      <td
-                        rowSpan={reqGroup.items.length}
-                        className="border-r px-4 py-3 align-top text-muted-foreground"
-                      >
-                        {reqGroup.requestor || "—"}
-                      </td>
-                    )}
-
-                    {/* 4. 상태 */}
+                    {/* 3. 상태 */}
                     <td className="border-r px-4 py-3 align-top">
                       <StatusBadge status={item.status} />
                     </td>
 
-                    {/* 5. 작업명 */}
-                    <td className="border-r px-4 py-3 align-top">
-                      <span className="block font-medium leading-snug">
-                        {item.title}
-                      </span>
+                    {/* 4. 작업명 */}
+                    <td
+                      className="border-r px-4 py-3 align-top cursor-pointer hover:bg-accent/40 transition-colors"
+                      onClick={() => onOpen(item)}
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {item.category && categoryNameByCode[item.category] && (
+                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            {categoryNameByCode[item.category]}
+                          </span>
+                        )}
+                        <span className="font-medium leading-snug">{item.title}</span>
+                      </div>
                       {item.additionalNotes && (
                         <span className="mt-1 block whitespace-pre-wrap text-[11px] text-muted-foreground">
                           {item.additionalNotes}
@@ -450,12 +463,12 @@ function TransferTable({
                       )}
                     </td>
 
-                    {/* 6. 담당자 */}
+                    {/* 5. 담당자 */}
                     <td className="border-r px-4 py-3 align-top text-muted-foreground">
                       {item.assignee?.name ?? "미배정"}
                     </td>
 
-                    {/* 7. 이관 시스템 */}
+                    {/* 6. 이관 시스템 */}
                     <td className="px-4 py-3 align-top">
                       {item.tickets.length > 0 ? (
                         <div className="flex flex-col gap-1">
@@ -467,11 +480,7 @@ function TransferTable({
                               <span className="font-medium text-foreground/80">
                                 {systemNameByCode[t.systemName] ?? t.systemName}
                               </span>
-                              {t.ticketNumber ? (
-                                <span>
-                                  {t.ticketNumber}
-                                </span>
-                              ) : null}
+                              {t.ticketNumber ? <span>{t.ticketNumber}</span> : null}
                             </div>
                           ))}
                         </div>
@@ -482,10 +491,10 @@ function TransferTable({
                   </tr>
                 );
               })
-            )
-          )}
-        </tbody>
-      </table>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

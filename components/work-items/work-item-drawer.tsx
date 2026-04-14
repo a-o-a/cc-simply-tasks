@@ -114,7 +114,7 @@ export function WorkItemDrawer({
   return (
     <>
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-        <SheetContent className="w-full sm:max-w-2xl">
+        <SheetContent className="w-full sm:max-w-2xl gap-2">
           {loading ? (
             <DrawerSkeleton />
           ) : error ? (
@@ -192,7 +192,7 @@ function DrawerBody({
         <SheetTitle className="text-xl">{detail.title}</SheetTitle>
       </SheetHeader>
 
-      <div className="mt-2 flex justify-end gap-2">
+      <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={onEdit}>
           <Pencil className="mr-2 h-4 w-4" />
           수정
@@ -204,9 +204,19 @@ function DrawerBody({
       </div>
 
       <Tabs defaultValue="detail" className="mt-3 flex min-h-0 flex-1 flex-col">
-        <TabsList>
-          <TabsTrigger value="detail">상세</TabsTrigger>
-          <TabsTrigger value="activity">활동</TabsTrigger>
+        <TabsList className="h-auto w-full justify-start gap-0 rounded-none border-b border-border bg-transparent p-0">
+          <TabsTrigger
+            value="detail"
+            className="-mb-px rounded-b-none rounded-t-md border border-border border-b-0 bg-muted px-5 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-none"
+          >
+            상세
+          </TabsTrigger>
+          <TabsTrigger
+            value="activity"
+            className="-mb-px rounded-b-none rounded-t-md border border-border border-b-0 bg-muted px-5 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-none"
+          >
+            활동
+          </TabsTrigger>
         </TabsList>
 
         <div className="min-h-0 flex-1 overflow-y-auto">

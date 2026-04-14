@@ -22,6 +22,8 @@ import type {
 } from "@/lib/client/types";
 import { STATUSES, type Status } from "@/lib/enums";
 import { STATUS_LABELS } from "@/lib/enum-labels";
+
+type WorkItemCounts = { byStatus: Record<string, number>; total: number };
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/work-items/status-badge";
 import { WorkItemDrawer } from "@/components/work-items/work-item-drawer";
@@ -59,7 +61,9 @@ export function DashboardClient() {
   const todayKst = React.useMemo(() => utcMsToKstDateString(Date.now()), []);
   const weekDates = React.useMemo(() => kstWeekContaining(todayKst), [todayKst]);
 
-  const [items, setItems] = React.useState<WorkItemListItem[] | null>(null);
+  const [counts, setCounts] = React.useState<WorkItemCounts | null>(null);
+  const [dueThisWeek, setDueThisWeek] = React.useState<WorkItemListItem[] | null>(null);
+  const [inProgress, setInProgress] = React.useState<WorkItemListItem[] | null>(null);
   const [members, setMembers] = React.useState<Member[]>([]);
   const [categories, setCategories] = React.useState<WorkCategory[]>([]);
   const [systems, setSystems] = React.useState<WorkSystem[]>([]);
@@ -72,10 +76,35 @@ export function DashboardClient() {
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<WorkItemListItem | null>(null);
 
-  const loadItems = React.useCallback(async () => {
-    const res = await api.get<ListResponse<WorkItemListItem>>("/api/work-items");
-    setItems(res.items);
-  }, []);
+  const loadWorkItems = React.useCallback(async () => {
+    const weekStart = weekDates[0];
+    const weekEnd = weekDates[6];
+    const [countsRes, dueRes, inProgressRes] = await Promise.all([
+      api.get<WorkItemCounts>("/api/work-items/count"),
+      api.get<ListResponse<WorkItemListItem>>("/api/work-items", {
+        query: {
+          scope: "active",
+          transferDate: weekStart,
+          transferDateTo: weekEnd,
+          pageSize: "200",
+        },
+      }),
+      api.get<ListResponse<WorkItemListItem>>("/api/work-items", {
+        query: { scope: "active", status: "IN_PROGRESS", pageSize: "200" },
+      }),
+    ]);
+    setCounts(countsRes);
+    setDueThisWeek(
+      dueRes.items
+        .filter((item) => item.status !== "HOLDING")
+        .sort((a, b) => {
+          const ad = utcMsToKstDateString(new Date(a.transferDate!).getTime());
+          const bd = utcMsToKstDateString(new Date(b.transferDate!).getTime());
+          return ad.localeCompare(bd);
+        }),
+    );
+    setInProgress(inProgressRes.items);
+  }, [weekDates]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -83,7 +112,7 @@ export function DashboardClient() {
     const todayToMs = todayFromMs + DAY_MS;
 
     Promise.all([
-      api.get<ListResponse<WorkItemListItem>>("/api/work-items"),
+      loadWorkItems(),
       api.get<ListResponse<AuditLog>>("/api/audit-logs"),
       api.get<{ items: CalendarEvent[] }>("/api/calendar-events", {
         query: {
@@ -95,9 +124,8 @@ export function DashboardClient() {
       api.get<{ items: WorkCategory[] }>("/api/work-categories"),
       api.get<{ items: WorkSystem[] }>("/api/work-systems"),
     ])
-      .then(([itemsRes, logsRes, calRes, membersRes, catRes, sysRes]) => {
+      .then(([, logsRes, calRes, membersRes, catRes, sysRes]) => {
         if (cancelled) return;
-        setItems(itemsRes.items);
         setLogs(logsRes.items.slice(0, 10));
         setMembers(membersRes.items);
         setCategories(catRes.items);
@@ -118,36 +146,14 @@ export function DashboardClient() {
           description: err instanceof ApiError ? err.message : undefined,
           variant: "destructive",
         });
-        setItems([]);
+        setCounts({ byStatus: {}, total: 0 });
+        setDueThisWeek([]);
+        setInProgress([]);
         setLogs([]);
         setCalEvents([]);
       });
     return () => { cancelled = true; };
-  }, [todayKst]);
-
-  // 이번주 이관 예정
-  const dueThisWeek = React.useMemo(() => {
-    const [weekStart, weekEnd] = [weekDates[0], weekDates[6]];
-    return (items ?? [])
-      .filter((item) => {
-        if (!item.transferDate) return false;
-        const d = utcMsToKstDateString(new Date(item.transferDate).getTime());
-        return d >= weekStart && d <= weekEnd
-          && item.status !== "TRANSFERRED"
-          && item.status !== "HOLDING";
-      })
-      .sort((a, b) => {
-        const ad = utcMsToKstDateString(new Date(a.transferDate!).getTime());
-        const bd = utcMsToKstDateString(new Date(b.transferDate!).getTime());
-        return ad.localeCompare(bd);
-      });
-  }, [items, weekDates]);
-
-  // 진행중인 작업
-  const inProgress = React.useMemo(
-    () => (items ?? []).filter((item) => item.status === "IN_PROGRESS"),
-    [items],
-  );
+  }, [todayKst, loadWorkItems]);
 
   // 이관일 라벨
   function transferDateLabel(transferDate: string) {
@@ -170,7 +176,7 @@ export function DashboardClient() {
       </header>
 
       {/* 작업 현황 통계 */}
-      <StatusStats items={items} />
+      <StatusStats counts={counts} />
 
       {/* 3열: 이번주 이관 예정 | 진행중인 작업 | 오늘 일정 */}
       <div className="grid gap-4 lg:grid-cols-3">
@@ -184,10 +190,10 @@ export function DashboardClient() {
                 ({weekDates[0].slice(5).replace("-", "/")} – {weekDates[6].slice(5).replace("-", "/")})
               </span>
             </div>
-            <span className="text-xs text-muted-foreground">{dueThisWeek.length}건</span>
+            <span className="text-xs text-muted-foreground">{dueThisWeek?.length ?? "—"}건</span>
           </header>
           <div className="p-2">
-            {items === null ? (
+            {dueThisWeek === null ? (
               <SkeletonRows />
             ) : dueThisWeek.length === 0 ? (
               <EmptyRow icon={<CalendarClock className="h-4 w-4" />}>
@@ -227,10 +233,10 @@ export function DashboardClient() {
               <Loader2 className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold">진행중인 작업</h2>
             </div>
-            <span className="text-xs text-muted-foreground">{inProgress.length}건</span>
+            <span className="text-xs text-muted-foreground">{inProgress?.length ?? "—"}건</span>
           </header>
           <div className="p-2">
-            {items === null ? (
+            {inProgress === null ? (
               <SkeletonRows />
             ) : inProgress.length === 0 ? (
               <EmptyRow icon={<Loader2 className="h-4 w-4" />}>
@@ -356,9 +362,9 @@ export function DashboardClient() {
         }}
         onDeleted={() => {
           setDrawerId(null);
-          void loadItems();
+          void loadWorkItems();
         }}
-        onMutated={() => void loadItems()}
+        onMutated={() => void loadWorkItems()}
       />
 
       <WorkItemFormDialog
@@ -370,7 +376,7 @@ export function DashboardClient() {
         onClose={() => setFormOpen(false)}
         onSaved={() => {
           setFormOpen(false);
-          void loadItems();
+          void loadWorkItems();
           if (drawerId) setDrawerReloadKey((k) => k + 1);
         }}
       />
@@ -391,29 +397,20 @@ const STATUS_STYLE: Record<Status, { bar: string; text: string }> = {
   HOLDING:        { bar: "bg-red-500",               text: "text-red-500" },
 };
 
-function StatusStats({ items }: { items: WorkItemListItem[] | null }) {
-  const counts = React.useMemo(() => {
-    const map = new Map<Status, number>();
-    for (const s of STATUSES) map.set(s, 0);
-    for (const item of items ?? []) {
-      map.set(item.status as Status, (map.get(item.status as Status) ?? 0) + 1);
-    }
-    return map;
-  }, [items]);
-
-  const total = items?.length ?? 0;
+function StatusStats({ counts }: { counts: WorkItemCounts | null }) {
+  const total = counts?.total ?? 0;
 
   return (
     <div className="rounded-lg border bg-card px-4 py-3">
       <div className="mb-3 flex items-baseline gap-2">
-        <span className="text-2xl font-bold tabular-nums">{items === null ? "—" : total}</span>
+        <span className="text-2xl font-bold tabular-nums">{counts === null ? "—" : total}</span>
         <span className="text-sm text-muted-foreground">건 전체</span>
       </div>
       {/* 진행 바 */}
-      {items !== null && total > 0 && (
+      {counts !== null && total > 0 && (
         <div className="mb-4 flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
           {STATUSES.map((s) => {
-            const cnt = counts.get(s) ?? 0;
+            const cnt = counts.byStatus[s] ?? 0;
             if (cnt === 0) return null;
             return (
               <div
@@ -429,13 +426,13 @@ function StatusStats({ items }: { items: WorkItemListItem[] | null }) {
       {/* 상태별 카드 */}
       <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
         {STATUSES.map((s) => {
-          const cnt = counts.get(s) ?? 0;
+          const cnt = counts?.byStatus[s] ?? 0;
           const style = STATUS_STYLE[s];
           return (
             <div key={s} className="flex flex-col gap-1 rounded-md bg-muted/40 px-2 py-2">
               <span className="text-[10px] text-muted-foreground leading-tight">{STATUS_LABELS[s]}</span>
-              <span className={cn("text-lg font-bold tabular-nums leading-none", items === null ? "text-muted-foreground" : style.text)}>
-                {items === null ? "—" : cnt}
+              <span className={cn("text-lg font-bold tabular-nums leading-none", counts === null ? "text-muted-foreground" : style.text)}>
+                {counts === null ? "—" : cnt}
               </span>
             </div>
           );

@@ -232,15 +232,7 @@
   - 요청번호 (`# {requestNumber}`) 표시
   - 시스템 연동 딱지: 코드 → 시스템명, `10px` 소형 칩
   - 우선순위 뱃지 제거 → 카드 왼쪽 테두리 색상으로 구분 (파스텔: LOW slate-200 / NORMAL blue-200 / HIGH red-300)
-- [ ] 대시보드 전체 카운트용 dedicated count API
-- [ ] CSV export (`/api/work-items/export.csv`)
-- [ ] Audit log 보존 정책
-
-### Phase 6 — Postgres 이관 대비 체크
-- [ ] raw SQL 금지 규칙 (schema.prisma로만)
-- [ ] JSON 필드는 "JSON 문자열" 컨벤션 유지
-- [ ] DateTime 컬럼 통일 (Date 타입 미사용)
-- [ ] 이관 런북 작성: `DATABASE_URL` 교체 → `prisma migrate` → seed
+- [x] 대시보드 전체 카운트용 dedicated count API (`GET /api/work-items/count`, `groupBy` SQL)
 
 ---
 

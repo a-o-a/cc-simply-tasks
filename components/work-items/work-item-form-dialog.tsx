@@ -135,6 +135,36 @@ export function WorkItemFormDialog({
   // 수정 시 detail의 tickets를 가져오기 위해 필요하면 별도 fetch
   const [loadingTickets, setLoadingTickets] = React.useState(false);
 
+  // ─── 드래그 ────────────────────────────────────────────────
+  const [dragPos, setDragPos] = React.useState({ x: 0, y: 0 });
+  const dragRef = React.useRef<{ mouseX: number; mouseY: number; posX: number; posY: number } | null>(null);
+
+  React.useEffect(() => {
+    if (open) setDragPos({ x: 0, y: 0 });
+  }, [open]);
+
+  function onDragStart(e: React.MouseEvent<HTMLDivElement>) {
+    // 버튼·입력 요소 클릭은 드래그 제외
+    if ((e.target as HTMLElement).closest("button,input,select,textarea,a")) return;
+    e.preventDefault();
+    dragRef.current = { mouseX: e.clientX, mouseY: e.clientY, posX: dragPos.x, posY: dragPos.y };
+
+    function onMove(ev: MouseEvent) {
+      if (!dragRef.current) return;
+      setDragPos({
+        x: dragRef.current.posX + (ev.clientX - dragRef.current.mouseX),
+        y: dragRef.current.posY + (ev.clientY - dragRef.current.mouseY),
+      });
+    }
+    function onUp() {
+      dragRef.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
   React.useEffect(() => {
     if (!open) return;
     if (!editing) {
@@ -276,11 +306,23 @@ export function WorkItemFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent
+        className="sm:max-w-2xl max-h-[90vh] flex flex-col"
+        style={{ translate: `${dragPos.x}px ${dragPos.y}px` } as React.CSSProperties}
+      >
+        {/* 드래그 핸들 */}
+        <div
+          onMouseDown={onDragStart}
+          className="absolute left-1/2 top-1 -translate-x-1/2 flex h-5 w-12 cursor-grab items-center justify-center active:cursor-grabbing"
+          aria-hidden
+        >
+          <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
+        </div>
+
         <DialogHeader>
           <DialogTitle>{editing ? "작업 수정" : "작업 추가"}</DialogTitle>
           <DialogDescription>
-            제목과 일정/상태를 입력하세요. 생성 후에도 모든 항목을 변경할 수 있습니다.
+            작업 정보를 입력한 후 저장하세요.
           </DialogDescription>
         </DialogHeader>
 
@@ -315,7 +357,7 @@ export function WorkItemFormDialog({
                 value={state.requestType}
                 onChange={(e) => update("requestType", e.target.value)}
                 maxLength={200}
-                placeholder="예: 신규개발"
+                placeholder=""
               />
             </div>
             <div className="space-y-2">
@@ -325,7 +367,7 @@ export function WorkItemFormDialog({
                 value={state.requestor}
                 onChange={(e) => update("requestor", e.target.value)}
                 maxLength={200}
-                placeholder="예: 홍길동"
+                placeholder=""
               />
             </div>
             <div className="space-y-2">
@@ -335,7 +377,7 @@ export function WorkItemFormDialog({
                 value={state.requestNumber}
                 onChange={(e) => update("requestNumber", e.target.value)}
                 maxLength={200}
-                placeholder="예: REQ-2024-001"
+                placeholder=""
               />
             </div>
           </div>
@@ -349,7 +391,7 @@ export function WorkItemFormDialog({
               value={state.requestContent}
               onChange={(e) => update("requestContent", e.target.value)}
               maxLength={10_000}
-              placeholder="요청 배경, 세부 내용 등"
+              placeholder=""
             />
           </div>
 
@@ -361,7 +403,7 @@ export function WorkItemFormDialog({
               value={state.title}
               onChange={(e) => update("title", e.target.value)}
               maxLength={300}
-              placeholder="예: 대시보드에 요약정보 표시 영역 추가"
+              placeholder=""
             />
           </div>
 
@@ -531,7 +573,7 @@ export function WorkItemFormDialog({
               rows={3}
               value={state.additionalNotes}
               onChange={(e) => update("additionalNotes", e.target.value)}
-              placeholder="추가 사항을 자유롭게 적어주세요."
+              placeholder=""
             />
           </div>
 
@@ -544,7 +586,7 @@ export function WorkItemFormDialog({
               value={state.description}
               onChange={(e) => update("description", e.target.value)}
               maxLength={10_000}
-              placeholder="작업 배경, 범위, 참고사항 등"
+              placeholder=""
             />
           </div>
 
