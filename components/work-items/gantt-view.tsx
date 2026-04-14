@@ -389,6 +389,15 @@ function groupByAssignee(items: ScheduledItem[]): Group[] {
     }
     group.items.push(item);
   }
+
+  for (const group of map.values()) {
+    group.items.sort((a, b) => {
+      if (a.startMs !== b.startMs) return a.startMs - b.startMs;
+      if (a.endMs !== b.endMs) return a.endMs - b.endMs;
+      return a.title.localeCompare(b.title, "ko");
+    });
+  }
+
   // 정렬: 미배정은 마지막
   return [...map.values()].sort((a, b) => {
     if (a.key === "__unassigned__") return 1;

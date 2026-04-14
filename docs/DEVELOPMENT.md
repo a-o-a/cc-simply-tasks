@@ -60,11 +60,26 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     Object.fromEntries(searchParams),
   );
   const { take, cursor } = parsePagination(searchParams);
+  const activeStatuses = filters.status?.filter((s) => s !== "TRANSFERRED");
+  const statusWhere =
+    filters.scope === "transferred"
+      ? { status: "TRANSFERRED" as const }
+      : filters.scope === "active"
+        ? activeStatuses && activeStatuses.length > 0
+          ? { status: { in: activeStatuses } }
+          : { status: { not: "TRANSFERRED" as const } }
+        : filters.status?.length
+          ? { status: { in: filters.status } }
+          : {};
+  const orderBy =
+    filters.scope === "transferred"
+      ? [{ transferDate: "desc" as const }, { createdAt: "desc" as const }, { id: "desc" as const }]
+      : [{ order: "asc" as const }, { createdAt: "desc" as const }, { id: "desc" as const }];
 
   const rows = await prisma.workItem.findMany({
     where: {
       deletedAt: null,
-      ...(filters.status?.length ? { status: { in: filters.status } } : {}),
+      ...statusWhere,
       ...(filters.assigneeId?.length ? { assigneeId: { in: filters.assigneeId } } : {}),
       ...(filters.category?.length ? { category: { in: filters.category } } : {}),
       ...(filters.priority?.length ? { priority: { in: filters.priority } } : {}),
@@ -81,7 +96,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    orderBy: [{ order: "asc" }, { createdAt: "desc" }, { id: "desc" }],
+    orderBy,
   });
 
   const { items, nextCursor } = toPage(rows, take);
@@ -277,6 +292,9 @@ export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Para
 - `PATCH`에서 `tickets`가 전달되면 부분 수정이 아니라 **전체 대체**로 해석한다.
 - `WorkTicket`은 `workItemId + systemName` 유니크다. 한 작업에 같은 시스템은 1개만 연결한다.
 - `ticketUrl`은 더 이상 저장하지 않는다. 현재 저장값은 `systemName`, `ticketNumber`뿐이다.
+- 목록 조회는 `scope=active|transferred|all`을 지원한다.
+- `scope=active`는 기본 운영 목록으로 간주하며, 상태 필터가 비어 있어도 `TRANSFERRED`는 제외한다.
+- `scope=transferred`는 완료 아카이브 뷰로 간주하며, `TRANSFERRED`만 조회하고 정렬은 `transferDate desc` 우선이다.
 
 ---
 

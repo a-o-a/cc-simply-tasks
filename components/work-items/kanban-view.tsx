@@ -233,7 +233,7 @@ export function KanbanView({
           <div
             className="grid gap-3"
             style={{
-              gridTemplateColumns: `repeat(${Math.max(visibleStatuses.length, 1)}, 300px)`,
+              gridTemplateColumns: `repeat(${Math.max(visibleStatuses.length, 1)}, 320px)`,
             }}
           >
             {visibleStatuses.map((status) => {

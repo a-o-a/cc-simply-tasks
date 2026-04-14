@@ -22,11 +22,27 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     Object.fromEntries(searchParams),
   );
   const { take, cursor } = parsePagination(searchParams);
+  const activeStatuses = filters.status?.filter((s) => s !== "TRANSFERRED");
+
+  const statusWhere =
+    filters.scope === "transferred"
+      ? { status: "TRANSFERRED" as const }
+      : filters.scope === "active"
+        ? activeStatuses && activeStatuses.length > 0
+          ? { status: { in: activeStatuses } }
+          : { status: { not: "TRANSFERRED" as const } }
+        : filters.status?.length
+          ? { status: { in: filters.status } }
+          : {};
+  const orderBy =
+    filters.scope === "transferred"
+      ? [{ transferDate: "desc" as const }, { createdAt: "desc" as const }, { id: "desc" as const }]
+      : [{ order: "asc" as const }, { createdAt: "desc" as const }, { id: "desc" as const }];
 
   const rows = await prisma.workItem.findMany({
     where: {
       deletedAt: null,
-      ...(filters.status?.length ? { status: { in: filters.status } } : {}),
+      ...statusWhere,
       ...(filters.assigneeId?.length ? { assigneeId: { in: filters.assigneeId } } : {}),
       ...(filters.category?.length ? { category: { in: filters.category } } : {}),
       ...(filters.priority?.length ? { priority: { in: filters.priority } } : {}),
@@ -58,7 +74,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    orderBy: [{ order: "asc" }, { createdAt: "desc" }, { id: "desc" }],
+    orderBy,
   });
 
   const { items, nextCursor } = toPage(rows, take);
