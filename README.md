@@ -116,7 +116,6 @@
 ├── docs/
 │   └── DEVELOPMENT.md           # 개발 가이드 (API 패턴, 컨벤션)
 ├── .nvmrc                       # node 16
-├── .env.example
 ├── package.json
 ├── tsconfig.json
 ├── next.config.js
@@ -132,7 +131,11 @@
 # Node 16 사용 (nvm 설치 권장)
 nvm use                 # .nvmrc 따름
 
-cp .env.example .env
+# .env 파일 생성
+cat > .env <<'EOF'
+DATABASE_URL="file:./dev.db"
+EOF
+
 npm install
 npx prisma migrate dev
 npm run dev

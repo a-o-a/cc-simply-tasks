@@ -51,7 +51,7 @@
 - [x] Next.js 13.5.11 (app router) + TypeScript 5.2 strict + Prisma 5.10.2 + SQLite
 - [x] `engines: { node: ">=16.14 <17" }` + `.nvmrc` (사내 Node 16 제약)
 - [x] `prisma/schema.prisma`, `DATABASE_URL` 환경변수 기반
-- [x] `prisma/dev.db` gitignore, `.env.example`
+- [x] `prisma/dev.db` gitignore, 로컬 `.env` 기반 설정
 - [x] `lib/db.ts` Prisma 싱글톤
 - [x] SQLite PRAGMA는 Phase 2에서 `ensureSqlitePragma()`로 배치
 
