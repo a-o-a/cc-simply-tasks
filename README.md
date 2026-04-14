@@ -138,6 +138,74 @@ npx prisma migrate dev
 npm run dev
 ```
 
+## 빌드 및 배포 가이드
+
+### 핵심 원칙
+
+- 운영에서는 **앱 배포 디렉터리와 SQLite DB 파일 경로를 분리**하는 것을 권장합니다.
+- 현재 개발 기본값은 `.env`의 `DATABASE_URL="file:./dev.db"`이며, 이는 `prisma/schema.prisma` 기준으로 `prisma/dev.db`를 뜻합니다.
+- 이 값을 운영에서도 그대로 쓰면 배포 과정에서 프로젝트 디렉터리를 통째로 교체할 때 DB가 함께 유실될 수 있습니다.
+- 따라서 운영에서는 예를 들어 `DATABASE_URL="file:/var/lib/cc-simply-tasks/prod.db"`처럼 **배포 산출물 바깥의 영속 경로**를 사용하세요.
+
+### 권장 디렉터리 예시
+
+```text
+/srv/cc-simply-tasks/
+├── current/                  # 현재 서비스 중인 앱
+├── releases/2026-04-14/      # 배포 버전별 코드
+└── shared/
+    ├── .env.production
+    └── prod.db               # 운영 DB (영속 파일)
+```
+
+예시 `.env.production`:
+
+```bash
+DATABASE_URL="file:/srv/cc-simply-tasks/shared/prod.db"
+NODE_ENV=production
+```
+
+### 첫 배포
+
+```bash
+# 1) 서버에 코드 배치
+npm install
+
+# 2) 프로덕션용 Prisma Client 생성
+npx prisma generate
+
+# 3) 기존 마이그레이션 적용
+npx prisma migrate deploy
+
+# 4) 빌드
+npm run build
+
+# 5) 실행
+npm run start
+```
+
+기본적으로 Next.js는 `3000` 포트를 사용하므로, 실제 운영에서는 보통 reverse proxy(Nginx 등) 뒤에서 실행합니다.
+
+### 배포 업데이트
+
+```bash
+# 새 코드 반영
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npm run build
+```
+
+그 다음 앱 프로세스를 재시작합니다. 이때 **DB 파일이 배포 디렉터리 밖의 영속 경로에 있으면 덮어씌워지지 않습니다.**
+
+### 절대 하지 말아야 할 것
+
+- 운영 서버에서 `prisma migrate dev` 실행
+- 운영 DB를 프로젝트 폴더 안의 `prisma/dev.db`에 두고 배포 디렉터리를 통째로 교체
+- 백업 없이 운영 DB 파일을 수동 덮어쓰기
+
+운영에서는 항상 `prisma migrate deploy`를 사용하고, DB 파일은 `/var/lib/...`, `/srv/.../shared/...` 같은 별도 경로에 두는 편이 안전합니다.
+
 ## 스크립트
 
 | 스크립트 | 설명 |
@@ -204,6 +272,8 @@ curl -O http://localhost:3000/api/backup
    ```
 
 > **주의**: 기존 데이터가 모두 덮어씌워지므로 복구 전 현재 DB를 별도 보관하세요.
+>
+> 운영 환경에서는 `prisma/dev.db` 대신 `DATABASE_URL`이 가리키는 **영속 DB 파일 경로**에 복구해야 합니다.
 
 ## Phase 진행 상황
 
