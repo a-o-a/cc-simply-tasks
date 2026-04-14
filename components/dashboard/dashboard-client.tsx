@@ -330,18 +330,32 @@ export function DashboardClient() {
           ) : (
             <ul className="divide-y">
               {logs.map((log) => (
-                <li key={log.id} className="px-2 py-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">
-                      {log.entityType} · {ACTION_LABELS[log.action] ?? log.action}
+                <li key={log.id} className="px-2 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-[12px] text-foreground/75">
+                      <span className="font-medium text-foreground/65">
+                        {log.actorName ?? "익명"}
+                      </span>
+                      {" · "}
+                      <span>{ENTITY_LABELS[log.entityType] ?? log.entityType}</span>
+                      {" "}
+                      <span className="text-muted-foreground/80">
+                        #{shortEntityId(log.entityId)}
+                      </span>
+                      {" · "}
+                      <span>{ACTION_LABELS[log.action] ?? log.action}</span>
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="shrink-0 text-[11px] text-muted-foreground/80">
                       {formatDateTime(log.createdAt)}
                     </span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {log.actorName ?? "익명"}
-                  </div>
+                  {/*
+                  {summarizeAuditLog(log) ? (
+                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground/65">
+                      {summarizeAuditLog(log)}
+                    </div>
+                  ) : null}
+                   */}
                 </li>
               ))}
             </ul>
@@ -450,6 +464,62 @@ const ACTION_LABELS: Record<string, string> = {
   DELETE: "삭제",
   RESTORE: "복원",
 };
+
+const ENTITY_LABELS: Record<string, string> = {
+  WorkItem: "작업",
+  WorkTicket: "티켓",
+  CalendarEvent: "일정",
+  TeamMember: "팀원",
+  WorkSystem: "시스템",
+  WorkCategory: "분류",
+};
+
+function shortEntityId(id: string) {
+  return id.length > 8 ? id.slice(-8) : id;
+}
+
+function prettifyAuditValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "비어 있음";
+  if (typeof value === "boolean") return value ? "예" : "아니오";
+  if (Array.isArray(value)) return `${value.length}개`;
+  if (typeof value === "object") return "변경됨";
+  return String(value);
+}
+
+function summarizeAuditLog(log: AuditLog): string | null {
+  try {
+    const before = log.beforeJson ? JSON.parse(log.beforeJson) as Record<string, unknown> : {};
+    const after = log.afterJson ? JSON.parse(log.afterJson) as Record<string, unknown> : {};
+    const keys = [...new Set([...Object.keys(after), ...Object.keys(before)])];
+    const preferredKeys = [
+      "title",
+      "name",
+      "status",
+      "category",
+      "priority",
+      "requestNumber",
+      "requestor",
+      "role",
+      "startDateTime",
+      "endDateTime",
+      "startDate",
+      "endDate",
+      "transferDate",
+    ];
+    const key = preferredKeys.find((item) => keys.includes(item)) ?? keys[0];
+    if (!key) return null;
+
+    if (log.action === "CREATE") {
+      return `${key}: ${prettifyAuditValue(after[key])}`;
+    }
+    if (log.action === "DELETE") {
+      return `${key}: ${prettifyAuditValue(before[key])}`;
+    }
+    return `${key}: ${prettifyAuditValue(before[key])} -> ${prettifyAuditValue(after[key])}`;
+  } catch {
+    return null;
+  }
+}
 
 function SkeletonRows() {
   return (

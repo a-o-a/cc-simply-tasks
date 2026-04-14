@@ -15,6 +15,17 @@ function parseYmd(v: string): { y: number; m: number; d: number } | null {
   return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
 }
 
+function isValidYmd(v: string): boolean {
+  const parsed = parseYmd(v);
+  if (!parsed) return false;
+  const dt = new Date(parsed.y, parsed.m - 1, parsed.d);
+  return (
+    dt.getFullYear() === parsed.y &&
+    dt.getMonth() === parsed.m - 1 &&
+    dt.getDate() === parsed.d
+  );
+}
+
 function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
@@ -157,6 +168,8 @@ export function DatePicker({
   const [open, setOpen] = React.useState(false);
   const today = new Date();
   const parsed = parseYmd(value);
+  const [draftInput, setDraftInput] = React.useState(value.slice(0, 10));
+  const [inputError, setInputError] = React.useState<string | null>(null);
 
   const [viewYear, setViewYear] = React.useState(parsed?.y ?? today.getFullYear());
   const [viewMonth, setViewMonth] = React.useState(parsed?.m ?? today.getMonth() + 1);
@@ -166,8 +179,17 @@ export function DatePicker({
     const p = parseYmd(value);
     setViewYear(p?.y ?? today.getFullYear());
     setViewMonth(p?.m ?? today.getMonth() + 1);
+    setDraftInput(value.slice(0, 10));
+    setInputError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  React.useEffect(() => {
+    if (!open) {
+      setDraftInput(value.slice(0, 10));
+      setInputError(null);
+    }
+  }, [open, value]);
 
   function prevMonth() {
     if (viewMonth === 1) { setViewYear((y) => y - 1); setViewMonth(12); }
@@ -181,6 +203,33 @@ export function DatePicker({
   const displayLabel = parsed
     ? `${parsed.y}년 ${String(parsed.m).padStart(2, "0")}월 ${String(parsed.d).padStart(2, "0")}일`
     : "";
+
+  const previewYmd = open && isValidYmd(draftInput.trim())
+    ? draftInput.trim().slice(0, 10)
+    : value.slice(0, 10);
+
+  function applyDraftInput() {
+    const trimmed = draftInput.trim();
+    if (!trimmed) {
+      onChange("");
+      setInputError(null);
+      setOpen(false);
+      return;
+    }
+    if (!isValidYmd(trimmed)) {
+      setInputError("yyyy-mm-dd 형식으로 올바른 날짜를 입력하세요");
+      return;
+    }
+    const next = trimmed.slice(0, 10);
+    const nextParsed = parseYmd(next);
+    if (nextParsed) {
+      setViewYear(nextParsed.y);
+      setViewMonth(nextParsed.m);
+    }
+    onChange(next);
+    setInputError(null);
+    setOpen(false);
+  }
 
   return (
     <Popover.Root open={open} onOpenChange={disabled ? undefined : setOpen}>
@@ -221,7 +270,7 @@ export function DatePicker({
           <CalendarGrid
             viewYear={viewYear}
             viewMonth={viewMonth}
-            selectedYmd={value.slice(0, 10)}
+            selectedYmd={previewYmd}
             onPrev={prevMonth}
             onNext={nextMonth}
             onSelect={(day) => {
@@ -229,6 +278,54 @@ export function DatePicker({
               setOpen(false);
             }}
           />
+          <div className="mt-3 border-t pt-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="yyyy-mm-dd"
+                value={draftInput}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setDraftInput(next);
+                  const trimmed = next.trim();
+                  if (isValidYmd(trimmed)) {
+                    const parsedDraft = parseYmd(trimmed);
+                    if (parsedDraft) {
+                      setViewYear(parsedDraft.y);
+                      setViewMonth(parsedDraft.m);
+                    }
+                  }
+                  if (inputError) setInputError(null);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyDraftInput();
+                  }
+                }}
+                className={cn(
+                  "flex-1 rounded border border-input bg-background px-2 py-1 text-sm",
+                  "focus:outline-none focus:ring-1 focus:ring-ring",
+                  inputError && "border-destructive focus:ring-destructive",
+                )}
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  applyDraftInput();
+                }}
+                className="rounded border border-input px-2 py-1 text-xs font-medium hover:bg-accent"
+              >
+                적용
+              </button>
+            </div>
+            <p className={cn("mt-1.5 text-[11px]", inputError ? "text-destructive" : "text-muted-foreground")}>
+              {inputError ?? "달력에서 고르거나 날짜를 직접 입력할 수 있습니다"}
+            </p>
+          </div>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -270,16 +367,28 @@ export function DateTimePicker({
 
   const [viewYear, setViewYear] = React.useState(parsed?.y ?? today.getFullYear());
   const [viewMonth, setViewMonth] = React.useState(parsed?.m ?? today.getMonth() + 1);
+  const [draftDate, setDraftDate] = React.useState(datePart);
   const [draftTime, setDraftTime] = React.useState(timePart || "09:00");
+  const [dateError, setDateError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
     const p = parseYmd(datePart);
     setViewYear(p?.y ?? today.getFullYear());
     setViewMonth(p?.m ?? today.getMonth() + 1);
+    setDraftDate(datePart);
     setDraftTime(timePart || "09:00");
+    setDateError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  React.useEffect(() => {
+    if (!open) {
+      setDraftDate(datePart);
+      setDraftTime(timePart || "09:00");
+      setDateError(null);
+    }
+  }, [open, datePart, timePart]);
 
   function prevMonth() {
     if (viewMonth === 1) { setViewYear((y) => y - 1); setViewMonth(12); }
@@ -292,13 +401,35 @@ export function DateTimePicker({
 
   function handleSelectDay(day: number) {
     const d = ymd(viewYear, viewMonth, day);
+    setDraftDate(d);
     onChange(`${d}T${draftTime}`);
     setOpen(false);
   }
 
   function handleTimeChange(t: string) {
     setDraftTime(t);
-    if (datePart) onChange(`${datePart}T${t}`);
+    const nextDate = isValidYmd(draftDate.trim()) ? draftDate.trim().slice(0, 10) : datePart;
+    if (nextDate) onChange(`${nextDate}T${t}`);
+  }
+
+  function applyDraftDate() {
+    const trimmed = draftDate.trim();
+    if (!trimmed) {
+      setDateError("yyyy-mm-dd 형식으로 올바른 날짜를 입력하세요");
+      return;
+    }
+    if (!isValidYmd(trimmed)) {
+      setDateError("yyyy-mm-dd 형식으로 올바른 날짜를 입력하세요");
+      return;
+    }
+    const next = trimmed.slice(0, 10);
+    const nextParsed = parseYmd(next);
+    if (nextParsed) {
+      setViewYear(nextParsed.y);
+      setViewMonth(nextParsed.m);
+    }
+    onChange(`${next}T${draftTime}`);
+    setDateError(null);
   }
 
   const displayLabel = parsed && timePart
@@ -306,6 +437,10 @@ export function DateTimePicker({
     : parsed
       ? `${parsed.y}년 ${String(parsed.m).padStart(2, "0")}월 ${String(parsed.d).padStart(2, "0")}일`
       : "";
+
+  const previewDatePart = open && isValidYmd(draftDate.trim())
+    ? draftDate.trim().slice(0, 10)
+    : datePart;
 
   return (
     <Popover.Root open={open} onOpenChange={disabled ? undefined : setOpen}>
@@ -346,7 +481,7 @@ export function DateTimePicker({
           <CalendarGrid
             viewYear={viewYear}
             viewMonth={viewMonth}
-            selectedYmd={datePart}
+            selectedYmd={previewDatePart}
             onPrev={prevMonth}
             onNext={nextMonth}
             onSelect={handleSelectDay}
@@ -354,6 +489,49 @@ export function DateTimePicker({
 
           {/* 시간 입력 */}
           <div className="mt-2 border-t pt-2">
+            <div className="mb-2 flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="yyyy-mm-dd"
+                value={draftDate}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setDraftDate(next);
+                  const trimmed = next.trim();
+                  if (isValidYmd(trimmed)) {
+                    const parsedDraft = parseYmd(trimmed);
+                    if (parsedDraft) {
+                      setViewYear(parsedDraft.y);
+                      setViewMonth(parsedDraft.m);
+                    }
+                  }
+                  if (dateError) setDateError(null);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyDraftDate();
+                  }
+                }}
+                className={cn(
+                  "flex-1 rounded border border-input bg-background px-2 py-1 text-sm",
+                  "focus:outline-none focus:ring-1 focus:ring-ring",
+                  dateError && "border-destructive focus:ring-destructive",
+                )}
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  applyDraftDate();
+                }}
+                className="rounded border border-input px-2 py-1 text-xs font-medium hover:bg-accent"
+              >
+                적용
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <input
@@ -367,7 +545,9 @@ export function DateTimePicker({
                 )}
               />
             </div>
-            <p className="mt-1.5 text-[11px] text-muted-foreground">날짜를 클릭하면 선택됩니다</p>
+            <p className={cn("mt-1.5 text-[11px]", dateError ? "text-destructive" : "text-muted-foreground")}>
+              {dateError ?? "달력에서 고르거나 날짜를 직접 입력한 뒤 시간을 선택할 수 있습니다"}
+            </p>
           </div>
         </Popover.Content>
       </Popover.Portal>
