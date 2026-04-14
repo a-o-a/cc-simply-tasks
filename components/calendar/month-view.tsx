@@ -108,7 +108,7 @@ function DraggableChip({
       {...attributes}
       onClick={onClick}
       className={cn(
-        "flex w-full flex-col rounded bg-muted/60 px-1 py-0.5 text-left hover:bg-muted touch-none select-none",
+        "flex w-full flex-col rounded bg-muted/60 px-1 py-0.5 text-left hover:bg-muted touch-none select-none gap-0.5",
         isDragging && "opacity-40",
       )}
     >
