@@ -387,7 +387,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 상태 / 우선순위 / 담당자 */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 items-end gap-3">
             <div className="space-y-2">
               <Label htmlFor="wi-status">상태</Label>
               <Select
@@ -416,7 +416,7 @@ export function WorkItemFormDialog({
                 ))}
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 self-end">
               <Label className="block">담당자</Label>
               <MemberFilter
                 members={members}
@@ -425,6 +425,7 @@ export function WorkItemFormDialog({
                 onClear={() => update("assigneeId", "")}
                 placeholder="미배정"
                 mode="single"
+                className="w-full justify-between"
               />
             </div>
           </div>

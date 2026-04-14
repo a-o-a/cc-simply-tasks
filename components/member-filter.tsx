@@ -28,6 +28,7 @@ type Props = {
   onClear: () => void;
   placeholder?: string;
   mode?: "multi" | "single";
+  className?: string;
 };
 
 export function MemberFilter({
@@ -37,6 +38,7 @@ export function MemberFilter({
   onClear,
   placeholder = "팀원",
   mode = "multi",
+  className,
 }: Props) {
   const [open, setOpen] = React.useState(false);
   const count = selectedIds.size;
@@ -72,6 +74,7 @@ export function MemberFilter({
             count > 0
               ? "border-primary/40 bg-primary/5 text-primary"
               : "border-input bg-background text-foreground hover:bg-accent",
+            className,
           )}
         >
           <Users className="h-3.5 w-3.5 shrink-0" />
