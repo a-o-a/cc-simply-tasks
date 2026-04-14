@@ -93,6 +93,17 @@ export const workItemListQuerySchema = z.object({
   ticket: z.string().min(1).optional(),
   transferDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   transferDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  // 텍스트 검색
+  title: z.string().max(300).optional(),
+  requestType: z.string().max(200).optional(),
+  requestor: z.string().max(200).optional(),
+  requestNumber: z.string().max(200).optional(),
+  // 시스템 코드 (쉼표 구분)
+  systemCode: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(",").filter(Boolean) : undefined))
+    .pipe(z.array(z.string()).optional()),
 });
 
 export type WorkItemCreateInput = z.infer<typeof workItemCreateSchema>;

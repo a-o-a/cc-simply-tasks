@@ -25,7 +25,9 @@ import { toast } from "@/lib/client/use-toast";
 import type {
   AuditLog,
   ListResponse,
+  WorkCategory,
   WorkItemDetail,
+  WorkSystem,
 } from "@/lib/client/types";
 import {
   MEMBER_ROLE_LABELS,
@@ -45,6 +47,8 @@ type Props = {
   workItemId: string | null;
   /** 이 값이 바뀌면 현재 열린 상세를 다시 fetch한다. 폼 저장 후 드로어 갱신용. */
   reloadKey?: number;
+  categories: WorkCategory[];
+  systems: WorkSystem[];
   onClose: () => void;
   onEdit: (item: WorkItemDetail) => void;
   onDeleted: () => void;
@@ -54,6 +58,8 @@ type Props = {
 export function WorkItemDrawer({
   workItemId,
   reloadKey,
+  categories,
+  systems,
   onClose,
   onEdit,
   onDeleted,
@@ -132,6 +138,8 @@ export function WorkItemDrawer({
           ) : detail ? (
             <DrawerBody
               detail={detail}
+              categories={categories}
+              systems={systems}
               onEdit={() => onEdit(detail)}
               onRequestDelete={() => setConfirmDelete(true)}
             />
@@ -164,26 +172,32 @@ export function WorkItemDrawer({
 
 function DrawerBody({
   detail,
+  categories,
+  systems,
   onEdit,
   onRequestDelete,
 }: {
   detail: WorkItemDetail;
+  categories: WorkCategory[];
+  systems: WorkSystem[];
   onEdit: () => void;
   onRequestDelete: () => void;
 }) {
+  const categoryName = React.useMemo(() => {
+    if (!detail.category) return null;
+    return categories.find((c) => c.code === detail.category)?.name ?? detail.category;
+  }, [categories, detail.category]);
+
   return (
     <>
       <SheetHeader className="pr-12">
-        <div className="flex items-center gap-2">
-          <StatusBadge status={detail.status} />
-          <span className="text-xs text-muted-foreground">
-            {detail.category || "미분류"} · {PRIORITY_LABELS[detail.priority]}
-          </span>
-        </div>
+        {categoryName && (
+          <p className="text-xs text-muted-foreground">{categoryName}</p>
+        )}
         <SheetTitle className="text-xl">{detail.title}</SheetTitle>
       </SheetHeader>
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-2 flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={onEdit}>
           <Pencil className="mr-2 h-4 w-4" />
           수정
@@ -194,7 +208,7 @@ function DrawerBody({
         </Button>
       </div>
 
-      <Tabs defaultValue="detail" className="mt-6 flex min-h-0 flex-1 flex-col">
+      <Tabs defaultValue="detail" className="mt-3 flex min-h-0 flex-1 flex-col">
         <TabsList>
           <TabsTrigger value="detail">상세</TabsTrigger>
           <TabsTrigger value="activity">활동</TabsTrigger>
@@ -202,7 +216,7 @@ function DrawerBody({
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           <TabsContent value="detail">
-            <DetailPanel detail={detail} />
+            <DetailPanel detail={detail} systems={systems} />
           </TabsContent>
           <TabsContent value="activity">
             <ActivityPanel workItemId={detail.id} />
@@ -213,19 +227,70 @@ function DrawerBody({
   );
 }
 
-function DetailPanel({ detail }: { detail: WorkItemDetail }) {
+function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: WorkSystem[] }) {
+  const systemNameByCode = React.useMemo(
+    () => Object.fromEntries(systems.map((s) => [s.code, s.name])),
+    [systems],
+  );
   const hasRequestInfo =
     detail.requestType || detail.requestor || detail.requestNumber || detail.requestContent;
 
+  const [actors, setActors] = React.useState<{
+    creator: string | null;
+    modifier: string | null;
+  } | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    api
+      .get<ListResponse<AuditLog>>("/api/audit-logs", {
+        query: { entityType: "WorkItem", entityId: detail.id, pageSize: 100 },
+      })
+      .then((res) => {
+        if (cancelled) return;
+        // createdAt DESC 정렬 — 첫 번째 CREATE가 등록자, 첫 번째 UPDATE가 최근 수정자
+        const createLog = res.items.find((l) => l.action === "CREATE");
+        const updateLog = res.items.find((l) => l.action === "UPDATE");
+        setActors({
+          creator: createLog?.actorName ?? null,
+          modifier: updateLog?.actorName ?? null,
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [detail.id]);
+
   return (
-    <div className="space-y-5">
+    <div className="mt-4 space-y-3">
+      {/* 기본 정보 */}
+      <Section title="기본 정보">
+        <dl className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
+          <Field label="상태"><StatusBadge status={detail.status} /></Field>
+          <Field label="우선순위">{PRIORITY_LABELS[detail.priority]}</Field>
+          <Field label="담당자">
+            {detail.assignee ? (
+              <span>
+                {detail.assignee.name}
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {MEMBER_ROLE_LABELS[detail.assignee.role]}
+                </span>
+              </span>
+            ) : (
+              <span className="text-muted-foreground">미배정</span>
+            )}
+          </Field>
+          <Field label="시작일">{formatDate(detail.startDate) || "—"}</Field>
+          <Field label="종료일">{formatDate(detail.endDate) || "—"}</Field>
+          <Field label="이관일">{formatDate(detail.transferDate) || "—"}</Field>
+        </dl>
+      </Section>
+
       {/* 요청 정보 */}
       {hasRequestInfo && (
-        <section className="rounded-md border bg-muted/30 p-3 space-y-3">
-          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
-            요청 정보
-          </p>
-          <dl className="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
+        <Section title="요청 정보">
+          <dl className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
             {detail.requestType && (
               <Field label="요청구분">{detail.requestType}</Field>
             )}
@@ -235,74 +300,68 @@ function DetailPanel({ detail }: { detail: WorkItemDetail }) {
             {detail.requestNumber && (
               <Field label="요청번호">{detail.requestNumber}</Field>
             )}
-            {detail.requestContent && (
-              <div className="col-span-3">
-                <dt className="mb-1 text-xs font-medium uppercase text-muted-foreground">
-                  요청내용
-                </dt>
-                <dd className="whitespace-pre-wrap text-sm">
-                  {detail.requestContent}
-                </dd>
-              </div>
-            )}
           </dl>
-        </section>
-      )}
-
-      {/* 메타데이터 */}
-      <dl className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
-        <Field label="담당자">
-          {detail.assignee ? (
-            <span>
-              {detail.assignee.name}
-              <span className="ml-2 text-xs text-muted-foreground">
-                {MEMBER_ROLE_LABELS[detail.assignee.role]}
-              </span>
-            </span>
-          ) : (
-            <span className="text-muted-foreground">미배정</span>
+          {detail.requestContent && (
+            <div className="mt-3 border-t border-border pt-3">
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">요청내용</p>
+              <p className="whitespace-pre-wrap text-sm">{detail.requestContent}</p>
+            </div>
           )}
-        </Field>
-        <Field label="시작일">{formatDate(detail.startDate) || "—"}</Field>
-        <Field label="종료일">{formatDate(detail.endDate) || "—"}</Field>
-        <Field label="이관일">{formatDate(detail.transferDate) || "—"}</Field>
-        <Field label="생성">{formatDateTime(detail.createdAt)}</Field>
-        <Field label="수정">{formatDateTime(detail.updatedAt)}</Field>
-      </dl>
+        </Section>
+      )}
 
       {/* 시스템 연동 */}
       {detail.tickets.length > 0 && (
-        <section className="space-y-1.5">
-          <p className="text-xs font-medium uppercase text-muted-foreground">
-            시스템 연동
-          </p>
-          <ul className="space-y-1">
+        <Section title="시스템 연동">
+          <ul className="space-y-1.5">
             {detail.tickets.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm"
+                className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm"
               >
-                <span className="font-medium shrink-0">{t.systemName}</span>
-                <span className="text-muted-foreground">·</span>
-                <span>{t.ticketNumber}</span>
+                <span className="font-medium shrink-0">{systemNameByCode[t.systemName] ?? t.systemName}</span>
+                <span className="text-muted-foreground/50">·</span>
+                <span className="text-muted-foreground">{t.ticketNumber}</span>
               </li>
             ))}
           </ul>
-        </section>
+        </Section>
       )}
 
       {/* 설명 */}
-      <section className="space-y-1.5">
-        <p className="text-xs font-medium uppercase text-muted-foreground">
-          설명
-        </p>
-        <div className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">
-          {detail.description?.trim() || (
-            <span className="text-muted-foreground">설명 없음</span>
-          )}
-        </div>
-      </section>
+      <Section title="설명">
+        {detail.description?.trim() ? (
+          <p className="whitespace-pre-wrap text-sm">{detail.description}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">설명 없음</p>
+        )}
+      </Section>
+
+      {/* 등록 / 수정 */}
+      <Section title="등록 / 수정">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+          <Field label="등록자">{actors?.creator ?? "—"}</Field>
+          <Field label="등록일시">{formatDateTime(detail.createdAt)}</Field>
+          <Field label="수정자">{actors?.modifier ?? "—"}</Field>
+          <Field label="수정일시">{formatDateTime(detail.updatedAt)}</Field>
+        </dl>
+      </Section>
     </div>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border p-4 space-y-3">
+      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground">{title}</h3>
+      {children}
+    </section>
   );
 }
 
@@ -315,10 +374,8 @@ function Field({
 }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-1">{children}</dd>
+      <dt className="mb-1 text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="text-sm">{children}</dd>
     </div>
   );
 }

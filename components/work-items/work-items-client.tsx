@@ -1,15 +1,20 @@
 "use client";
 
 import * as React from "react";
+import * as Popover from "@radix-ui/react-popover";
 import {
+  Check,
+  ChevronDown,
   GanttChartSquare,
   LayoutGrid,
   ListChecks,
   Plus,
+  SlidersHorizontal,
   Table as TableIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MemberFilter } from "@/components/member-filter";
 import { ApiError, api } from "@/lib/client/api";
@@ -70,6 +75,11 @@ interface Filters {
   category: string[];
   priority: Priority[];
   transferDate: string;
+  title: string;
+  systemCode: string[];
+  requestType: string;
+  requestor: string;
+  requestNumber: string;
 }
 
 function defaultFilters(scope: WorkScope): Filters {
@@ -79,6 +89,11 @@ function defaultFilters(scope: WorkScope): Filters {
     category: [],
     priority: [],
     transferDate: "",
+    title: "",
+    systemCode: [],
+    requestType: "",
+    requestor: "",
+    requestNumber: "",
   };
 }
 
@@ -94,6 +109,7 @@ export function WorkItemsClient() {
   const [categories, setCategories] = React.useState<WorkCategory[]>([]);
   const [systems, setSystems] = React.useState<WorkSystem[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [filterVisible, setFilterVisible] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   const [formOpen, setFormOpen] = React.useState(false);
@@ -203,6 +219,11 @@ export function WorkItemsClient() {
             category: filters.category.length > 0 ? filters.category.join(",") : undefined,
             priority: filters.priority.length > 0 ? filters.priority.join(",") : undefined,
             transferDate: filters.transferDate || undefined,
+            title: filters.title || undefined,
+            systemCode: filters.systemCode.length > 0 ? filters.systemCode.join(",") : undefined,
+            requestType: filters.requestType || undefined,
+            requestor: filters.requestor || undefined,
+            requestNumber: filters.requestNumber || undefined,
           },
         },
       );
@@ -321,14 +342,30 @@ export function WorkItemsClient() {
         </Button>
       </header>
 
-      <FilterBar
-        scope={scope}
-        filters={filters}
-        members={members}
-        categories={categories}
-        onChange={handleFilterChange}
-        onReset={handleReset}
-      />
+      {filterVisible && (
+        <FilterBar
+          scope={scope}
+          filters={filters}
+          members={members}
+          categories={categories}
+          systems={systems}
+          onChange={handleFilterChange}
+        />
+      )}
+      <div className="mt-1.5 flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setFilterVisible((v) => !v)}
+        >
+          <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+          {filterVisible ? "필터 숨기기" : "필터 보기"}
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={handleReset}>
+          초기화
+        </Button>
+      </div>
 
       <section className={cn("mt-4", loading && "pointer-events-none opacity-60")}>
         {error ? (
@@ -336,11 +373,12 @@ export function WorkItemsClient() {
         ) : items.length === 0 && !loading ? (
           <EmptyState onCreate={openCreate} scope={scope} />
         ) : scope === "transferred" || view === "table" ? (
-          <TableView items={tableItems} onOpen={openDrawer} />
+          <TableView items={tableItems} categories={categories} onOpen={openDrawer} />
         ) : view === "kanban" ? (
           <KanbanView
             items={items}
             visibleStatuses={filters.status.length > 0 ? filters.status : ACTIVE_STATUSES}
+            systems={systems}
             onOpen={openDrawer}
             onUpdate={updateItemStatus}
           />
@@ -375,8 +413,19 @@ export function WorkItemsClient() {
         categories={categories}
         systems={systems}
         onClose={() => setFormOpen(false)}
-        onSaved={() => {
+        onSaved={(updated) => {
           setFormOpen(false);
+          // 수정 시: 서버 응답(최신 updatedAt)으로 items를 즉시 동기 갱신.
+          // loadItems()가 완료되기 전에 다시 편집해도 stale If-Match 문제가 발생하지 않음.
+          if (updated) {
+            setItems((prev) =>
+              prev.map((item) =>
+                item.id === updated.id
+                  ? { ...item, ...updated, assignee: item.assignee }
+                  : item,
+              ),
+            );
+          }
           void loadItems();
           // 드로어가 열려 있으면 최신 detail 재로드 (updatedAt 동기화)
           if (drawerId) setDrawerReloadKey((k) => k + 1);
@@ -386,6 +435,8 @@ export function WorkItemsClient() {
       <WorkItemDrawer
         workItemId={drawerId}
         reloadKey={drawerReloadKey}
+        categories={categories}
+        systems={systems}
         onClose={() => setDrawerId(null)}
         onEdit={(item) => {
           openEditFromDrawer(item);
@@ -500,62 +551,100 @@ function FilterBar({
   filters,
   members,
   categories,
+  systems,
   onChange,
-  onReset,
 }: {
   scope: WorkScope;
   filters: Filters;
   members: Member[];
   categories: WorkCategory[];
+  systems: WorkSystem[];
   onChange: (next: Filters) => void;
-  onReset: () => void;
 }) {
+  // 텍스트 입력은 로컬 state — Enter/blur 시 필터 반영
+  const [localTitle, setLocalTitle] = React.useState(filters.title);
+  const [localRequestType, setLocalRequestType] = React.useState(filters.requestType);
+  const [localRequestor, setLocalRequestor] = React.useState(filters.requestor);
+  const [localRequestNumber, setLocalRequestNumber] = React.useState(filters.requestNumber);
+
+  // 외부(초기화)에서 filters가 비워지면 로컬도 동기화
+  React.useEffect(() => { setLocalTitle(filters.title); }, [filters.title]);
+  React.useEffect(() => { setLocalRequestType(filters.requestType); }, [filters.requestType]);
+  React.useEffect(() => { setLocalRequestor(filters.requestor); }, [filters.requestor]);
+  React.useEffect(() => { setLocalRequestNumber(filters.requestNumber); }, [filters.requestNumber]);
+
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
     onChange({ ...filters, [key]: value });
   }
 
-  function toggleStatus(status: Status) {
-    const newStatus = filters.status.includes(status)
-      ? filters.status.filter((s) => s !== status)
-      : [...filters.status, status];
-    set("status", newStatus);
+  function applyText(key: "title" | "requestType" | "requestor" | "requestNumber", value: string) {
+    onChange({ ...filters, [key]: value });
   }
 
-function toggleCategory(code: string) {
-    const newCategory = filters.category.includes(code)
+  function textInputProps(
+    key: "title" | "requestType" | "requestor" | "requestNumber",
+    local: string,
+    setLocal: (v: string) => void,
+  ) {
+    return {
+      value: local,
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setLocal(e.target.value),
+      onBlur: () => applyText(key, local),
+      onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") applyText(key, local);
+      },
+    };
+  }
+
+  function toggleStatus(status: Status) {
+    const next = filters.status.includes(status)
+      ? filters.status.filter((s) => s !== status)
+      : [...filters.status, status];
+    set("status", next);
+  }
+
+  function toggleCategory(code: string) {
+    const next = filters.category.includes(code)
       ? filters.category.filter((c) => c !== code)
       : [...filters.category, code];
-    set("category", newCategory);
+    set("category", next);
   }
 
   function togglePriority(priority: Priority) {
-    const newPriority = filters.priority.includes(priority)
+    const next = filters.priority.includes(priority)
       ? filters.priority.filter((p) => p !== priority)
       : [...filters.priority, priority];
-    set("priority", newPriority);
+    set("priority", next);
   }
 
+  function toggleSystem(code: string) {
+    const next = filters.systemCode.includes(code)
+      ? filters.systemCode.filter((c) => c !== code)
+      : [...filters.systemCode, code];
+    set("systemCode", next);
+  }
+
+  const chipCls = (active: boolean) =>
+    cn(
+      "inline-flex items-center rounded px-2 py-1 text-xs transition-colors",
+      active
+        ? "bg-primary text-primary-foreground"
+        : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    );
+
   return (
-    <div className="mt-4 rounded-lg border bg-card p-3">
-      <div className="grid gap-3 md:grid-cols-5">
+    <div className="mt-4 rounded-lg border bg-card p-3 space-y-3">
+      {/* 1행: 분류 / 상태 / 담당자 / 우선순위 / 이관일 */}
+      <div className="flex divide-x divide-border">
         {/* 분류 */}
-        <div className="space-y-1.5">
+        <div className="flex-1 space-y-1.5 pr-3">
           <Label className="text-xs">분류</Label>
           <div className="flex flex-wrap gap-1">
             {categories.length === 0 ? (
               <span className="text-xs text-muted-foreground">설정에서 분류를 추가하세요</span>
             ) : (
               categories.map((c) => (
-                <button
-                  key={c.code}
-                  onClick={() => toggleCategory(c.code)}
-                  className={cn(
-                    "inline-flex items-center rounded px-2 py-1 text-xs",
-                    filters.category.includes(c.code)
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-                  )}
-                >
+                <button key={c.code} onClick={() => toggleCategory(c.code)} className={chipCls(filters.category.includes(c.code))}>
                   {c.name}
                 </button>
               ))
@@ -564,32 +653,19 @@ function toggleCategory(code: string) {
         </div>
 
         {/* 상태 */}
-        <div className="space-y-1.5">
+        <div className="flex-1 space-y-1.5 px-3">
           <Label className="text-xs">상태</Label>
           {scope === "active" ? (
             <div className="flex flex-wrap gap-1">
               {ACTIVE_STATUSES.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => toggleStatus(s)}
-                  className={cn(
-                    "inline-flex items-center rounded px-2 py-1 text-xs",
-                    filters.status.includes(s)
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-                  )}
-                >
+                <button key={s} onClick={() => toggleStatus(s)} className={chipCls(filters.status.includes(s))}>
                   {STATUS_LABELS[s]}
                 </button>
               ))}
             </div>
           ) : (
             <div className="flex flex-wrap gap-1">
-              <button
-                type="button"
-                disabled
-                className="inline-flex items-center rounded px-2 py-1 text-xs bg-primary text-primary-foreground opacity-100"
-              >
+              <button type="button" disabled className="inline-flex items-center rounded px-2 py-1 text-xs bg-primary text-primary-foreground">
                 {STATUS_LABELS.TRANSFERRED}
               </button>
             </div>
@@ -597,7 +673,7 @@ function toggleCategory(code: string) {
         </div>
 
         {/* 담당자 */}
-        <div className="space-y-1.5">
+        <div className="flex-1 space-y-1.5 px-3">
           <Label className="text-xs">담당자</Label>
           <div className="flex flex-wrap gap-1">
             <MemberFilter
@@ -615,20 +691,11 @@ function toggleCategory(code: string) {
         </div>
 
         {/* 우선순위 */}
-        <div className="space-y-1.5">
+        <div className="flex-1 space-y-1.5 px-3">
           <Label className="text-xs">우선순위</Label>
           <div className="flex flex-wrap gap-1">
             {PRIORITIES.map((p) => (
-              <button
-                key={p}
-                onClick={() => togglePriority(p)}
-                className={cn(
-                  "inline-flex items-center rounded px-2 py-1 text-xs",
-                  filters.priority.includes(p)
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-                )}
-              >
+              <button key={p} onClick={() => togglePriority(p)} className={chipCls(filters.priority.includes(p))}>
                 {PRIORITY_LABELS[p]}
               </button>
             ))}
@@ -636,22 +703,150 @@ function toggleCategory(code: string) {
         </div>
 
         {/* 이관일 */}
-        <div className="space-y-1.5">
+        <div className="flex-1 space-y-1.5 pl-3">
           <Label className="text-xs">이관일</Label>
-          <DatePicker
-            value={filters.transferDate}
-            onChange={(v) => set("transferDate", v)}
-            placeholder="날짜 선택"
-          />
+          <DatePicker value={filters.transferDate} onChange={(v) => set("transferDate", v)} placeholder="날짜 선택" />
         </div>
       </div>
 
-      <div className="mt-3 flex justify-end">
-        <Button type="button" variant="outline" size="sm" onClick={onReset}>
-          초기화
-        </Button>
+      {/* 가로 구분선 */}
+      <div className="border-t border-border" />
+
+      {/* 2행: 제목 / 시스템 / 요청구분 / 요청자 / 요청번호 */}
+      <div className="flex divide-x divide-border">
+        {/* 제목 */}
+        <div className="flex-1 space-y-1.5 pr-3">
+          <Label className="text-xs">제목</Label>
+          <Input
+            placeholder="제목 검색"
+            className="h-7 text-xs"
+            {...textInputProps("title", localTitle, setLocalTitle)}
+          />
+        </div>
+
+        {/* 시스템 */}
+        <div className="flex-1 space-y-1.5 px-3">
+          <Label className="text-xs">시스템</Label>
+          <div>
+            <SystemFilter
+              systems={systems}
+              selectedCodes={new Set(filters.systemCode)}
+              onToggle={(code) => toggleSystem(code)}
+              onClear={() => set("systemCode", [])}
+            />
+          </div>
+        </div>
+
+        {/* 요청구분 */}
+        <div className="flex-1 space-y-1.5 px-3">
+          <Label className="text-xs">요청구분</Label>
+          <Input
+            placeholder="요청구분 검색"
+            className="h-7 text-xs"
+            {...textInputProps("requestType", localRequestType, setLocalRequestType)}
+          />
+        </div>
+
+        {/* 요청자 */}
+        <div className="flex-1 space-y-1.5 px-3">
+          <Label className="text-xs">요청자</Label>
+          <Input
+            placeholder="요청자 검색"
+            className="h-7 text-xs"
+            {...textInputProps("requestor", localRequestor, setLocalRequestor)}
+          />
+        </div>
+
+        {/* 요청번호 */}
+        <div className="flex-1 space-y-1.5 pl-3">
+          <Label className="text-xs">요청번호</Label>
+          <Input
+            placeholder="요청번호 검색"
+            className="h-7 text-xs"
+            {...textInputProps("requestNumber", localRequestNumber, setLocalRequestNumber)}
+          />
+        </div>
       </div>
     </div>
+  );
+}
+
+function SystemFilter({
+  systems,
+  selectedCodes,
+  onToggle,
+  onClear,
+}: {
+  systems: WorkSystem[];
+  selectedCodes: Set<string>;
+  onToggle: (code: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const count = selectedCodes.size;
+
+  const triggerLabel =
+    count === 0
+      ? "시스템"
+      : count === 1
+        ? (systems.find((s) => selectedCodes.has(s.code))?.name ?? `${count}개`)
+        : `${count}개 선택`;
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          className={cn(
+            "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs transition-colors",
+            count > 0
+              ? "border-primary/40 bg-primary/5 text-primary"
+              : "border-input bg-background text-foreground hover:bg-accent",
+          )}
+        >
+          <span className="max-w-[8rem] truncate">{triggerLabel}</span>
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        </button>
+      </Popover.Trigger>
+
+      <Popover.Portal>
+        <Popover.Content
+          side="bottom"
+          align="start"
+          sideOffset={6}
+          avoidCollisions={false}
+          className="z-50 min-w-[10rem] rounded-md border bg-popover p-1.5 shadow-md animate-in fade-in-0 zoom-in-95"
+        >
+          <button
+            onClick={onClear}
+            className={cn(
+              "flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition-colors hover:bg-accent",
+              count === 0 ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground",
+            )}
+          >
+            전체
+          </button>
+          {systems.length === 0 && (
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">등록된 시스템 없음</p>
+          )}
+          {systems.map((s) => {
+            const selected = selectedCodes.has(s.code);
+            return (
+              <button
+                key={s.code}
+                onClick={() => onToggle(s.code)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition-colors hover:bg-accent",
+                  selected ? "bg-primary/10 text-primary font-medium" : "text-foreground",
+                )}
+              >
+                <span>{s.name}</span>
+                {selected && <Check className="h-3 w-3 shrink-0" />}
+              </button>
+            );
+          })}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

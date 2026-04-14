@@ -30,7 +30,7 @@ export type WorkTicket = {
   updatedAt: string;
 };
 
-/** 목록 응답에 들어 있는 work item (assignee include). */
+/** 목록 응답에 들어 있는 work item (assignee + tickets include). */
 export type WorkItemListItem = {
   id: string;
   title: string;
@@ -50,10 +50,11 @@ export type WorkItemListItem = {
   createdAt: string;
   updatedAt: string;
   assignee: Member | null;
+  tickets: { systemName: string }[];
 };
 
-/** 상세 응답: 위에 tickets 추가. */
-export type WorkItemDetail = WorkItemListItem & {
+/** 상세 응답: tickets를 WorkTicket[] 전체 필드로 오버라이드. */
+export type WorkItemDetail = Omit<WorkItemListItem, "tickets"> & {
   tickets: WorkTicket[];
 };
 

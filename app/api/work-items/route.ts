@@ -46,12 +46,26 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       ...(filters.assigneeId?.length ? { assigneeId: { in: filters.assigneeId } } : {}),
       ...(filters.category?.length ? { category: { in: filters.category } } : {}),
       ...(filters.priority?.length ? { priority: { in: filters.priority } } : {}),
+      ...(filters.title ? { title: { contains: filters.title } } : {}),
+      ...(filters.requestType ? { requestType: { contains: filters.requestType } } : {}),
+      ...(filters.requestor ? { requestor: { contains: filters.requestor } } : {}),
+      ...(filters.requestNumber ? { requestNumber: { contains: filters.requestNumber } } : {}),
       ...(filters.ticket
         ? {
             tickets: {
               some: {
                 deletedAt: null,
                 ticketNumber: { contains: filters.ticket },
+              },
+            },
+          }
+        : {}),
+      ...(filters.systemCode?.length
+        ? {
+            tickets: {
+              some: {
+                deletedAt: null,
+                systemName: { in: filters.systemCode },
               },
             },
           }
@@ -71,6 +85,11 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     },
     include: {
       assignee: true,
+      tickets: {
+        where: { deletedAt: null },
+        select: { systemName: true },
+        orderBy: { createdAt: "asc" as const },
+      },
     },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

@@ -11,12 +11,18 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { formatDate } from "@/lib/client/format";
-import type { WorkItemListItem } from "@/lib/client/types";
+import type { WorkItemListItem, WorkSystem } from "@/lib/client/types";
 import { STATUSES, type Status } from "@/lib/enums";
-import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/enum-labels";
+import { STATUS_LABELS } from "@/lib/enum-labels";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PriorityBadge } from "./status-badge";
+import type { Priority } from "@/lib/enums";
+
+const PRIORITY_BORDER: Record<Priority, string> = {
+  LOW: "border-l-4 border-l-slate-200",
+  NORMAL: "border-l-4 border-l-blue-200",
+  HIGH: "border-l-4 border-l-red-300",
+};
 
 /**
  * 칸반 보기 — 상태별 컬럼.
@@ -25,20 +31,18 @@ import { PriorityBadge } from "./status-badge";
  */
 function KanbanCard({
   item,
+  systemNameByCode,
   onOpen,
 }: {
   item: WorkItemListItem;
+  systemNameByCode: Record<string, string>;
   onOpen: (item: WorkItemListItem) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({
-      id: item.id,
-    });
+    useDraggable({ id: item.id });
 
   const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      }
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined;
 
   return (
@@ -50,25 +54,49 @@ function KanbanCard({
       onClick={() => onOpen(item)}
       className={cn(
         "rounded-md border bg-background p-3 text-left text-sm shadow-sm transition-colors hover:bg-accent/40",
+        PRIORITY_BORDER[item.priority],
         isDragging && "opacity-50",
       )}
     >
-      <div className="line-clamp-2 font-medium">{item.title}</div>
-      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{item.assignee?.name ?? "미배정"}</span>
-        <PriorityBadge priority={item.priority} />
-      </div>
-      {item.transferDate ? (
-        <div className={cn("mt-1 text-[11px] text-muted-foreground", (() => {
-          const today = new Date().toDateString();
-          const transfer = new Date(item.transferDate!).toDateString();
-          if (transfer === today) return "text-blue-600 font-semibold";
-          if (new Date(item.transferDate!) < new Date()) return "text-red-600 font-semibold";
-          return "";
-        })())}>
-          이관 {formatDate(item.transferDate)}
+      {/* 제목 */}
+      <div className="line-clamp-2 font-medium leading-snug">{item.title}</div>
+
+      {/* 요청번호 */}
+      {item.requestNumber && (
+        <div className="mt-1.5 text-[11px] text-muted-foreground">
+          # {item.requestNumber}
         </div>
-      ) : null}
+      )}
+
+      {/* 시스템 연동 */}
+      {item.tickets.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {item.tickets.map((t) => (
+            <span
+              key={t.systemName}
+              className="inline-flex items-center rounded bg-muted px-1 py-px text-[10px] text-muted-foreground"
+            >
+              {systemNameByCode[t.systemName] ?? t.systemName}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 담당자 + 이관일 */}
+      <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>{item.assignee?.name ?? "미배정"}</span>
+        {item.transferDate && (
+          <span className={cn((() => {
+            const today = new Date().toDateString();
+            const transfer = new Date(item.transferDate!).toDateString();
+            if (transfer === today) return "text-blue-600 font-semibold";
+            if (new Date(item.transferDate!) < new Date()) return "text-red-600 font-semibold";
+            return "";
+          })())}>
+            이관 {formatDate(item.transferDate)}
+          </span>
+        )}
+      </div>
     </button>
   );
 }
@@ -76,10 +104,12 @@ function KanbanCard({
 function KanbanColumn({
   status,
   items,
+  systemNameByCode,
   onOpen,
 }: {
   status: Status;
   items: WorkItemListItem[];
+  systemNameByCode: Record<string, string>;
   onOpen: (item: WorkItemListItem) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -103,7 +133,7 @@ function KanbanColumn({
           <p className="px-1 py-3 text-xs text-muted-foreground">비어 있음</p>
         ) : (
           items.map((item) => (
-            <KanbanCard key={item.id} item={item} onOpen={onOpen} />
+            <KanbanCard key={item.id} item={item} systemNameByCode={systemNameByCode} onOpen={onOpen} />
           ))
         )}
       </div>
@@ -114,11 +144,13 @@ function KanbanColumn({
 export function KanbanView({
   items,
   visibleStatuses,
+  systems,
   onOpen,
   onUpdate,
 }: {
   items: WorkItemListItem[];
   visibleStatuses: readonly Status[];
+  systems: WorkSystem[];
   onOpen: (item: WorkItemListItem) => void;
   onUpdate: (id: string, status: Status) => void;
 }) {
@@ -181,6 +213,11 @@ export function KanbanView({
     scrollRef.current?.scrollBy({ left: px, behavior: "smooth" });
   }
 
+  const systemNameByCode = React.useMemo(
+    () => Object.fromEntries(systems.map((s) => [s.code, s.name])),
+    [systems],
+  );
+
   const grouped = React.useMemo(() => {
     const map = new Map<Status, WorkItemListItem[]>();
     for (const s of STATUSES) map.set(s, []);
@@ -233,7 +270,7 @@ export function KanbanView({
           <div
             className="grid gap-3"
             style={{
-              gridTemplateColumns: `repeat(${Math.max(visibleStatuses.length, 1)}, 320px)`,
+              gridTemplateColumns: `repeat(${Math.max(visibleStatuses.length, 1)}, 330px)`,
             }}
           >
             {visibleStatuses.map((status) => {
@@ -243,6 +280,7 @@ export function KanbanView({
                   key={status}
                   status={status}
                   items={list}
+                  systemNameByCode={systemNameByCode}
                   onOpen={onOpen}
                 />
               );

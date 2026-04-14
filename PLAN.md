@@ -209,6 +209,29 @@
 - [x] **사이드바 개선** — 이름 변경 Dialog, 다크모드 resolvedTheme 수정, 액터 이름 즉시 반영
 - [x] **캘린더 이관 건수 표시** — 월/주 보기 셀 최상단 `[이관] N건` emerald 칩
 - [x] **칸반 개선** — PointerSensor(distance:8), 연속 드래그 CONFLICT 수정, 상태 필터 컬럼 연동
+
+### Phase 5+ — 작업 탭 UX 폴리싱 ✅ 완료
+
+- [x] **필터바 재설계** — 2행 레이아웃(`divide-x`), 제목·요청구분·요청자·요청번호 텍스트 검색 추가
+  - 시스템 필터: 담당자처럼 Radix Popover 레이어로 분리 (다수 선택 지원)
+  - 필터 영역 토글 버튼 (`SlidersHorizontal`), 초기화 버튼 필터박스 외부로 분리
+- [x] **작업 목록 API 확장** — `GET /api/work-items` 필터: `title`, `requestType`, `requestor`, `requestNumber` (LIKE), `systemCode` (tickets.some, 다중)
+  - 목록 응답에 `tickets: { systemName }[]` include 추가 (칸반 카드·필터 표시용)
+- [x] **타입 정비** — `WorkItemListItem.tickets: { systemName: string }[]`, `WorkItemDetail`를 `Omit<..., "tickets"> & { tickets: WorkTicket[] }`로 분리 (intersection 충돌 해결)
+- [x] **테이블 뷰** — 분류 컬럼 첫 번째 위치, 코드 → 코드명으로 표시 (`WorkCategory` 조회)
+- [x] **작업 상세 드로어 개편** — `Section` / `Field` 일관 블록
+  - 헤더: 분류명만 표시 (상태·우선순위 제거 → 기본 정보 섹션으로 이동)
+  - 기본 정보 (StatusBadge·우선순위·담당자·시작일·종료일·이관일)
+  - 요청 정보 (requestType·requestor·requestNumber·requestContent)
+  - 시스템 연동: 코드 → 시스템명 표시
+  - 등록/수정: Audit Log 조회로 등록자·수정자·일시 한 블록에 표시
+- [x] **연속 수정 409 버그픽스** — PATCH 응답(`updatedAt` 갱신)으로 `items` 상태를 즉시 동기 업데이트, 비동기 `loadItems()` 완료 전 재편집 시 stale If-Match 방지
+- [x] **모바일 최소 너비** — `app-shell` 본문에 `min-w-[768px]` 래퍼, 좁은 화면에서 가로 스크롤로 처리
+- [x] **작업 폼 하단 버튼 고정** — `DialogFooter`에 `shrink-0 border-t pt-4` 적용, 폼 내용 스크롤과 독립
+- [x] **칸반 카드 개선**
+  - 요청번호 (`# {requestNumber}`) 표시
+  - 시스템 연동 딱지: 코드 → 시스템명, `10px` 소형 칩
+  - 우선순위 뱃지 제거 → 카드 왼쪽 테두리 색상으로 구분 (파스텔: LOW slate-200 / NORMAL blue-200 / HIGH red-300)
 - [ ] 대시보드 전체 카운트용 dedicated count API
 - [ ] CSV export (`/api/work-items/export.csv`)
 - [ ] Audit log 보존 정책

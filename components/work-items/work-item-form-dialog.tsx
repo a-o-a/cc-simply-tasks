@@ -53,7 +53,8 @@ type Props = {
   categories: WorkCategory[];
   systems: WorkSystem[];
   onClose: () => void;
-  onSaved: () => void;
+  /** 저장 완료. 수정 시 서버 응답(최신 updatedAt 포함)을 전달해 목록 즉시 갱신. */
+  onSaved: (updated?: WorkItemListItem) => void;
 };
 
 interface TicketRow {
@@ -251,17 +252,18 @@ export function WorkItemFormDialog({
     setSubmitting(true);
     try {
       if (editing) {
-        await api.patch(
+        const updated = await api.patch<WorkItemListItem>(
           `/api/work-items/${editing.id}`,
           payload,
           ifMatchToken,
         );
         toast({ title: "작업을 수정했습니다" });
+        onSaved(updated);
       } else {
         await api.post("/api/work-items", payload);
         toast({ title: "작업을 추가했습니다" });
+        onSaved();
       }
-      onSaved();
     } catch (err) {
       if (err instanceof ApiError && err.code === "CONFLICT") {
         // 서버가 응답한 최신 updatedAt으로 1회 자동 재시도 (사용자 입력 보존)
@@ -269,10 +271,14 @@ export function WorkItemFormDialog({
           ?.serverUpdatedAt;
         if (serverUpdatedAt && editing) {
           try {
-            await api.patch(`/api/work-items/${editing.id}`, payload, serverUpdatedAt);
+            const updated = await api.patch<WorkItemListItem>(
+              `/api/work-items/${editing.id}`,
+              payload,
+              serverUpdatedAt,
+            );
             setIfMatchToken(serverUpdatedAt);
             toast({ title: "작업을 수정했습니다" });
-            onSaved();
+            onSaved(updated);
             return;
           } catch {
             // 재시도도 실패 — 아래 공통 에러 처리로 fall-through
@@ -308,8 +314,9 @@ export function WorkItemFormDialog({
 
         <form
           onSubmit={handleSubmit}
-          className="flex-1 overflow-y-auto space-y-4 px-1"
+          className="flex min-h-0 flex-1 flex-col"
         >
+          <div className="flex-1 overflow-y-auto space-y-4 px-1 pb-1">
           {/* 분류 — 맨 위 단독 */}
           <div className="space-y-2">
             <Label htmlFor="wi-category">분류</Label>
@@ -556,7 +563,9 @@ export function WorkItemFormDialog({
             />
           </div>
 
-          <DialogFooter className="pt-2">
+          </div>
+
+          <DialogFooter className="shrink-0 border-t pt-4">
             <Button type="button" variant="ghost" onClick={onClose}>
               취소
             </Button>

@@ -347,6 +347,8 @@ export function DashboardClient() {
       <WorkItemDrawer
         workItemId={drawerId}
         reloadKey={drawerReloadKey}
+        categories={categories}
+        systems={systems}
         onClose={() => setDrawerId(null)}
         onEdit={(item) => {
           setEditing(item);
