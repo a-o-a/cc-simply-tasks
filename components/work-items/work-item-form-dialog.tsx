@@ -226,9 +226,9 @@ export function WorkItemFormDialog({
       return;
     }
 
-    // 빈 행 필터링 (systemName 또는 ticketNumber가 비어있는 행 제외)
+    // 빈 행 필터링 (시스템이 선택된 행만 저장)
     const validTickets = tickets.filter(
-      (t) => t.systemName.trim() && t.ticketNumber.trim(),
+      (t) => t.systemName.trim(),
     );
 
     const payload = {
@@ -474,7 +474,7 @@ export function WorkItemFormDialog({
                       onChange={(e) =>
                         updateTicketRow(index, "ticketNumber", e.target.value)
                       }
-                      placeholder="작업번호"
+                      placeholder="티켓번호 (선택)"
                       maxLength={100}
                       className="flex-1"
                     />

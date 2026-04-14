@@ -145,6 +145,7 @@ export function TransferClient() {
   const [cursor, setCursor] = React.useState(() => cursorFromDateStr(today));
 
   const [items, setItems] = React.useState<WorkItemListItem[]>([]);
+  const [members, setMembers] = React.useState<Member[]>([]);
   const [categories, setCategories] = React.useState<WorkCategory[]>([]);
   const [systems, setSystems] = React.useState<WorkSystem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -163,7 +164,7 @@ export function TransferClient() {
       const daysInMonth = new Date(cursor.year, cursor.month0 + 1, 0).getDate();
       const toDate = `${cursor.year}-${String(cursor.month0 + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
 
-      const [itemsRes, catsRes, sysRes] = await Promise.all([
+      const [itemsRes, membersRes, catsRes, sysRes] = await Promise.all([
         api.get<ListResponse<WorkItemListItem>>("/api/work-items", {
           query: {
             hasTransferDate: "true",
@@ -172,10 +173,12 @@ export function TransferClient() {
             pageSize: 10000,
           },
         }),
+        api.get<ListResponse<Member>>("/api/team-members"),
         api.get<ListResponse<WorkCategory>>("/api/work-categories"),
         api.get<ListResponse<WorkSystem>>("/api/work-systems"),
       ]);
       setItems(itemsRes.items);
+      setMembers(membersRes.items);
       setCategories(catsRes.items);
       setSystems(sysRes.items);
     } catch (err) {
@@ -289,7 +292,7 @@ export function TransferClient() {
       <WorkItemFormDialog
         open={formOpen}
         editing={editing}
-        members={[]}
+        members={members}
         categories={categories}
         systems={systems}
         onClose={() => setFormOpen(false)}
@@ -464,9 +467,11 @@ function TransferTable({
                               <span className="font-medium text-foreground/80">
                                 {systemNameByCode[t.systemName] ?? t.systemName}
                               </span>
-                              <span>
-                                {t.ticketNumber}
-                              </span>
+                              {t.ticketNumber ? (
+                                <span>
+                                  {t.ticketNumber}
+                                </span>
+                              ) : null}
                             </div>
                           ))}
                         </div>

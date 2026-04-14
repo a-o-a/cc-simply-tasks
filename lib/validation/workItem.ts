@@ -6,7 +6,7 @@ export const WORK_ITEM_SCOPES = ["all", "active", "transferred"] as const;
 
 const ticketRowSchema = z.object({
   systemName: z.string().min(1).max(100),
-  ticketNumber: z.string().min(1).max(100),
+  ticketNumber: z.string().max(100),
 });
 
 export const workItemCreateSchema = z

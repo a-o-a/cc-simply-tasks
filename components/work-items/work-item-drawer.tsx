@@ -315,8 +315,12 @@ function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: Wor
                 className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm"
               >
                 <span className="font-medium shrink-0">{systemNameByCode[t.systemName] ?? t.systemName}</span>
-                <span className="text-muted-foreground/50">·</span>
-                <span className="text-muted-foreground">{t.ticketNumber}</span>
+                {t.ticketNumber ? (
+                  <>
+                    <span className="text-muted-foreground/50">·</span>
+                    <span className="text-muted-foreground">{t.ticketNumber}</span>
+                  </>
+                ) : null}
               </li>
             ))}
           </ul>
