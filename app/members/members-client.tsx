@@ -22,7 +22,7 @@ import { MEMBER_ROLE_LABELS } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
 
 /**
- * 멤버 목록/생성/수정/삭제 클라이언트.
+ * 팀원 목록/생성/수정/삭제 클라이언트.
  *
  * Phase 4 Step 3 — 가장 단순한 모델로 list/create/edit/delete + 낙관적 락 +
  * 토스트 패턴을 검증한다. 이 페이지에서 정착시킨 패턴을 다른 페이지가 답습한다.
@@ -85,7 +85,7 @@ export function MembersClient() {
         </p>
         <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
           <Plus className="mr-2 h-4 w-4" />
-          멤버 추가
+          팀원 추가
         </Button>
       </div>
 
@@ -106,12 +106,12 @@ export function MembersClient() {
         ) : items.length === 0 ? (
           <EmptyState
             icon={<UsersIcon className="h-8 w-8 text-muted-foreground" />}
-            title="등록된 멤버가 없습니다"
-            description="첫 멤버를 추가해 작업 담당자로 지정해보세요."
+            title="등록된 팀원이 없습니다"
+            description="첫 팀원을 추가해 작업 담당자로 지정해보세요."
             action={
               <Button onClick={() => setDialog({ mode: "create" })}>
                 <Plus className="mr-2 h-4 w-4" />
-                멤버 추가
+                팀원 추가
               </Button>
             }
           />
@@ -140,18 +140,20 @@ export function MembersClient() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7"
                         aria-label="수정"
                         onClick={() => setDialog({ mode: "edit", member: m })}
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
                         aria-label="삭제"
                         onClick={() => setDialog({ mode: "delete", member: m })}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </td>
@@ -220,14 +222,14 @@ function MemberFormDialog({
           `/api/team-members/${editing.id}`,
           { name: trimmed, role }
         );
-        toast({ title: "멤버를 수정했습니다" });
+        toast({ title: "팀원을 수정했습니다" });
       } else {
         await api.post("/api/team-members", { name: trimmed, role });
-        toast({ title: "멤버를 추가했습니다" });
+        toast({ title: "팀원을 추가했습니다" });
       }
       onSaved();
     } catch (err) {
-      handleApiError(err, editing ? "멤버 수정 실패" : "멤버 추가 실패");
+      handleApiError(err, editing ? "팀원 수정 실패" : "팀원 추가 실패");
     } finally {
       setSubmitting(false);
     }
@@ -237,7 +239,7 @@ function MemberFormDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editing ? "멤버 수정" : "멤버 추가"}</DialogTitle>
+          <DialogTitle>{editing ? "팀원 수정" : "팀원 추가"}</DialogTitle>
           <DialogDescription>
             팀원의 표시 이름과 주 담당 역할을 입력하세요. 역할은 추후 변경 가능합니다.
           </DialogDescription>
@@ -300,10 +302,10 @@ function DeleteMemberDialog({
     setSubmitting(true);
     try {
       await api.delete(`/api/team-members/${member.id}`);
-      toast({ title: "멤버를 삭제했습니다" });
+      toast({ title: "팀원을 삭제했습니다" });
       onDeleted();
     } catch (err) {
-      handleApiError(err, "멤버 삭제 실패");
+      handleApiError(err, "팀원 삭제 실패");
     } finally {
       setSubmitting(false);
     }
@@ -313,7 +315,7 @@ function DeleteMemberDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>멤버 삭제</DialogTitle>
+          <DialogTitle>팀원 삭제</DialogTitle>
           <DialogDescription>
             <span className="font-medium text-foreground">{member?.name}</span>
             {" "}님을 삭제하시겠습니까? 작업/캘린더의 담당자 연결은 그대로

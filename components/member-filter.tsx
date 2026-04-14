@@ -8,8 +8,8 @@
  *
  * Props:
  *   members        — 전체 팀원 목록
- *   selectedIds    — 현재 선택된 멤버 ID Set
- *   onToggle       — 멤버 ID 토글 핸들러
+ *   selectedIds    — 현재 선택된 팀원 ID Set
+ *   onToggle       — 팀원 ID 토글 핸들러
  *   onClear        — 전체 선택 해제 핸들러 (multi 모드에서만 사용)
  *   placeholder    — 미선택 시 버튼 텍스트 (기본: "팀원")
  *   mode           — "multi" | "single" (기본: "multi")

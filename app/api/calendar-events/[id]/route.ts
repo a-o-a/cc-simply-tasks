@@ -38,7 +38,7 @@ export const PATCH = withErrorHandler(
       });
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
 
-      // memberIds가 제공된 경우 기존 멤버 교체
+      // memberIds가 제공된 경우 기존 팀원 교체
       if (input.memberIds !== undefined) {
         await tx.calendarEventMember.deleteMany({ where: { eventId: params.id } });
         for (const memberId of input.memberIds) {

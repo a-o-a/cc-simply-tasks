@@ -29,7 +29,7 @@ export function SettingsClient() {
       <Tabs defaultValue="service">
         <TabsList>
           <TabsTrigger value="service">서비스</TabsTrigger>
-          <TabsTrigger value="members">멤버</TabsTrigger>
+          <TabsTrigger value="members">팀원</TabsTrigger>
           <TabsTrigger value="codes">코드 관리</TabsTrigger>
           <TabsTrigger value="backup">백업</TabsTrigger>
         </TabsList>

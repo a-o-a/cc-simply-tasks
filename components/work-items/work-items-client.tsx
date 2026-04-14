@@ -48,7 +48,7 @@ import { WorkItemFormDialog } from "./work-item-form-dialog";
  * 작업 페이지 클라이언트 — Phase 4 Step 4.
  *
  * 책임:
- *  - 멤버 + 작업 목록 fetch
+ *  - 팀원 + 작업 목록 fetch
  *  - 필터 (status / assignee / category / priority / ticket)
  *  - 보기 모드 토글 (table / kanban) — localStorage에 저장
  *  - 생성/수정 다이얼로그 + 상세 드로어 트리거
@@ -171,7 +171,7 @@ export function WorkItemsClient() {
       setMembers(res.items);
     } catch (err) {
       toast({
-        title: "멤버 목록 조회 실패",
+        title: "팀원 목록 조회 실패",
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
