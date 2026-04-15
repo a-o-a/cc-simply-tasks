@@ -330,7 +330,7 @@ export function WorkItemFormDialog({
           onSubmit={handleSubmit}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex-1 overflow-y-auto space-y-4 px-1 pb-1">
+          <div className="subtle-scrollbar flex-1 overflow-y-auto space-y-4 px-1 pb-1 pr-2">
           {/* 분류 — 맨 위 단독 */}
           <div className="space-y-2">
             <Label htmlFor="wi-category">분류</Label>

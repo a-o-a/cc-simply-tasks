@@ -224,6 +224,29 @@ export function KanbanView({
     for (const item of items) {
       map.get(item.status)?.push(item);
     }
+    for (const status of STATUSES) {
+      const columnItems = map.get(status);
+      if (!columnItems) continue;
+      columnItems.sort((a, b) => {
+        const aName = a.assignee?.name?.trim() ?? "";
+        const bName = b.assignee?.name?.trim() ?? "";
+        if (aName && bName) {
+          const assigneeDiff = aName.localeCompare(bName, "ko");
+          if (assigneeDiff !== 0) return assigneeDiff;
+        } else if (aName || bName) {
+          return aName ? -1 : 1;
+        }
+
+        const orderDiff = a.order - b.order;
+        if (orderDiff !== 0) return orderDiff;
+
+        const createdDiff =
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (createdDiff !== 0) return createdDiff;
+
+        return b.id.localeCompare(a.id);
+      });
+    }
     return map;
   }, [items]);
 
