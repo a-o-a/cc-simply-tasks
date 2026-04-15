@@ -1,145 +1,122 @@
 # Development Guide
 
-이 문서는 API 라우트와 비즈니스 로직을 작성할 때 **모든 개발자(사람 + 에이전트)가 반드시 따르는 컨벤션**을 정리합니다. Phase 3 API 구현 전에 반드시 숙지.
+이 문서는 현재 코드베이스의 서버/API 구현 규칙을 정리합니다. 기준 스택은 `Next.js + Drizzle ORM + SQLite`입니다.
 
-- 레퍼런스 구현: [`app/api/work-items/`](../app/api/work-items/) — 이 문서의 규칙이 실제로 어떻게 쓰이는지 확인용
-- 스택/전체 계획: [`README.md`](../README.md), [`PLAN.md`](../PLAN.md)
+- 레퍼런스 구현: [`app/api/work-items/`](../app/api/work-items/)
+- DB 진입점: [`lib/db.ts`](../lib/db.ts)
+- 스키마: [`lib/db/schema.ts`](../lib/db/schema.ts)
+- 조회/관계 하이드레이션 헬퍼: [`lib/db/queries.ts`](../lib/db/queries.ts)
+- 감사 로그: [`lib/audit.ts`](../lib/audit.ts)
 
----
+## 1. 핵심 원칙
 
-## 1. 핵심 원칙 (절대 어기지 말 것)
-
-1. **모든 write는 `prisma.$transaction` 안에서 `withAudit`과 함께 실행한다.**
-   - `withAudit`은 `Prisma.TransactionClient` 타입만 받으므로 트랜잭션 밖 호출은 컴파일 에러가 된다. 이 타입 강제를 우회하지 말 것.
-2. **raw SQL 금지.** Postgres 이관 대비. 예외는 SQLite PRAGMA(`lib/db.ts`의 `ensureSqlitePragma`)뿐.
-3. **Soft delete만 사용.** 실제 `delete` 대신 `deletedAt: new Date()` 업데이트. 목록 쿼리는 전부 `where: { deletedAt: null }`.
-4. **모든 외부 입력은 zod로 검증.** 라우트 핸들러의 첫 줄은 `schema.parse(body)` 또는 `schema.parse(Object.fromEntries(searchParams))`.
-5. **PATCH/DELETE는 `If-Match` 헤더 필수.** `assertIfMatch(req, current.updatedAt)` 호출. 헤더 누락도 거부(`BAD_REQUEST`).
-6. **에러 응답은 반드시 `withErrorHandler`로 감싸라.** 표준 포맷과 Prisma 에러 매핑을 자동 처리.
-7. **시간은 DB에 UTC, UI에 KST.** 변환은 `lib/time.ts`에서만. 라우트 코드에서 직접 시간대 변환 금지.
-
----
+1. 모든 write는 `db.transaction((tx) => { ... })` 안에서 실행한다.
+2. write와 감사 로그는 같은 트랜잭션 안에서 `withAudit(tx, ...)`로 묶는다.
+3. Soft delete만 사용한다. 실제 삭제 대신 `deletedAt`을 업데이트한다.
+4. 모든 외부 입력은 zod로 검증한다.
+5. 에러 응답은 `withErrorHandler`로 통일한다.
+6. 시간은 DB에 UTC `Date`, UI 표시는 KST로 처리한다.
+7. SQLite 경로 기본값은 `.env`의 `DATABASE_URL="file:./db/dev.db"`다.
 
 ## 2. 디렉터리 규칙
 
+```text
+app/api/<resource>/route.ts
+app/api/<resource>/[id]/route.ts
 ```
-app/api/<resource>/route.ts          # collection: GET(list) / POST
-app/api/<resource>/[id]/route.ts     # item: GET / PATCH / DELETE
+
+- collection route: `GET(list)`, `POST(create)`
+- item route: `GET(detail)`, `PATCH(update)`, `DELETE(soft delete)`
+
+복잡한 관계 조회는 라우트에서 직접 전부 풀지 말고 `lib/db/queries.ts` 같은 공통 헬퍼로 뺀다.
+
+## 3. DB 레이어 규칙
+
+### 3.1 연결
+
+- 공용 DB 객체는 [`lib/db.ts`](../lib/db.ts) 의 `db`를 사용한다.
+- SQLite PRAGMA는 DB 초기화 시 한 번 적용된다.
+- API 코드에서는 관성적으로 `await ensureSqlitePragma()`를 호출해도 되지만, 현재는 no-op이다.
+
+### 3.2 스키마
+
+- 테이블 정의는 [`lib/db/schema.ts`](../lib/db/schema.ts)만 소스 오브 트루스로 본다.
+- 새 컬럼/테이블 추가 시 이 파일을 먼저 수정한다.
+- enum 비슷한 값은 SQLite native enum이 없으므로 문자열 컬럼 + [`lib/enums.ts`](../lib/enums.ts) + zod 조합으로 관리한다.
+
+### 3.3 쓰기 쿼리
+
+`better-sqlite3` 기반 Drizzle에서는 write 빌더를 만든 뒤 반드시 실행해야 한다.
+
+```ts
+tx.insert(teamMembers).values(row).run();
+tx.update(workItems).set(after).where(eq(workItems.id, id)).run();
+tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, id)).run();
 ```
 
-- **예시**:
-  - `app/api/work-items/route.ts` — list/create
-  - `app/api/work-items/[id]/route.ts` — get/patch/delete
+`.run()`이 빠지면 실제 DB 반영이 되지 않는다.
 
-- 라우트 파일 안에 **비즈니스 로직을 직접 쓰지 말 것.** 복잡한 로직은 `lib/services/<resource>.ts`로 추출. 라우트는 "파싱 → 서비스 호출 → 응답"만.
+## 4. 표준 라우트 패턴
 
----
-
-## 3. 표준 라우트 스켈레톤
-
-아래 템플릿을 **그대로 복사해서** 시작하면 규칙을 어길 일이 없다.
-
-### 3.1 Collection route — `app/api/<resource>/route.ts`
+### 4.1 Collection route
 
 ```ts
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
-import { withErrorHandler, HttpError } from "@/lib/http";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { newId, now } from "@/lib/db/helpers";
+import { teamMembers } from "@/lib/db/schema";
+import { withErrorHandler } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { parsePagination, toPage } from "@/lib/pagination";
+import { parsePagination, slicePageAfterCursor } from "@/lib/pagination";
 import {
-  workItemCreateSchema,
-  workItemListQuerySchema,
-} from "@/lib/validation/workItem";
+  teamMemberCreateSchema,
+  teamMemberListQuerySchema,
+} from "@/lib/validation/teamMember";
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const { searchParams } = new URL(req.url);
-  const filters = workItemListQuerySchema.parse(
+  const filters = teamMemberListQuerySchema.parse(
     Object.fromEntries(searchParams),
   );
   const { take, cursor } = parsePagination(searchParams);
-  const activeStatuses = filters.status?.filter((s) => s !== "TRANSFERRED");
-  const statusWhere =
-    filters.scope === "transferred"
-      ? { status: "TRANSFERRED" as const }
-      : filters.scope === "active"
-        ? activeStatuses && activeStatuses.length > 0
-          ? { status: { in: activeStatuses } }
-          : { status: { not: "TRANSFERRED" as const } }
-        : filters.status?.length
-          ? { status: { in: filters.status } }
-          : {};
-  const orderBy =
-    filters.scope === "transferred"
-      ? [{ transferDate: "desc" as const }, { createdAt: "desc" as const }, { id: "desc" as const }]
-      : [{ order: "asc" as const }, { createdAt: "desc" as const }, { id: "desc" as const }];
 
-  const rows = await prisma.workItem.findMany({
-    where: {
-      deletedAt: null,
-      ...statusWhere,
-      ...(filters.assigneeId?.length ? { assigneeId: { in: filters.assigneeId } } : {}),
-      ...(filters.category?.length ? { category: { in: filters.category } } : {}),
-      ...(filters.priority?.length ? { priority: { in: filters.priority } } : {}),
-      ...(filters.ticket
-        ? {
-            tickets: {
-              some: {
-                deletedAt: null,
-                ticketNumber: { contains: filters.ticket },
-              },
-            },
-          }
-        : {}),
-    },
-    take: take + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    orderBy,
-  });
+  const rows = await db
+    .select()
+    .from(teamMembers)
+    .where(
+      and(
+        isNull(teamMembers.deletedAt),
+        filters.role ? eq(teamMembers.role, filters.role) : undefined,
+      ),
+    )
+    .orderBy(asc(teamMembers.name), asc(teamMembers.id));
 
-  const { items, nextCursor } = toPage(rows, take);
+  const { items, nextCursor } = slicePageAfterCursor(rows, cursor, take);
   return NextResponse.json({ items, nextCursor });
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
-  const input = workItemCreateSchema.parse(await req.json());
+  const input = teamMemberCreateSchema.parse(await req.json());
+  const createdAt = now();
 
-  const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.workItem.create({
-      data: {
-        title: input.title,
-        description: input.description ?? null,
-        category: input.category,
-        status: input.status,
-        priority: input.priority,
-        order: input.order,
-        assigneeId: input.assigneeId ?? null,
-        startDate: input.startDate ?? null,
-        endDate: input.endDate ?? null,
-        transferDate: input.transferDate ?? null,
-        requestType: input.requestType ?? null,
-        requestor: input.requestor ?? null,
-        requestNumber: input.requestNumber ?? null,
-        requestContent: input.requestContent ?? null,
-      },
-    });
-    if (input.tickets?.length) {
-      for (const t of input.tickets) {
-        await tx.workTicket.create({
-          data: {
-            workItemId: row.id,
-            systemName: t.systemName,
-            ticketNumber: t.ticketNumber,
-          },
-        });
-      }
-    }
-    await withAudit(tx, {
-      entityType: "WorkItem",
+  const created = db.transaction((tx) => {
+    const row = {
+      id: newId(),
+      name: input.name,
+      role: input.role,
+      createdAt,
+      updatedAt: createdAt,
+      deletedAt: null,
+    } satisfies typeof teamMembers.$inferInsert;
+
+    tx.insert(teamMembers).values(row).run();
+    withAudit(tx, {
+      entityType: "TeamMember",
       entityId: row.id,
       action: "CREATE",
       after: row as unknown as Record<string, unknown>,
@@ -152,316 +129,234 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 });
 ```
 
-### 3.2 Item route — `app/api/<resource>/[id]/route.ts`
+### 4.2 Item route
 
 ```ts
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { now } from "@/lib/db/helpers";
+import { teamMembers } from "@/lib/db/schema";
 import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { assertIfMatch } from "@/lib/optimisticLock";
-import { workItemUpdateSchema } from "@/lib/validation/workItem";
+import { teamMemberUpdateSchema } from "@/lib/validation/teamMember";
 
 type Params = { params: { id: string } };
 
-export const GET = withErrorHandler(async (_req: NextRequest, { params }: Params) => {
-  await ensureSqlitePragma();
-  const row = await prisma.workItem.findFirst({
-    where: { id: params.id, deletedAt: null },
-    include: {
-      tickets: { where: { deletedAt: null } },
-      assignee: true,
-    },
-  });
-  if (!row) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
-  return NextResponse.json(row);
-});
+export const GET = withErrorHandler(
+  async (_req: NextRequest, { params }: Params) => {
+    await ensureSqlitePragma();
+    const row = await db
+      .select()
+      .from(teamMembers)
+      .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
+      .limit(1);
 
-export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Params) => {
-  await ensureSqlitePragma();
-  const actor = getActorContext(req);
-  const input = workItemUpdateSchema.parse(await req.json());
+    if (!row[0]) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
+    return NextResponse.json(row[0]);
+  },
+);
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const before = await tx.workItem.findFirst({
-      where: { id: params.id, deletedAt: null },
-    });
-    if (!before) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
-    assertIfMatch(req, before.updatedAt);
+export const PATCH = withErrorHandler(
+  async (req: NextRequest, { params }: Params) => {
+    await ensureSqlitePragma();
+    const actor = getActorContext(req);
+    const input = teamMemberUpdateSchema.parse(await req.json());
+    const updatedAt = now();
 
-    const after = await tx.workItem.update({
-      where: { id: params.id },
-      data: {
-        ...(input.title !== undefined ? { title: input.title } : {}),
-        ...(input.description !== undefined
-          ? { description: input.description }
-          : {}),
-        ...(input.category !== undefined ? { category: input.category } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-        ...(input.priority !== undefined ? { priority: input.priority } : {}),
-        ...(input.order !== undefined ? { order: input.order } : {}),
-        ...(input.assigneeId !== undefined
-          ? { assigneeId: input.assigneeId }
-          : {}),
-        ...(input.startDate !== undefined
-          ? { startDate: input.startDate }
-          : {}),
-        ...(input.endDate !== undefined ? { endDate: input.endDate } : {}),
-        ...(input.transferDate !== undefined
-          ? { transferDate: input.transferDate }
-          : {}),
-        ...(input.requestType !== undefined
-          ? { requestType: input.requestType }
-          : {}),
-        ...(input.requestor !== undefined
-          ? { requestor: input.requestor }
-          : {}),
-        ...(input.requestNumber !== undefined
-          ? { requestNumber: input.requestNumber }
-          : {}),
-        ...(input.requestContent !== undefined
-          ? { requestContent: input.requestContent }
-          : {}),
-      },
-    });
-    if (input.tickets !== undefined) {
-      await tx.workTicket.updateMany({
-        where: { workItemId: params.id, deletedAt: null },
-        data: { deletedAt: new Date() },
+    const updated = db.transaction((tx) => {
+      const before = tx
+        .select()
+        .from(teamMembers)
+        .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
+        .limit(1)
+        .get();
+      if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
+
+      const after = {
+        ...before,
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.role !== undefined ? { role: input.role } : {}),
+        updatedAt,
+      };
+
+      tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id)).run();
+      withAudit(tx, {
+        entityType: "TeamMember",
+        entityId: after.id,
+        action: "UPDATE",
+        before: before as unknown as Record<string, unknown>,
+        after: after as unknown as Record<string, unknown>,
+        actor,
       });
-      for (const t of input.tickets) {
-        await tx.workTicket.create({
-          data: {
-            workItemId: params.id,
-            systemName: t.systemName,
-            ticketNumber: t.ticketNumber,
-          },
-        });
-      }
-    }
-    await withAudit(tx, {
-      entityType: "WorkItem",
-      entityId: after.id,
-      action: "UPDATE",
-      before: before as unknown as Record<string, unknown>,
-      after: after as unknown as Record<string, unknown>,
-      actor,
+      return after;
     });
-    return after;
-  });
 
-  return NextResponse.json(updated);
-});
-
-export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Params) => {
-  await ensureSqlitePragma();
-  const actor = getActorContext(req);
-
-  await prisma.$transaction(async (tx) => {
-    const before = await tx.workItem.findFirst({
-      where: { id: params.id, deletedAt: null },
-    });
-    if (!before) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
-    assertIfMatch(req, before.updatedAt);
-
-    const after = await tx.workItem.update({
-      where: { id: params.id },
-      data: { deletedAt: new Date() },
-    });
-    await withAudit(tx, {
-      entityType: "WorkItem",
-      entityId: after.id,
-      action: "DELETE",
-      before: before as unknown as Record<string, unknown>,
-      after: after as unknown as Record<string, unknown>,
-      actor,
-    });
-  });
-
-  return new NextResponse(null, { status: 204 });
-});
+    return NextResponse.json(updated);
+  },
+);
 ```
 
-> **패턴 요약**: `ensureSqlitePragma` → `getActorContext` → zod parse → `$transaction(async tx => { findFirst + assertIfMatch → update → withAudit })` → NextResponse.
+패턴 요약:
 
-### 3.3 WorkItem 확장 규칙
+- `ensureSqlitePragma`
+- 입력 파싱
+- write면 `getActorContext`
+- `db.transaction`
+- `before` 조회
+- `insert/update/delete ... .run()`
+- `withAudit`
+- `NextResponse.json(...)`
 
-- `WorkItem` payload는 요청 정보 필드(`requestType`, `requestor`, `requestNumber`, `requestContent`)를 포함할 수 있다.
-- 시스템 연동 번호는 별도 공개 서브 리소스 대신 `tickets` 배열로 함께 처리한다.
-- `PATCH`에서 `tickets`가 전달되면 부분 수정이 아니라 **전체 대체**로 해석한다.
-- `WorkTicket`은 `workItemId + systemName` 유니크다. 한 작업에 같은 시스템은 1개만 연결한다.
-- `ticketUrl`은 더 이상 저장하지 않는다. 현재 저장값은 `systemName`, `ticketNumber`뿐이다.
-- 목록 조회는 `scope=active|transferred|all`을 지원한다.
-- `scope=active`는 기본 운영 목록으로 간주하며, 상태 필터가 비어 있어도 `TRANSFERRED`는 제외한다.
-- `scope=transferred`는 완료 아카이브 뷰로 간주하며, `TRANSFERRED`만 조회하고 정렬은 `transferDate desc` 우선이다.
+## 5. 공통 규칙 상세
 
----
-
-## 4. 공통 규칙 상세
-
-### 4.1 HTTP status / 에러
+### 5.1 에러 처리
 
 | 상황 | code | HTTP |
 |---|---|---|
 | zod 검증 실패 | `VALIDATION_ERROR` | 400 |
-| 기타 잘못된 요청 (If-Match 누락 등) | `BAD_REQUEST` | 400 |
+| 잘못된 요청 | `BAD_REQUEST` | 400 |
 | 리소스 없음 | `NOT_FOUND` | 404 |
-| 낙관적 락 충돌 / 유니크 위반 | `CONFLICT` | 409 |
+| 유니크 충돌 / 중복 | `CONFLICT` | 409 |
 | 서버 내부 오류 | `INTERNAL` | 500 |
 
-- **직접 `NextResponse.json({ error: ... })` 쓰지 말 것.** `throw new HttpError("CONFLICT", "...")` 또는 `errorResponse(...)` 사용.
-- Prisma `P2002`/`P2025`는 `withErrorHandler`가 자동 매핑하므로 catch 불필요.
+- 직접 에러 JSON을 만들기보다 `throw new HttpError(...)`를 사용한다.
+- 라우트는 반드시 `withErrorHandler`로 감싼다.
+- SQLite unique 에러는 `withErrorHandler`가 `CONFLICT`로 매핑한다.
 
-### 4.2 성공 응답
+### 5.2 성공 응답
 
 | 동작 | status | body |
 |---|---|---|
-| list | 200 | `{ items, nextCursor }` |
+| list | 200 | `{ items, nextCursor }` 또는 `{ items }` |
 | get | 200 | `row` |
 | create | 201 | `row` |
 | update | 200 | `row` |
-| delete (soft) | 204 | (empty) |
+| delete | 204 | empty |
 
-- list 응답은 항상 `{ items, nextCursor }` 형태. 단일 배열 금지.
+페이지네이션이 없는 목록 API는 `{ items }`를 사용한다.
 
-### 4.3 페이지네이션
+### 5.3 페이지네이션
 
-- 쿼리 파라미터: `cursor`, `pageSize` (기본 50, 최대 200)
 - `parsePagination(searchParams)` → `{ take, cursor }`
-- `findMany` 호출 시 `take: take + 1` + cursor가 있으면 `skip: 1`
-- `toPage(rows, take)` → `{ items, nextCursor }`
-- **정렬 안정성 확보**: `orderBy`에 항상 tie-breaker(보통 `id` 또는 `createdAt`) 포함
+- Drizzle에서는 cursor-skip을 DB에 직접 밀지 않고, 현재 코드베이스처럼 정렬된 결과를 `slicePageAfterCursor()`로 잘라낸다.
+- 항상 안정 정렬을 유지한다.
 
-### 4.4 낙관적 락 (`If-Match`)
+### 5.4 Soft delete
 
-- **모든 PATCH/DELETE 필수.** 헤더 누락도 `BAD_REQUEST`로 거부.
-- 클라이언트는 직전 GET의 `updatedAt`(ISO)을 그대로 `If-Match`에 실어 보냄.
-- PATCH 성공 뒤에는 응답 본문의 최신 `updatedAt`을 클라이언트 목록 상태에도 즉시 반영해야 함. 낙관적 업데이트만 하고 이전 `updatedAt`을 유지하면 다음 PATCH에서 자기 자신의 변경과 충돌할 수 있음.
-- 서버는 `assertIfMatch(req, before.updatedAt)` 호출. 불일치 시 `CONFLICT` + `{ serverUpdatedAt }`.
-- GET 응답 헤더에 `ETag: "<updatedAt ISO>"`는 1차에 필수 아님 (body의 `updatedAt`으로 충분).
+- 삭제는 `deletedAt: now()` 업데이트다.
+- 목록/상세 조회는 기본적으로 `isNull(table.deletedAt)`를 넣는다.
+- soft delete된 레코드는 상세 조회에서 `404`로 본다.
 
-### 4.4.1 SQLite 경로 / PRAGMA 메모
+### 5.5 감사 로그
 
-- SQLite `file:` 경로는 `schema.prisma` 기준 상대경로로 해석됨. 현재 로컬 개발 기본값은 `.env(.example)`의 `DATABASE_URL="file:./dev.db"`이며 실제 파일은 `prisma/dev.db`.
-- SQLite PRAGMA 중 결과 row를 반환하는 항목(`journal_mode`, `busy_timeout`, `foreign_keys`)은 Prisma에서 `$queryRawUnsafe(...)`로 호출해야 dev 로그에 불필요한 에러가 남지 않음.
+- `CREATE`: `after`
+- `UPDATE`: `before`, `after`
+- `DELETE`: `before`, `after`
+- 변경 diff가 비면 `UPDATE` 로그는 자동 스킵된다.
+- 그래도 write 패턴에서는 `withAudit` 호출 자체를 유지한다.
 
-### 4.5 감사 로그
+### 5.6 시간 처리
 
-- `withAudit`의 `action`:
-  - `CREATE` — `after`만 넘김
-  - `UPDATE` — `before`, `after` 둘 다
-  - `DELETE` — `before`, `after`(= deletedAt 찍힌 상태)
-  - `RESTORE` — 1차 미사용 (UI에서 지원 시 추가)
-- `entityId`는 쓰기 대상 레코드의 id. 서브 리소스(WorkTicket 등)는 자기 자신의 id.
-- diff가 비면 UPDATE는 자동 스킵되지만, **그래도 `withAudit`을 호출해야 한다**. 패턴 깨지면 리뷰에서 반려.
+- DB에는 `Date` 객체를 그대로 넣는다.
+- all-day 여부와 KST/UTC 변환은 [`lib/time.ts`](../lib/time.ts)와 validation 레이어 기준으로 처리한다.
+- 라우트에서 임의 시간대 계산을 반복하지 않는다.
 
-### 4.6 Soft delete
+### 5.7 액터 컨텍스트
 
-- 필드: `deletedAt: DateTime?` (모든 도메인 모델 공통)
-- 목록 쿼리: `where: { deletedAt: null, ... }`
-- 상세 쿼리: `findFirst({ where: { id, deletedAt: null } })` — `findUnique` 쓰지 말 것 (deletedAt 조건을 `where`에 못 넣음)
-- 삭제: `update({ data: { deletedAt: new Date() } })`
-- 복구: `update({ data: { deletedAt: null } })` + `withAudit(action: "RESTORE")`
+- 모든 write API는 `getActorContext(req)`를 호출한다.
+- `x-actor-name`, `x-forwarded-for`, `user-agent`를 사용한다.
+- 인증이 없으므로 현재 `actorType`은 `ANONYMOUS`다.
 
-### 4.7 시간 처리
+## 6. 관계 조회 규칙
 
-- **저장은 항상 UTC `Date` 객체.** DB 컬럼은 `DateTime`.
-- **UI 표시는 KST.** 변환은 `lib/time.ts`에서만.
-- all-day 이벤트:
-  - 클라이언트는 `{ startDate: "YYYY-MM-DD", endDate: "YYYY-MM-DD" }` KST 날짜 문자열로 전송
-  - 서버에서 `normalizeAllDayRange(startDate, endDate)` → `{ startDateTime, endDateTime }` UTC Date
-  - 구간은 반열림 `[start, end)`
-- 날짜 문자열 파싱/포맷을 라우트에 직접 쓰지 말 것.
+Prisma의 `include`처럼 한 번에 끝내기보다, 현재 코드는 명시적으로 하이드레이션한다.
 
-### 4.8 액터 컨텍스트
+예:
 
-- **모든 write 핸들러의 첫 줄에 `const actor = getActorContext(req)`.**
-- 헤더 소스: `x-forwarded-for`(IP 첫 값) / `x-actor-name` / `user-agent`
-- `actorName`이 null이어도 write는 허용 (1차). 대신 프론트에서 localStorage 강제 입력 모달로 null이 거의 없게 만든다.
+- WorkItem + assignee + tickets: [`hydrateWorkItems`](../lib/db/queries.ts)
+- CalendarEvent + members: [`hydrateCalendarEvents`](../lib/db/queries.ts)
 
----
+관계 응답 shape가 여러 라우트에서 반복되면 공통 헬퍼로 뺀다.
 
-## 5. 서비스 레이어 (선택)
+## 7. WorkItem 특화 규칙
 
-- 단순 CRUD는 라우트에 바로 써도 됨.
-- **분기/집계/여러 테이블을 엮는 로직은 `lib/services/<resource>.ts`로 분리.**
-- 서비스 함수 시그니처는 `(tx: Prisma.TransactionClient, input, actor) => Promise<T>` — 트랜잭션을 밖에서 주입받도록.
+- `tickets`는 공개 서브 리소스 API가 아니라 `WorkItem` payload 안에서 함께 처리한다.
+- `PATCH`에서 `tickets`가 오면 부분 병합이 아니라 전체 대체다.
+- 목록은 `scope=active|transferred|all`을 지원한다.
+- `scope=transferred`는 `transferDate desc` 정렬을 우선한다.
+- ticket/systemCode 필터는 `exists(...)` 서브쿼리로 구현한다.
 
----
+## 8. 마이그레이션 / DB 파일
 
-## 6. 테스트 / 수동 검증
-
-1차 범위에서는 자동화 테스트보다 **curl 시나리오 체크리스트**로 검증.
+- 개발 기본 DB: `db/dev.db`
+- 운영에서는 `DATABASE_URL`을 영속 경로로 바꿔 사용한다.
+- 스키마 수정 후:
 
 ```bash
-# list (빈 상태)
-curl -s localhost:3000/api/work-items | jq
+npm run db:generate
+npm run db:migrate
+```
 
-# create
-curl -sX POST localhost:3000/api/work-items \
+- 백업/복구는 `DATABASE_URL`이 가리키는 실제 파일 기준으로 처리한다.
+
+## 9. 수동 검증 체크리스트
+
+```bash
+# settings
+curl -s localhost:3000/api/settings
+
+# team member create
+curl -sX POST localhost:3000/api/team-members \
   -H 'content-type: application/json' \
   -H 'x-actor-name: alice' \
-  -d '{"title":"첫 작업","category":"FEATURE"}' | jq
+  -d '{"name":"Alice","role":"WEB_DEV"}'
 
-# get
-curl -s localhost:3000/api/work-items/<id> | jq
+# work item list
+curl -s 'localhost:3000/api/work-items?pageSize=20'
 
-# patch (If-Match 필수)
+# work item detail
+curl -s localhost:3000/api/work-items/<id>
+
+# work item patch
 curl -sX PATCH localhost:3000/api/work-items/<id> \
   -H 'content-type: application/json' \
   -H 'x-actor-name: alice' \
-  -H 'if-match: <updatedAt ISO>' \
-  -d '{"status":"IN_PROGRESS"}' | jq
+  -d '{"status":"IN_PROGRESS"}'
 
-# delete (soft)
-curl -sX DELETE localhost:3000/api/work-items/<id> \
-  -H 'x-actor-name: alice' \
-  -H 'if-match: <updatedAt ISO>' -i
+# calendar range
+curl -s 'localhost:3000/api/calendar-events?from=2026-04-19T00:00:00Z&to=2026-04-21T00:00:00Z'
+
+# audit
+curl -s 'localhost:3000/api/audit-logs?pageSize=10'
 ```
 
-각 API PR 설명에 위 체크리스트 결과를 붙인다.
+## 10. 리뷰 체크리스트
 
----
+- [ ] write가 모두 `db.transaction(...)` 안에 있다
+- [ ] write 쿼리에 `.run()`이 빠진 곳이 없다
+- [ ] `withAudit(tx, ...)`가 write와 같은 트랜잭션에 있다
+- [ ] 입력은 zod로 검증한다
+- [ ] soft delete 필터가 필요한 곳에 `isNull(deletedAt)`가 있다
+- [ ] 에러 처리는 `withErrorHandler` / `HttpError`를 따른다
+- [ ] 관계 응답 shape가 기존 클라이언트 기대와 일치한다
+- [ ] README / 관련 문서도 함께 갱신했다
 
-## 7. 리뷰 체크리스트 (PR 머지 전)
-
-- [ ] write가 전부 `$transaction` + `withAudit`으로 묶여 있다
-- [ ] PATCH/DELETE가 `assertIfMatch`를 호출한다
-- [ ] 모든 입력이 zod로 검증된다
-- [ ] `where`에 `deletedAt: null` 필터가 빠진 곳이 없다
-- [ ] raw SQL 없음 (PRAGMA 제외)
-- [ ] 에러를 `throw new HttpError(...)` 또는 `withErrorHandler`로 처리 (직접 NextResponse 에러 금지)
-- [ ] 시간 변환이 `lib/time.ts` 밖에 있지 않다
-- [ ] 응답 포맷이 §4.2와 일치한다
-- [ ] README.md / PLAN.md 해당 Phase 항목 업데이트
-
----
-
-## 8. 하지 말 것 (안티 패턴)
+## 11. 안티 패턴
 
 ```ts
-// ❌ 트랜잭션 밖에서 감사 로그
-await prisma.workItem.update(...);
-await prisma.auditLog.create(...); // 정합성 깨질 수 있음
+// ❌ transaction 밖 write + audit 분리
+db.insert(workItems).values(row).run();
+withAudit(tx, ...);
 
-// ❌ withAudit 우회
-await prisma.$transaction(async (tx) => {
-  await tx.workItem.update(...);
-  // 감사 로그 없음
-});
+// ❌ write builder만 만들고 실행 안 함
+tx.insert(teamMembers).values(row);
 
-// ❌ deletedAt 필터 누락
-await prisma.workItem.findUnique({ where: { id } }); // 삭제된 것도 반환됨
+// ❌ soft delete 필터 누락
+db.select().from(workItems);
 
-// ❌ If-Match 없이 PATCH
-export const PATCH = async (req) => {
-  await prisma.workItem.update(...); // 덮어쓰기 경합 위험
-};
-
-// ❌ 시간 직접 변환
-const kst = new Date(utc.getTime() + 9 * 60 * 60 * 1000); // lib/time.ts 사용
-
-// ❌ raw SQL
-await prisma.$queryRawUnsafe("UPDATE ..."); // Postgres 이관 깨짐
+// ❌ 라우트마다 관계 조립 로직 복붙
+const tickets = await db.select().from(workTickets) ...
+const assignees = await db.select().from(teamMembers) ...
 ```

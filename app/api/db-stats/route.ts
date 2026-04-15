@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { sql } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import {
+  auditLogs as auditLogsTable,
+  calendarEventMembers as calendarEventMembersTable,
+  calendarEvents as calendarEventsTable,
+  settings as settingsTable,
+  teamMembers as teamMembersTable,
+  workCategories as workCategoriesTable,
+  workItems as workItemsTable,
+  workSystems as workSystemsTable,
+  workTickets as workTicketsTable,
+} from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
 
 /**
@@ -8,6 +20,13 @@ import { withErrorHandler } from "@/lib/http";
  */
 export const GET = withErrorHandler(async () => {
   await ensureSqlitePragma();
+
+  const countTable = async (table: any) => {
+    const rows = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(table);
+    return Number(rows[0]?.count ?? 0);
+  };
 
   const [
     teamMembers,
@@ -20,15 +39,15 @@ export const GET = withErrorHandler(async () => {
     workSystems,
     auditLogs,
   ] = await Promise.all([
-    prisma.teamMember.count(),
-    prisma.workItem.count(),
-    prisma.workTicket.count(),
-    prisma.calendarEvent.count(),
-    prisma.calendarEventMember.count(),
-    prisma.setting.count(),
-    prisma.workCategory.count(),
-    prisma.workSystem.count(),
-    prisma.auditLog.count(),
+    countTable(teamMembersTable),
+    countTable(workItemsTable),
+    countTable(workTicketsTable),
+    countTable(calendarEventsTable),
+    countTable(calendarEventMembersTable),
+    countTable(settingsTable),
+    countTable(workCategoriesTable),
+    countTable(workSystemsTable),
+    countTable(auditLogsTable),
   ]);
 
   return NextResponse.json({

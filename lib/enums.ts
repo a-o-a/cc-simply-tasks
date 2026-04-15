@@ -5,7 +5,7 @@
  * 런타임 검증은 zod가 이 배열을 기반으로 수행하고, 타입은 여기서 export된 union 타입을 쓴다.
  *
  * Postgres 이관 시:
- *  - prisma/schema.prisma의 String 컬럼을 enum 타입으로 교체
+ *  - Drizzle 스키마의 String 컬럼을 enum 타입으로 교체
  *  - 이 파일의 값과 DB enum 값을 동일하게 유지
  */
 

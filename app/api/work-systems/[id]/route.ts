@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { now } from "@/lib/db/helpers";
+import { workSystems } from "@/lib/db/schema";
 import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
@@ -11,15 +14,20 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const input = workSystemUpdateSchema.parse(await req.json());
+  const updatedAt = now();
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const before = await tx.workSystem.findFirst({
-      where: { id: params.id, deletedAt: null },
-    });
+  const updated = db.transaction((tx) => {
+    const before = tx
+      .select()
+      .from(workSystems)
+      .where(and(eq(workSystems.id, params.id), isNull(workSystems.deletedAt)))
+      .limit(1)
+      .get();
     if (!before) throw new HttpError("NOT_FOUND", "작업 시스템을 찾을 수 없습니다");
 
-    const after = await tx.workSystem.update({ where: { id: params.id }, data: input });
-    await withAudit(tx, {
+    const after = { ...before, ...input, updatedAt };
+    tx.update(workSystems).set(after).where(eq(workSystems.id, params.id)).run();
+    withAudit(tx, {
       entityType: "WorkSystem",
       entityId: after.id,
       action: "UPDATE",
@@ -36,18 +44,20 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
 export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Params) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
+  const deletedAt = now();
 
-  await prisma.$transaction(async (tx) => {
-    const before = await tx.workSystem.findFirst({
-      where: { id: params.id, deletedAt: null },
-    });
+  db.transaction((tx) => {
+    const before = tx
+      .select()
+      .from(workSystems)
+      .where(and(eq(workSystems.id, params.id), isNull(workSystems.deletedAt)))
+      .limit(1)
+      .get();
     if (!before) throw new HttpError("NOT_FOUND", "작업 시스템을 찾을 수 없습니다");
 
-    const after = await tx.workSystem.update({
-      where: { id: params.id },
-      data: { deletedAt: new Date() },
-    });
-    await withAudit(tx, {
+    const after = { ...before, updatedAt: deletedAt, deletedAt };
+    tx.update(workSystems).set(after).where(eq(workSystems.id, params.id)).run();
+    withAudit(tx, {
       entityType: "WorkSystem",
       entityId: after.id,
       action: "DELETE",

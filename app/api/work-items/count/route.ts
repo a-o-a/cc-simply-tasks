@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { isNull, sql } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { workItems } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
 
 /**
@@ -10,17 +12,20 @@ import { withErrorHandler } from "@/lib/http";
 export const GET = withErrorHandler(async () => {
   await ensureSqlitePragma();
 
-  const grouped = await prisma.workItem.groupBy({
-    by: ["status"],
-    where: { deletedAt: null },
-    _count: { _all: true },
-  });
+  const grouped = await db
+    .select({
+      status: workItems.status,
+      count: sql<number>`count(*)`,
+    })
+    .from(workItems)
+    .where(isNull(workItems.deletedAt))
+    .groupBy(workItems.status);
 
   const byStatus: Record<string, number> = {};
   let total = 0;
   for (const row of grouped) {
-    byStatus[row.status] = row._count._all;
-    total += row._count._all;
+    byStatus[row.status] = Number(row.count);
+    total += Number(row.count);
   }
 
   return NextResponse.json({ byStatus, total });

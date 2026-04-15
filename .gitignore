@@ -17,11 +17,9 @@ build
 .env.local
 .env.*.local
 
-# prisma / sqlite
-prisma/dev.db
-prisma/dev.db-journal
-prisma/*.db
-prisma/*.db-*
+# sqlite
+db/*.db
+db/*.db-*
 
 # logs
 *.log

@@ -65,15 +65,22 @@ export function withErrorHandler<Args extends unknown[]>(
       if (err instanceof HttpError) {
         return errorResponse(err.code, err.message, err.details);
       }
-      // Prisma unique 제약 위반 등
+      // SQLite unique 제약 위반 등
       if (err && typeof err === "object" && "code" in err) {
-        const prismaCode = (err as { code: unknown }).code;
-        if (prismaCode === "P2002") {
+        const dbCode = (err as { code: unknown }).code;
+        if (
+          dbCode === "P2002" ||
+          dbCode === "SQLITE_CONSTRAINT_UNIQUE" ||
+          dbCode === "SQLITE_CONSTRAINT_PRIMARYKEY"
+        ) {
           return errorResponse("CONFLICT", "중복된 값이 존재합니다");
         }
-        if (prismaCode === "P2025") {
+        if (dbCode === "P2025") {
           return errorResponse("NOT_FOUND", "대상 리소스를 찾을 수 없습니다");
         }
+      }
+      if (err instanceof Error && /UNIQUE constraint failed/i.test(err.message)) {
+        return errorResponse("CONFLICT", "중복된 값이 존재합니다");
       }
       // eslint-disable-next-line no-console
       console.error("[api] unhandled error:", err);

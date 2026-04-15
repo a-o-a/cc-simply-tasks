@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { now } from "@/lib/db/helpers";
+import { teamMembers } from "@/lib/db/schema";
 import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
@@ -13,9 +16,12 @@ type Params = { params: { id: string } };
 export const GET = withErrorHandler(
   async (_req: NextRequest, { params }: Params) => {
     await ensureSqlitePragma();
-    const row = await prisma.teamMember.findFirst({
-      where: { id: params.id, deletedAt: null },
-    });
+    const rows = await db
+      .select()
+      .from(teamMembers)
+      .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
+      .limit(1);
+    const row = rows[0];
     if (!row) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
     return NextResponse.json(row);
   },
@@ -29,21 +35,26 @@ export const PATCH = withErrorHandler(
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = teamMemberUpdateSchema.parse(await req.json());
+    const updatedAt = now();
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const before = await tx.teamMember.findFirst({
-        where: { id: params.id, deletedAt: null },
-      });
+    const updated = db.transaction((tx) => {
+      const before = tx
+        .select()
+        .from(teamMembers)
+        .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
+        .limit(1)
+        .get();
       if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
 
-      const after = await tx.teamMember.update({
-        where: { id: params.id },
-        data: {
-          ...(input.name !== undefined ? { name: input.name } : {}),
-          ...(input.role !== undefined ? { role: input.role } : {}),
-        },
-      });
-      await withAudit(tx, {
+      const after = {
+        ...before,
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.role !== undefined ? { role: input.role } : {}),
+        updatedAt,
+      };
+
+      tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id)).run();
+      withAudit(tx, {
         entityType: "TeamMember",
         entityId: after.id,
         action: "UPDATE",
@@ -68,18 +79,20 @@ export const DELETE = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
     await ensureSqlitePragma();
     const actor = getActorContext(req);
+    const deletedAt = now();
 
-    await prisma.$transaction(async (tx) => {
-      const before = await tx.teamMember.findFirst({
-        where: { id: params.id, deletedAt: null },
-      });
+    db.transaction((tx) => {
+      const before = tx
+        .select()
+        .from(teamMembers)
+        .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
+        .limit(1)
+        .get();
       if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
 
-      const after = await tx.teamMember.update({
-        where: { id: params.id },
-        data: { deletedAt: new Date() },
-      });
-      await withAudit(tx, {
+      const after = { ...before, updatedAt: deletedAt, deletedAt };
+      tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id)).run();
+      withAudit(tx, {
         entityType: "TeamMember",
         entityId: after.id,
         action: "DELETE",

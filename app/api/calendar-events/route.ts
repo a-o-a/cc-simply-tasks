@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { and, asc, eq, exists, gt, inArray, isNull, lt } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { newId, now } from "@/lib/db/helpers";
+import { hydrateCalendarEvents } from "@/lib/db/queries";
+import { calendarEventMembers, calendarEvents } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
@@ -23,22 +27,32 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     Object.fromEntries(searchParams),
   );
 
-  const items = await prisma.calendarEvent.findMany({
-    where: {
-      deletedAt: null,
-      startDateTime: { lt: filters.to },
-      endDateTime: { gt: filters.from },
-      ...(filters.memberId
-        ? { members: { some: { memberId: filters.memberId } } }
-        : {}),
-    },
-    include: {
-      members: { include: { member: true } },
-    },
-    orderBy: [{ startDateTime: "asc" }, { id: "asc" }],
-  });
+  const items = await db
+    .select()
+    .from(calendarEvents)
+    .where(
+      and(
+        isNull(calendarEvents.deletedAt),
+        lt(calendarEvents.startDateTime, filters.to),
+        gt(calendarEvents.endDateTime, filters.from),
+        filters.memberId
+          ? exists(
+              db
+                .select({ eventId: calendarEventMembers.eventId })
+                .from(calendarEventMembers)
+                .where(
+                  and(
+                    eq(calendarEventMembers.eventId, calendarEvents.id),
+                    eq(calendarEventMembers.memberId, filters.memberId),
+                  ),
+                ),
+            )
+          : undefined,
+      ),
+    )
+    .orderBy(asc(calendarEvents.startDateTime), asc(calendarEvents.id));
 
-  return NextResponse.json({ items });
+  return NextResponse.json({ items: await hydrateCalendarEvents(items) });
 });
 
 /**
@@ -48,27 +62,38 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const input = calendarEventCreateSchema.parse(await req.json());
+  const timestamp = now();
 
-  const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.calendarEvent.create({
-      data: {
-        title: input.title,
-        category: input.category,
-        startDateTime: input.startDateTime,
-        endDateTime: input.endDateTime,
-        allDay: input.allDay,
-        note: input.note ?? null,
-        members: {
-          create: input.memberIds.map((memberId) => ({ memberId })),
-        },
-      },
-      include: { members: { include: { member: true } } },
-    });
-    await withAudit(tx, {
+  const created = db.transaction((tx) => {
+    const row = {
+      id: newId(),
+      title: input.title,
+      category: input.category,
+      startDateTime: input.startDateTime,
+      endDateTime: input.endDateTime,
+      allDay: input.allDay,
+      note: input.note ?? null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      deletedAt: null,
+    } satisfies typeof calendarEvents.$inferInsert;
+    tx.insert(calendarEvents).values(row).run();
+    if (input.memberIds.length > 0) {
+      tx.insert(calendarEventMembers).values(
+        input.memberIds.map((memberId) => ({
+          eventId: row.id,
+          memberId,
+        })),
+      ).run();
+    }
+    withAudit(tx, {
       entityType: "CalendarEvent",
       entityId: row.id,
       action: "CREATE",
-      after: row as unknown as Record<string, unknown>,
+      after: {
+        ...row,
+        memberIds: input.memberIds,
+      } as unknown as Record<string, unknown>,
       actor,
     });
     return row;

@@ -1,50 +1,67 @@
-import { PrismaClient } from "@prisma/client";
+import path from "path";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import * as schema from "./db/schema";
 
-// Prisma 싱글톤. Next.js dev 모드 HMR에서 다중 인스턴스 생성 방지.
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-  prismaPragmaApplied: boolean | undefined;
+type DbClient = ReturnType<typeof drizzle>;
+type DatabaseState = {
+  sqlite: Database.Database | undefined;
+  db: DbClient | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
-  });
+const globalForDb = globalThis as unknown as DatabaseState;
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+function resolveSqliteFilePath() {
+  const rawUrl = process.env.DATABASE_URL ?? "file:./db/dev.db";
+  if (!rawUrl.startsWith("file:")) {
+    throw new Error("Only sqlite file DATABASE_URL values are supported");
+  }
+
+  const filePath = rawUrl.slice("file:".length);
+  if (path.isAbsolute(filePath)) return filePath;
+  return path.resolve(process.cwd(), filePath);
 }
 
-/**
- * SQLite PRAGMA를 첫 연결 시 1회 적용.
- *  - journal_mode=WAL: 동시 reader/writer 처리 개선
- *  - busy_timeout=5000: write 경합 시 최대 5초 대기 (SQLITE_BUSY 완화)
- *  - foreign_keys=ON: FK 제약 활성화 (SQLite 기본은 OFF)
- *
- * Postgres 이관 시 이 함수는 no-op으로 바꾸거나 제거.
- */
-let pragmaPromise: Promise<void> | null = null;
+function initDb() {
+  if (globalForDb.sqlite && globalForDb.db) {
+    return { sqlite: globalForDb.sqlite, db: globalForDb.db };
+  }
+
+  const sqlite = new Database(resolveSqliteFilePath(), {
+    fileMustExist: false,
+  });
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("busy_timeout = 5000");
+  sqlite.pragma("foreign_keys = ON");
+
+  const db = drizzle(sqlite, { schema });
+
+  globalForDb.sqlite = sqlite;
+  globalForDb.db = db;
+
+  return { sqlite, db };
+}
+
+export function getDb() {
+  return initDb().db;
+}
+
+export function getSqlite() {
+  return initDb().sqlite;
+}
+
+export const db = new Proxy({} as DbClient, {
+  get(_target, prop, receiver) {
+    const client = getDb() as unknown as Record<PropertyKey, unknown>;
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
+
 export function ensureSqlitePragma(): Promise<void> {
-  if (globalForPrisma.prismaPragmaApplied) return Promise.resolve();
-  if (pragmaPromise) return pragmaPromise;
+  return Promise.resolve();
+}
 
-  pragmaPromise = (async () => {
-    try {
-      // `journal_mode` returns a row in SQLite, so query API must be used.
-      await prisma.$queryRawUnsafe("PRAGMA journal_mode = WAL;");
-      await prisma.$queryRawUnsafe("PRAGMA busy_timeout = 5000;");
-      await prisma.$queryRawUnsafe("PRAGMA foreign_keys = ON;");
-      globalForPrisma.prismaPragmaApplied = true;
-    } catch (err) {
-      // PRAGMA 실패는 치명적이지 않지만 로그에 남김.
-      // eslint-disable-next-line no-console
-      console.warn("[db] failed to apply SQLite PRAGMA:", err);
-    }
-  })();
-
-  return pragmaPromise;
+export function getSqliteDbPath() {
+  return resolveSqliteFilePath();
 }

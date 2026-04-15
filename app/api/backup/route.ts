@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readFileSync, existsSync } from "fs";
-import path from "path";
+import { getSqliteDbPath } from "@/lib/db";
 
 /**
  * GET /api/backup
@@ -8,7 +8,7 @@ import path from "path";
  * 내부망 전용이므로 인증 없음.
  */
 export const GET = async () => {
-  const dbPath = path.join(process.cwd(), "prisma", "dev.db");
+  const dbPath = getSqliteDbPath();
 
   if (!existsSync(dbPath)) {
     return NextResponse.json({ error: { code: "NOT_FOUND", message: "DB 파일을 찾을 수 없습니다" } }, { status: 404 });

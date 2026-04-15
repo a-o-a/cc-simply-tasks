@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { and, desc, eq } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { auditLogs } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
-import { parsePagination, toPage } from "@/lib/pagination";
+import { parsePagination, slicePageAfterCursor } from "@/lib/pagination";
 import { auditLogListQuerySchema } from "@/lib/validation/auditLog";
 
 /**
@@ -17,19 +19,19 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     Object.fromEntries(searchParams),
   );
   const { take, cursor } = parsePagination(searchParams);
+  const conditions = [
+    filters.entityType ? eq(auditLogs.entityType, filters.entityType) : undefined,
+    filters.entityId ? eq(auditLogs.entityId, filters.entityId) : undefined,
+    filters.action ? eq(auditLogs.action, filters.action) : undefined,
+    filters.actorName ? eq(auditLogs.actorName, filters.actorName) : undefined,
+  ].filter(Boolean);
 
-  const rows = await prisma.auditLog.findMany({
-    where: {
-      ...(filters.entityType ? { entityType: filters.entityType } : {}),
-      ...(filters.entityId ? { entityId: filters.entityId } : {}),
-      ...(filters.action ? { action: filters.action } : {}),
-      ...(filters.actorName ? { actorName: filters.actorName } : {}),
-    },
-    take: take + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-  });
+  const rows = await db
+    .select()
+    .from(auditLogs)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id));
 
-  const { items, nextCursor } = toPage(rows, take);
+  const { items, nextCursor } = slicePageAfterCursor(rows, cursor, take);
   return NextResponse.json({ items, nextCursor });
 });

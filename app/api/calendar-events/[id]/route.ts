@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { now } from "@/lib/db/helpers";
+import { loadCalendarEventDetail } from "@/lib/db/queries";
+import { calendarEventMembers, calendarEvents } from "@/lib/db/schema";
 import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
@@ -14,10 +18,7 @@ type Params = { params: { id: string } };
 export const GET = withErrorHandler(
   async (_req: NextRequest, { params }: Params) => {
     await ensureSqlitePragma();
-    const row = await prisma.calendarEvent.findFirst({
-      where: { id: params.id, deletedAt: null },
-      include: { members: { include: { member: true } } },
-    });
+    const row = await loadCalendarEventDetail(params.id);
     if (!row) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
     return NextResponse.json(row);
   },
@@ -31,48 +32,55 @@ export const PATCH = withErrorHandler(
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = calendarEventUpdateSchema.parse(await req.json());
+    const updatedAt = now();
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const before = await tx.calendarEvent.findFirst({
-        where: { id: params.id, deletedAt: null },
-      });
+    db.transaction((tx) => {
+      const before = tx
+        .select()
+        .from(calendarEvents)
+        .where(and(eq(calendarEvents.id, params.id), isNull(calendarEvents.deletedAt)))
+        .limit(1)
+        .get();
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
 
       // memberIds가 제공된 경우 기존 팀원 교체
       if (input.memberIds !== undefined) {
-        await tx.calendarEventMember.deleteMany({ where: { eventId: params.id } });
-        for (const memberId of input.memberIds) {
-          await tx.calendarEventMember.create({ data: { eventId: params.id, memberId } });
+        tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, params.id)).run();
+        if (input.memberIds.length > 0) {
+          tx.insert(calendarEventMembers).values(
+            input.memberIds.map((memberId) => ({ eventId: params.id, memberId })),
+          ).run();
         }
       }
 
-      const after = await tx.calendarEvent.update({
-        where: { id: params.id },
-        data: {
-          ...(input.title !== undefined ? { title: input.title } : {}),
-          ...(input.startDateTime !== undefined
-            ? { startDateTime: input.startDateTime }
-            : {}),
-          ...(input.endDateTime !== undefined
-            ? { endDateTime: input.endDateTime }
-            : {}),
-          ...(input.category !== undefined ? { category: input.category } : {}),
-          ...(input.allDay !== undefined ? { allDay: input.allDay } : {}),
-          ...(input.note !== undefined ? { note: input.note } : {}),
-        },
-        include: { members: { include: { member: true } } },
-      });
-      await withAudit(tx, {
+      const after = {
+        ...before,
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.startDateTime !== undefined
+          ? { startDateTime: input.startDateTime }
+          : {}),
+        ...(input.endDateTime !== undefined ? { endDateTime: input.endDateTime } : {}),
+        ...(input.category !== undefined ? { category: input.category } : {}),
+        ...(input.allDay !== undefined ? { allDay: input.allDay } : {}),
+        ...(input.note !== undefined ? { note: input.note } : {}),
+        updatedAt,
+      };
+      tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, params.id)).run();
+      withAudit(tx, {
         entityType: "CalendarEvent",
         entityId: after.id,
         action: "UPDATE",
         before: before as unknown as Record<string, unknown>,
-        after: after as unknown as Record<string, unknown>,
+        after: {
+          ...after,
+          ...(input.memberIds !== undefined ? { memberIds: input.memberIds } : {}),
+        } as unknown as Record<string, unknown>,
         actor,
       });
-      return after;
     });
 
+    const updated = await loadCalendarEventDetail(params.id);
+    if (!updated) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
     emitCalendarChanged();
     return NextResponse.json(updated);
   },
@@ -86,18 +94,20 @@ export const DELETE = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
     await ensureSqlitePragma();
     const actor = getActorContext(req);
+    const deletedAt = now();
 
-    await prisma.$transaction(async (tx) => {
-      const before = await tx.calendarEvent.findFirst({
-        where: { id: params.id, deletedAt: null },
-      });
+    db.transaction((tx) => {
+      const before = tx
+        .select()
+        .from(calendarEvents)
+        .where(and(eq(calendarEvents.id, params.id), isNull(calendarEvents.deletedAt)))
+        .limit(1)
+        .get();
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
 
-      const after = await tx.calendarEvent.update({
-        where: { id: params.id },
-        data: { deletedAt: new Date() },
-      });
-      await withAudit(tx, {
+      const after = { ...before, updatedAt: deletedAt, deletedAt };
+      tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, params.id)).run();
+      withAudit(tx, {
         entityType: "CalendarEvent",
         entityId: after.id,
         action: "DELETE",

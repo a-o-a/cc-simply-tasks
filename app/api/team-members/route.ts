@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { newId, now } from "@/lib/db/helpers";
+import { teamMembers } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { parsePagination, toPage } from "@/lib/pagination";
+import { parsePagination, slicePageAfterCursor } from "@/lib/pagination";
 import {
   teamMemberCreateSchema,
   teamMemberListQuerySchema,
@@ -22,18 +25,18 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     Object.fromEntries(searchParams),
   );
   const { take, cursor } = parsePagination(searchParams);
+  const rows = await db
+    .select()
+    .from(teamMembers)
+    .where(
+      and(
+        isNull(teamMembers.deletedAt),
+        filters.role ? eq(teamMembers.role, filters.role) : undefined,
+      ),
+    )
+    .orderBy(asc(teamMembers.name), asc(teamMembers.id));
 
-  const rows = await prisma.teamMember.findMany({
-    where: {
-      deletedAt: null,
-      ...(filters.role ? { role: filters.role } : {}),
-    },
-    take: take + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    orderBy: [{ name: "asc" }, { id: "asc" }],
-  });
-
-  const { items, nextCursor } = toPage(rows, take);
+  const { items, nextCursor } = slicePageAfterCursor(rows, cursor, take);
   return NextResponse.json({ items, nextCursor });
 });
 
@@ -44,15 +47,20 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const input = teamMemberCreateSchema.parse(await req.json());
+  const createdAt = now();
 
-  const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.teamMember.create({
-      data: {
-        name: input.name,
-        role: input.role,
-      },
-    });
-    await withAudit(tx, {
+  const created = db.transaction((tx) => {
+    const row = {
+      id: newId(),
+      name: input.name,
+      role: input.role,
+      createdAt,
+      updatedAt: createdAt,
+      deletedAt: null,
+    } satisfies typeof teamMembers.$inferInsert;
+
+    tx.insert(teamMembers).values(row).run();
+    withAudit(tx, {
       entityType: "TeamMember",
       entityId: row.id,
       action: "CREATE",

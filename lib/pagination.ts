@@ -5,11 +5,7 @@ import { z } from "zod";
  *
  * 사용 예:
  *   const { take, cursor } = parsePagination(searchParams);
- *   const rows = await prisma.workItem.findMany({
- *     take: take + 1,
- *     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
- *     orderBy: { createdAt: "desc" },
- *   });
+ *   const rows = await db.select().from(workItems).orderBy(desc(workItems.createdAt));
  *   const { items, nextCursor } = toPage(rows, take);
  */
 
@@ -56,4 +52,19 @@ export function toPage<T extends { id: string }>(
     return { items, nextCursor: items[items.length - 1]?.id ?? null };
   }
   return { items: rows, nextCursor: null };
+}
+
+export function slicePageAfterCursor<T extends { id: string }>(
+  rows: T[],
+  cursor: string | undefined,
+  take: number,
+): { items: T[]; nextCursor: string | null } {
+  const start =
+    cursor === undefined
+      ? 0
+      : Math.max(
+          0,
+          rows.findIndex((row) => row.id === cursor) + 1,
+        );
+  return toPage(rows.slice(start, start + take + 1), take);
 }

@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import { asc, eq, isNull } from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { newId, now } from "@/lib/db/helpers";
+import { workCategories } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
@@ -11,10 +14,11 @@ import { workCategoryCreateSchema } from "@/lib/validation/workCategory";
  */
 export const GET = withErrorHandler(async () => {
   await ensureSqlitePragma();
-  const items = await prisma.workCategory.findMany({
-    where: { deletedAt: null },
-    orderBy: { name: "asc" },
-  });
+  const items = await db
+    .select()
+    .from(workCategories)
+    .where(isNull(workCategories.deletedAt))
+    .orderBy(asc(workCategories.name));
   return NextResponse.json({ items });
 });
 
@@ -25,18 +29,38 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const input = workCategoryCreateSchema.parse(await req.json());
+  const timestamp = now();
 
-  const created = await prisma.$transaction(async (tx) => {
-    // 같은 코드가 소프트 딜리트 상태로 남아있으면 복원
-    const deleted = await tx.workCategory.findFirst({ where: { code: input.code } });
-    const row = deleted
-      ? await tx.workCategory.update({
-          where: { id: deleted.id },
-          data: { name: input.name, deletedAt: null },
-        })
-      : await tx.workCategory.create({ data: input });
+  const created = db.transaction((tx) => {
+    const existing = tx
+      .select()
+      .from(workCategories)
+      .where(eq(workCategories.code, input.code))
+      .limit(1)
+      .get();
+    const row = existing
+      ? {
+          ...existing,
+          name: input.name,
+          updatedAt: timestamp,
+          deletedAt: null,
+        }
+      : {
+          id: newId(),
+          code: input.code,
+          name: input.name,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          deletedAt: null,
+        };
 
-    await withAudit(tx, {
+    if (existing) {
+      tx.update(workCategories).set(row).where(eq(workCategories.id, existing.id)).run();
+    } else {
+      tx.insert(workCategories).values(row).run();
+    }
+
+    withAudit(tx, {
       entityType: "WorkCategory",
       entityId: row.id,
       action: "CREATE",

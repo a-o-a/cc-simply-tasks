@@ -1,9 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, ensureSqlitePragma } from "@/lib/db";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+} from "drizzle-orm";
+import { db, ensureSqlitePragma } from "@/lib/db";
+import { contains, newId, now } from "@/lib/db/helpers";
+import { hydrateWorkItems } from "@/lib/db/queries";
+import { workItems, workTickets } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { parsePagination, toPage } from "@/lib/pagination";
+import { parsePagination, slicePageAfterCursor } from "@/lib/pagination";
 import {
   workItemCreateSchema,
   workItemListQuerySchema,
@@ -24,80 +40,73 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const { take, cursor } = parsePagination(searchParams);
   const activeStatuses = filters.status?.filter((s) => s !== "TRANSFERRED");
 
-  const statusWhere =
+  const conditions = [
+    isNull(workItems.deletedAt),
     filters.scope === "transferred"
-      ? { status: "TRANSFERRED" as const }
+      ? eq(workItems.status, "TRANSFERRED")
       : filters.scope === "active"
         ? activeStatuses && activeStatuses.length > 0
-          ? { status: { in: activeStatuses } }
-          : { status: { not: "TRANSFERRED" as const } }
+          ? inArray(workItems.status, activeStatuses)
+          : ne(workItems.status, "TRANSFERRED")
         : filters.status?.length
-          ? { status: { in: filters.status } }
-          : {};
-  const orderBy =
-    filters.scope === "transferred"
-      ? [{ transferDate: "desc" as const }, { createdAt: "desc" as const }, { id: "desc" as const }]
-      : [{ order: "asc" as const }, { createdAt: "desc" as const }, { id: "desc" as const }];
+          ? inArray(workItems.status, filters.status)
+          : undefined,
+    filters.assigneeId?.length ? inArray(workItems.assigneeId, filters.assigneeId) : undefined,
+    filters.category?.length ? inArray(workItems.category, filters.category) : undefined,
+    filters.priority?.length ? inArray(workItems.priority, filters.priority) : undefined,
+    filters.title ? contains(workItems.title, filters.title) : undefined,
+    filters.requestType ? contains(workItems.requestType, filters.requestType) : undefined,
+    filters.requestor ? contains(workItems.requestor, filters.requestor) : undefined,
+    filters.requestNumber ? contains(workItems.requestNumber, filters.requestNumber) : undefined,
+    filters.ticket
+      ? exists(
+          db
+            .select({ id: workTickets.id })
+            .from(workTickets)
+            .where(
+              and(
+                eq(workTickets.workItemId, workItems.id),
+                isNull(workTickets.deletedAt),
+                contains(workTickets.ticketNumber, filters.ticket),
+              ),
+            ),
+        )
+      : undefined,
+    filters.systemCode?.length
+      ? exists(
+          db
+            .select({ id: workTickets.id })
+            .from(workTickets)
+            .where(
+              and(
+                eq(workTickets.workItemId, workItems.id),
+                isNull(workTickets.deletedAt),
+                inArray(workTickets.systemName, filters.systemCode),
+              ),
+            ),
+        )
+      : undefined,
+    filters.hasTransferDate ? isNotNull(workItems.transferDate) : undefined,
+    filters.transferDate
+      ? gte(workItems.transferDate, new Date(`${filters.transferDate}T00:00:00+09:00`))
+      : undefined,
+    filters.transferDateTo
+      ? lte(workItems.transferDate, new Date(`${filters.transferDateTo}T23:59:59+09:00`))
+      : undefined,
+  ].filter(Boolean);
 
-  const rows = await prisma.workItem.findMany({
-    where: {
-      deletedAt: null,
-      ...statusWhere,
-      ...(filters.assigneeId?.length ? { assigneeId: { in: filters.assigneeId } } : {}),
-      ...(filters.category?.length ? { category: { in: filters.category } } : {}),
-      ...(filters.priority?.length ? { priority: { in: filters.priority } } : {}),
-      ...(filters.title ? { title: { contains: filters.title } } : {}),
-      ...(filters.requestType ? { requestType: { contains: filters.requestType } } : {}),
-      ...(filters.requestor ? { requestor: { contains: filters.requestor } } : {}),
-      ...(filters.requestNumber ? { requestNumber: { contains: filters.requestNumber } } : {}),
-      ...(filters.ticket
-        ? {
-            tickets: {
-              some: {
-                deletedAt: null,
-                ticketNumber: { contains: filters.ticket },
-              },
-            },
-          }
-        : {}),
-      ...(filters.systemCode?.length
-        ? {
-            tickets: {
-              some: {
-                deletedAt: null,
-                systemName: { in: filters.systemCode },
-              },
-            },
-          }
-        : {}),
-      ...(filters.hasTransferDate ? { transferDate: { not: null } } : {}),
-      ...(filters.transferDate || filters.transferDateTo
-        ? {
-            transferDate: {
-              ...(filters.transferDate
-                ? { gte: new Date(`${filters.transferDate}T00:00:00+09:00`) }
-                : {}),
-              ...(filters.transferDateTo
-                ? { lte: new Date(`${filters.transferDateTo}T23:59:59+09:00`) }
-                : {}),
-            },
-          }
-        : {}),
-    },
-    include: {
-      assignee: true,
-      tickets: {
-        where: { deletedAt: null },
-        select: { systemName: true, ticketNumber: true },
-        orderBy: { createdAt: "asc" as const },
-      },
-    },
-    take: take + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    orderBy,
-  });
+  const rows = await db
+    .select()
+    .from(workItems)
+    .where(and(...conditions))
+    .orderBy(
+      ...(filters.scope === "transferred"
+        ? [desc(workItems.transferDate), desc(workItems.createdAt), desc(workItems.id)]
+        : [asc(workItems.order), desc(workItems.createdAt), desc(workItems.id)]),
+    );
 
-  const { items, nextCursor } = toPage(rows, take);
+  const { items: pageItems, nextCursor } = slicePageAfterCursor(rows, cursor, take);
+  const items = await hydrateWorkItems(pageItems, "list");
   return NextResponse.json({ items, nextCursor });
 });
 
@@ -109,41 +118,47 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const input = workItemCreateSchema.parse(await req.json());
+  const timestamp = now();
 
-  const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.workItem.create({
-      data: {
-        title: input.title,
-        description: input.description ?? null,
-        additionalNotes: input.additionalNotes ?? null,
-        category: input.category,
-        status: input.status,
-        priority: input.priority,
-        order: input.order,
-        assigneeId: input.assigneeId ?? null,
-        startDate: input.startDate ?? null,
-        endDate: input.endDate ?? null,
-        transferDate: input.transferDate ?? null,
-        requestType: input.requestType ?? null,
-        requestor: input.requestor ?? null,
-        requestNumber: input.requestNumber ?? null,
-        requestContent: input.requestContent ?? null,
-      },
-    });
+  const created = db.transaction((tx) => {
+    const row = {
+      id: newId(),
+      title: input.title,
+      description: input.description ?? null,
+      additionalNotes: input.additionalNotes ?? null,
+      category: input.category,
+      status: input.status,
+      priority: input.priority,
+      order: input.order,
+      assigneeId: input.assigneeId ?? null,
+      startDate: input.startDate ?? null,
+      endDate: input.endDate ?? null,
+      transferDate: input.transferDate ?? null,
+      requestType: input.requestType ?? null,
+      requestor: input.requestor ?? null,
+      requestNumber: input.requestNumber ?? null,
+      requestContent: input.requestContent ?? null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      deletedAt: null,
+    } satisfies typeof workItems.$inferInsert;
+    tx.insert(workItems).values(row).run();
 
     if (input.tickets?.length) {
-      for (const t of input.tickets) {
-        await tx.workTicket.create({
-          data: {
-            workItemId: row.id,
-            systemName: t.systemName,
-            ticketNumber: t.ticketNumber,
-          },
-        });
-      }
+      tx.insert(workTickets).values(
+        input.tickets.map((ticket) => ({
+          id: newId(),
+          workItemId: row.id,
+          systemName: ticket.systemName,
+          ticketNumber: ticket.ticketNumber,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          deletedAt: null,
+        })),
+      ).run();
     }
 
-    await withAudit(tx, {
+    withAudit(tx, {
       entityType: "WorkItem",
       entityId: row.id,
       action: "CREATE",
