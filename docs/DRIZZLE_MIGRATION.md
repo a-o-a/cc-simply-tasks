@@ -1,251 +1,84 @@
-# Drizzle Migration Guide
+# Drizzle Migration Notes
 
-이 문서는 현재 코드베이스를 `Prisma + SQLite`에서 `Drizzle + SQLite`로 옮길 때의 현실적인 범위와 순서를 정리합니다.
+이 문서는 `Prisma + SQLite`에서 현재 `Drizzle ORM + @libsql/client + SQLite(file)` 구조로 전환한 결과를 기록합니다.
 
-대상 코드베이스:
+## 최종 상태
 
-- Next.js 13.5 app router
-- Node.js 16 고정
-- SQLite 사용
-- Prisma 5.10.2 사용
-- API write는 감사 로그(`withAudit`)와 트랜잭션에 묶여 있음
+- Prisma 의존성 제거
+- 런타임 ORM을 Drizzle로 통일
+- SQLite 드라이버를 `@libsql/client`로 통일
+- 개발 DB 기본 경로를 `db/dev.db`로 정리
+- API write 경로를 모두 `await db.transaction(async (tx) => { ... })` 패턴으로 통일
+- 감사 로그를 `withAudit(tx, ...)`로 같은 트랜잭션 안에서 기록
 
-## 왜 Drizzle인가
+## 왜 이렇게 바꿨나
 
-현재 Prisma는 내부망에서 엔진 바이너리 다운로드가 막히면 `install`, `generate`, `migrate` 단계가 모두 영향을 받습니다.
+기존 Prisma 구성은 사내 Windows / Linux 환경에서 엔진 바이너리 다운로드 제약이 컸습니다.
 
-Drizzle은 이 점에서 유리합니다.
+이후 `better-sqlite3` 기반 Drizzle도 잠시 검토했지만, 내부망 Windows에서 `node-gyp`, Python, Node headers 다운로드 이슈가 다시 생길 수 있었습니다.
 
-- Rust 엔진 다운로드가 없음
-- npm 패키지와 SQLite 드라이버만으로 동작 가능
-- TypeScript 친화적이고 Next.js 조합이 좋음
-- SQL에 가까워 디버깅이 쉬움
+현재 구조는 그 문제를 피하기 위해 `@libsql/client`를 사용합니다.
 
-이 프로젝트에서는 `Kysely`도 후보가 될 수 있지만, 스키마 선언과 마이그레이션 도구까지 함께 가져가려면 Drizzle이 더 자연스럽습니다.
+- Prisma 엔진 다운로드 없음
+- `better-sqlite3` 같은 네이티브 빌드 체인 의존성 회피
+- `npm install` 중심의 배포 흐름 유지
 
-## 추천 구성
+## 주요 변경점
 
-SQLite를 유지한다면 아래 조합을 권장합니다.
+### DB 레이어
 
-- `drizzle-orm`
-- `drizzle-kit`
-- `better-sqlite3`
+- [`lib/db.ts`](../lib/db.ts)
+  - `DATABASE_URL=file:...`를 실제 파일 경로로 해석
+  - `file://` URL로 변환해 `@libsql/client` 생성
+  - Drizzle 인스턴스를 글로벌 싱글톤처럼 재사용
 
-핵심 변화:
+- [`lib/db/schema.ts`](../lib/db/schema.ts)
+  - 현재 DB 스키마의 소스 오브 트루스
 
-- `lib/db.ts`: `PrismaClient` 싱글톤 대신 `better-sqlite3` 연결 + Drizzle 인스턴스 생성
-- 레거시 Prisma 산출물은 제거하고 현재 Drizzle 스키마만 유지
+- [`lib/db/queries.ts`](../lib/db/queries.ts)
+  - `WorkItem`, `CalendarEvent` 등의 관계 하이드레이션 공통화
 
-## 공수 체감
+### API 레이어
 
-현재 구조에서는 "설정 몇 줄 변경"으로 끝나지 않습니다.
+다음 write API들은 모두 async transaction 패턴으로 재작성했습니다.
 
-- 최소 공수 PoC: 반나절~1일
-- 일부 API를 Drizzle로 병행 전환: 1~2일
-- Prisma 제거 + 마이그레이션 체계 정리 + 회귀 검증: 2~4일
-
-공수가 생기는 이유:
-
-- Prisma 사용이 API 전반에 퍼져 있음
-- `withAudit`가 `Prisma.TransactionClient` 타입에 직접 결합돼 있음
-- `groupBy`, relation include, soft delete 패턴을 새 쿼리로 다시 써야 함
-- `lib/db.ts`의 SQLite PRAGMA 적용을 유지해야 함
-
-## 영향 범위
-
-우선 변경 대상은 아래가 핵심입니다.
-
-- `lib/db.ts`
-- `lib/audit.ts`
-- `app/api/work-items/**`
+- `app/api/settings/route.ts`
 - `app/api/team-members/**`
-- `app/api/calendar-events/**`
 - `app/api/work-categories/**`
 - `app/api/work-systems/**`
-- `app/api/settings/route.ts`
-- `app/api/db-stats/route.ts`
-- `app/api/audit-logs/route.ts`
+- `app/api/work-items/**`
+- `app/api/calendar-events/**`
 
-특히 아래 패턴이 전환 포인트입니다.
+### 감사 로그
 
-1. `prisma.$transaction(async (tx) => ...)`
-2. `findMany / findFirst / create / update / updateMany / upsert / count / groupBy`
-3. relation include
-4. `deletedAt: null` soft delete 필터
-5. `ensureSqlitePragma()`
+- [`lib/audit.ts`](../lib/audit.ts)
+  - ORM 전용 타입 결합 제거
+  - Drizzle transaction에서 직접 호출 가능한 형태로 정리
 
-## 가장 안전한 전환 전략
+## 운영 메모
 
-한 번에 Prisma를 제거하지 말고, 아래 순서로 병행 운영하는 편이 안전합니다.
+- 개발 기본값은 `.env`의 `DATABASE_URL="file:./db/dev.db"`입니다.
+- 운영에서는 배포 디렉터리 바깥의 영속 경로를 사용해야 합니다.
+- `npm run build` 시 `.env.production`이 빈 SQLite 파일을 가리키면 정적 생성 단계에서 `no such table` 로그가 남을 수 있습니다.
+  - 빌드 자체는 성공할 수 있지만,
+  - 실제 운영에서는 빌드 시점에도 스키마가 반영된 DB를 가리키는 편이 안전합니다.
 
-### 1. Drizzle 기반 DB 레이어 추가
+## 검증 내역
 
-예상 파일:
+- `npm install`
+- `npm run typecheck`
+- 개발 서버 기준 주요 API smoke test
+  - `settings`
+  - `db-stats`
+  - `team-members`
+  - `work-categories`
+  - `work-systems`
+  - `work-items`
+  - `calendar-events`
+  - `audit-logs`
+  - `calendar-events/stream`
 
-- `lib/db/drizzle.ts`
-- `lib/db/schema.ts`
-- `lib/db/types.ts`
+## 참고
 
-여기서 먼저 할 일:
-
-- SQLite 연결 생성
-- PRAGMA 적용
-- Drizzle DB export
-- 테이블 스키마 정의
-
-이 단계에서는 기존 Prisma 코드는 그대로 둡니다.
-
-### 2. 감사 로그 헬퍼 추상화
-
-현재 `lib/audit.ts`는 `Prisma.TransactionClient`만 받습니다.
-
-이 부분은 아래처럼 추상화해야 Drizzle에서도 재사용할 수 있습니다.
-
-- `withAuditPrisma(tx, params)`
-- `withAuditDrizzle(tx, params)`
-
-또는 더 간단하게:
-
-- diff 계산은 공통 함수로 유지
-- 실제 `auditLog` insert만 ORM별 어댑터로 분리
-
-전환 초반에는 이 작업이 가장 중요합니다. write 경로의 규칙이 여기에 걸려 있기 때문입니다.
-
-### 3. 단순 읽기 API부터 전환
-
-추천 순서:
-
-1. `app/api/db-stats/route.ts`
-2. `app/api/work-categories/route.ts`
-3. `app/api/work-systems/route.ts`
-4. `app/api/settings/route.ts`
-5. `app/api/audit-logs/route.ts`
-
-이 구간은 relation 처리와 write 트랜잭션 부담이 작아서 패턴 정리에 좋습니다.
-
-### 4. 그 다음 목록/상세 API 전환
-
-추천 순서:
-
-1. `team-members`
-2. `calendar-events`
-3. `work-items`
-
-`work-items`를 마지막에 두는 이유:
-
-- 필터가 가장 많음
-- tickets relation 조회가 있음
-- 생성/수정 시 하위 레코드 처리까지 필요
-
-### 5. 마지막에 마이그레이션 체계 정리
-
-Prisma를 완전히 제거할 시점까지는 기존 DB 파일과 기존 스키마를 유지하는 편이 낫습니다.
-
-마지막 단계에서 결정:
-
-- Prisma migration 계속 유지하고 런타임만 Drizzle로 전환
-- Drizzle migration으로 완전 이전
-
-사내 환경 제약이 크면, 런타임만 Drizzle로 바꾸고 마이그레이션은 나중에 분리하는 것도 충분히 현실적인 전략입니다.
-
-## 코드 패턴 비교
-
-### Prisma
-
-```ts
-const rows = await prisma.teamMember.findMany({
-  where: { deletedAt: null },
-  orderBy: [{ name: "asc" }, { id: "asc" }],
-});
-```
-
-### Drizzle
-
-```ts
-const rows = await db
-  .select()
-  .from(teamMembers)
-  .where(isNull(teamMembers.deletedAt))
-  .orderBy(asc(teamMembers.name), asc(teamMembers.id));
-```
-
-핵심 차이:
-
-- Prisma는 모델 중심 API
-- Drizzle은 SQL에 가까운 조합식 API
-- 복잡한 조건 조립은 Drizzle 쪽이 더 명시적
-
-## 이 프로젝트에서 까다로운 포인트
-
-### 1. `groupBy`
-
-현재 `app/api/work-items/count/route.ts`는 Prisma `groupBy`를 사용합니다.
-
-Drizzle에서는 보통 아래처럼 다시 씁니다.
-
-```ts
-const rows = await db
-  .select({
-    status: workItems.status,
-    count: sql<number>`count(*)`,
-  })
-  .from(workItems)
-  .where(isNull(workItems.deletedAt))
-  .groupBy(workItems.status);
-```
-
-### 2. relation include
-
-Prisma의 `include`는 편하지만, Drizzle에서는 join 또는 별도 쿼리 조합으로 바뀝니다.
-
-예:
-
-- `calendarEvent` + `members`
-- `workItem` + `assignee` + `tickets`
-
-이 부분은 응답 shape를 유지하도록 신중하게 맞춰야 합니다.
-
-### 3. upsert
-
-`app/api/settings/route.ts`의 `upsert`는 Drizzle에서 SQLite `onConflictDoUpdate`로 바꾸는 식으로 대응합니다.
-
-### 4. PRAGMA
-
-현재 `ensureSqlitePragma()`는 Prisma raw query로 PRAGMA를 적용합니다.
-
-Drizzle로 옮기면 `better-sqlite3` 연결 직후에 아래 식으로 처리하면 됩니다.
-
-```ts
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("busy_timeout = 5000");
-sqlite.pragma("foreign_keys = ON");
-```
-
-### 5. 타입 결합
-
-현재 `withAudit`는 Prisma 타입에 직접 묶여 있습니다.
-
-전환 작업에서 가장 먼저 해야 할 리팩터링은 "도메인 규칙"과 "ORM 구현"을 분리하는 일입니다.
-
-## 추천 마이그레이션 체크리스트
-
-1. Node 16에서 쓸 SQLite 드라이버 조합 확정
-2. `lib/db/drizzle.ts` 추가
-3. PRAGMA 로직 이전
-4. Drizzle 스키마 선언
-5. `withAudit` ORM 의존성 분리
-6. 읽기 전용 API 1개 전환
-7. write API 1개 전환
-8. 트랜잭션/감사 로그 회귀 확인
-9. 나머지 API 순차 전환
-10. Prisma 제거 여부 최종 결정
-
-## 추천 결론
-
-이 프로젝트에서는 아래 전략이 가장 무난합니다.
-
-- 단기: Prisma 유지, 내부망 우회 또는 엔진 반입
-- 중기: Drizzle 병행 도입
-- 장기: 충분히 안정화되면 Prisma 제거
-
-내부망 이슈 때문에 "지금 당장 npm만으로 돌고 싶다"가 목표라면, 처음부터 전면 교체하기보다 `db-stats`, `settings`, `work-categories`, `work-systems` 같은 쉬운 API부터 Drizzle로 옮기는 편이 가장 비용 대비 효과가 좋습니다.
+- 현재 개발/운영 규칙은 [`docs/DEVELOPMENT.md`](./DEVELOPMENT.md)를 기준으로 봅니다.
+- 이 문서는 “전환 배경과 결과”를 남기는 메모이며, 구현 규칙의 소스 오브 트루스는 아닙니다.

@@ -1,11 +1,12 @@
 import path from "path";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { pathToFileURL } from "url";
+import { createClient, type Client } from "@libsql/client/node";
+import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./db/schema";
 
 type DbClient = ReturnType<typeof drizzle>;
 type DatabaseState = {
-  sqlite: Database.Database | undefined;
+  sqlite: Client | undefined;
   db: DbClient | undefined;
 };
 
@@ -22,17 +23,18 @@ function resolveSqliteFilePath() {
   return path.resolve(process.cwd(), filePath);
 }
 
+function resolveSqliteClientUrl() {
+  return pathToFileURL(resolveSqliteFilePath()).toString();
+}
+
 function initDb() {
   if (globalForDb.sqlite && globalForDb.db) {
     return { sqlite: globalForDb.sqlite, db: globalForDb.db };
   }
 
-  const sqlite = new Database(resolveSqliteFilePath(), {
-    fileMustExist: false,
+  const sqlite = createClient({
+    url: resolveSqliteClientUrl(),
   });
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("busy_timeout = 5000");
-  sqlite.pragma("foreign_keys = ON");
 
   const db = drizzle(sqlite, { schema });
 

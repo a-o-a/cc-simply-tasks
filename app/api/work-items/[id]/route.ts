@@ -36,13 +36,13 @@ export const PATCH = withErrorHandler(
     const input = workItemUpdateSchema.parse(await req.json());
     const updatedAt = now();
 
-    const updated = db.transaction((tx) => {
-      const before = tx
+    const updated = await db.transaction(async (tx) => {
+      const beforeRows = await tx
         .select()
         .from(workItems)
         .where(and(eq(workItems.id, params.id), isNull(workItems.deletedAt)))
-        .limit(1)
-        .get();
+        .limit(1);
+      const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
 
       const after = {
@@ -68,17 +68,16 @@ export const PATCH = withErrorHandler(
           : {}),
         updatedAt,
       };
-      tx.update(workItems).set(after).where(eq(workItems.id, params.id)).run();
+      await tx.update(workItems).set(after).where(eq(workItems.id, params.id));
 
       // tickets 배열이 전달된 경우: 기존 soft delete 후 전체 재생성
       if (input.tickets !== undefined) {
-        tx
+        await tx
           .update(workTickets)
           .set({ deletedAt: updatedAt, updatedAt })
-          .where(and(eq(workTickets.workItemId, params.id), isNull(workTickets.deletedAt)))
-          .run();
+          .where(and(eq(workTickets.workItemId, params.id), isNull(workTickets.deletedAt)));
         if (input.tickets.length > 0) {
-          tx.insert(workTickets).values(
+          await tx.insert(workTickets).values(
             input.tickets.map((ticket) => ({
               id: newId(),
               workItemId: params.id,
@@ -88,11 +87,11 @@ export const PATCH = withErrorHandler(
               updatedAt,
               deletedAt: null,
             })),
-          ).run();
+          );
         }
       }
 
-      withAudit(tx, {
+      await withAudit(tx, {
         entityType: "WorkItem",
         entityId: after.id,
         action: "UPDATE",
@@ -117,18 +116,18 @@ export const DELETE = withErrorHandler(
     const actor = getActorContext(req);
     const deletedAt = now();
 
-    db.transaction((tx) => {
-      const before = tx
+    await db.transaction(async (tx) => {
+      const beforeRows = await tx
         .select()
         .from(workItems)
         .where(and(eq(workItems.id, params.id), isNull(workItems.deletedAt)))
-        .limit(1)
-        .get();
+        .limit(1);
+      const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
 
       const after = { ...before, updatedAt: deletedAt, deletedAt };
-      tx.update(workItems).set(after).where(eq(workItems.id, params.id)).run();
-      withAudit(tx, {
+      await tx.update(workItems).set(after).where(eq(workItems.id, params.id));
+      await withAudit(tx, {
         entityType: "WorkItem",
         entityId: after.id,
         action: "DELETE",

@@ -1,6 +1,6 @@
 # Development Guide
 
-이 문서는 현재 코드베이스의 서버/API 구현 규칙을 정리합니다. 기준 스택은 `Next.js + Drizzle ORM + SQLite`입니다.
+이 문서는 현재 코드베이스의 서버/API 구현 규칙을 정리합니다. 기준 스택은 `Next.js + Drizzle ORM + @libsql/client + SQLite(file)`입니다.
 
 - 레퍼런스 구현: [`app/api/work-items/`](../app/api/work-items/)
 - DB 진입점: [`lib/db.ts`](../lib/db.ts)
@@ -10,7 +10,7 @@
 
 ## 1. 핵심 원칙
 
-1. 모든 write는 `db.transaction((tx) => { ... })` 안에서 실행한다.
+1. 모든 write는 `await db.transaction(async (tx) => { ... })` 안에서 실행한다.
 2. write와 감사 로그는 같은 트랜잭션 안에서 `withAudit(tx, ...)`로 묶는다.
 3. Soft delete만 사용한다. 실제 삭제 대신 `deletedAt`을 업데이트한다.
 4. 모든 외부 입력은 zod로 검증한다.
@@ -35,7 +35,7 @@ app/api/<resource>/[id]/route.ts
 ### 3.1 연결
 
 - 공용 DB 객체는 [`lib/db.ts`](../lib/db.ts) 의 `db`를 사용한다.
-- SQLite PRAGMA는 DB 초기화 시 한 번 적용된다.
+- DB 연결은 `DATABASE_URL=file:...` 값을 `file://` URL로 변환해 `@libsql/client`에 전달한다.
 - API 코드에서는 관성적으로 `await ensureSqlitePragma()`를 호출해도 되지만, 현재는 no-op이다.
 
 ### 3.2 스키마
@@ -46,15 +46,15 @@ app/api/<resource>/[id]/route.ts
 
 ### 3.3 쓰기 쿼리
 
-`better-sqlite3` 기반 Drizzle에서는 write 빌더를 만든 뒤 반드시 실행해야 한다.
+`libsql` 기반 Drizzle에서는 모든 write를 `await`로 실행한다.
 
 ```ts
-tx.insert(teamMembers).values(row).run();
-tx.update(workItems).set(after).where(eq(workItems.id, id)).run();
-tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, id)).run();
+await tx.insert(teamMembers).values(row);
+await tx.update(workItems).set(after).where(eq(workItems.id, id));
+await tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, id));
 ```
 
-`.run()`이 빠지면 실제 DB 반영이 되지 않는다.
+`await`를 빼먹으면 의도한 순서대로 반영되지 않거나 감사 로그와 분리될 수 있다.
 
 ## 4. 표준 라우트 패턴
 
@@ -104,7 +104,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const input = teamMemberCreateSchema.parse(await req.json());
   const createdAt = now();
 
-  const created = db.transaction((tx) => {
+  const created = await db.transaction(async (tx) => {
     const row = {
       id: newId(),
       name: input.name,
@@ -114,8 +114,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       deletedAt: null,
     } satisfies typeof teamMembers.$inferInsert;
 
-    tx.insert(teamMembers).values(row).run();
-    withAudit(tx, {
+    await tx.insert(teamMembers).values(row);
+    await withAudit(tx, {
       entityType: "TeamMember",
       entityId: row.id,
       action: "CREATE",
@@ -165,13 +165,13 @@ export const PATCH = withErrorHandler(
     const input = teamMemberUpdateSchema.parse(await req.json());
     const updatedAt = now();
 
-    const updated = db.transaction((tx) => {
-      const before = tx
+    const updated = await db.transaction(async (tx) => {
+      const beforeRows = await tx
         .select()
         .from(teamMembers)
         .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
-        .limit(1)
-        .get();
+        .limit(1);
+      const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
 
       const after = {
@@ -181,8 +181,8 @@ export const PATCH = withErrorHandler(
         updatedAt,
       };
 
-      tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id)).run();
-      withAudit(tx, {
+      await tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id));
+      await withAudit(tx, {
         entityType: "TeamMember",
         entityId: after.id,
         action: "UPDATE",
@@ -205,7 +205,7 @@ export const PATCH = withErrorHandler(
 - write면 `getActorContext`
 - `db.transaction`
 - `before` 조회
-- `insert/update/delete ... .run()`
+- `await insert/update/delete`
 - `withAudit`
 - `NextResponse.json(...)`
 
@@ -271,7 +271,7 @@ export const PATCH = withErrorHandler(
 
 ## 6. 관계 조회 규칙
 
-Prisma의 `include`처럼 한 번에 끝내기보다, 현재 코드는 명시적으로 하이드레이션한다.
+관계 응답은 한 번에 암묵적으로 끌어오지 않고, 현재 코드처럼 명시적으로 하이드레이션한다.
 
 예:
 
@@ -334,8 +334,8 @@ curl -s 'localhost:3000/api/audit-logs?pageSize=10'
 
 ## 10. 리뷰 체크리스트
 
-- [ ] write가 모두 `db.transaction(...)` 안에 있다
-- [ ] write 쿼리에 `.run()`이 빠진 곳이 없다
+- [ ] write가 모두 `await db.transaction(async (tx) => ...)` 안에 있다
+- [ ] write 쿼리에 `await`가 빠진 곳이 없다
 - [ ] `withAudit(tx, ...)`가 write와 같은 트랜잭션에 있다
 - [ ] 입력은 zod로 검증한다
 - [ ] soft delete 필터가 필요한 곳에 `isNull(deletedAt)`가 있다
@@ -347,7 +347,7 @@ curl -s 'localhost:3000/api/audit-logs?pageSize=10'
 
 ```ts
 // ❌ transaction 밖 write + audit 분리
-db.insert(workItems).values(row).run();
+await db.insert(workItems).values(row);
 withAudit(tx, ...);
 
 // ❌ write builder만 만들고 실행 안 함

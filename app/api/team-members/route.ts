@@ -49,7 +49,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const input = teamMemberCreateSchema.parse(await req.json());
   const createdAt = now();
 
-  const created = db.transaction((tx) => {
+  const created = await db.transaction(async (tx) => {
     const row = {
       id: newId(),
       name: input.name,
@@ -59,8 +59,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       deletedAt: null,
     } satisfies typeof teamMembers.$inferInsert;
 
-    tx.insert(teamMembers).values(row).run();
-    withAudit(tx, {
+    await tx.insert(teamMembers).values(row);
+    await withAudit(tx, {
       entityType: "TeamMember",
       entityId: row.id,
       action: "CREATE",

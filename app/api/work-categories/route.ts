@@ -31,13 +31,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const input = workCategoryCreateSchema.parse(await req.json());
   const timestamp = now();
 
-  const created = db.transaction((tx) => {
-    const existing = tx
+  const created = await db.transaction(async (tx) => {
+    const existingRows = await tx
       .select()
       .from(workCategories)
       .where(eq(workCategories.code, input.code))
-      .limit(1)
-      .get();
+      .limit(1);
+    const existing = existingRows[0];
     const row = existing
       ? {
           ...existing,
@@ -55,12 +55,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         };
 
     if (existing) {
-      tx.update(workCategories).set(row).where(eq(workCategories.id, existing.id)).run();
+      await tx.update(workCategories).set(row).where(eq(workCategories.id, existing.id));
     } else {
-      tx.insert(workCategories).values(row).run();
+      await tx.insert(workCategories).values(row);
     }
 
-    withAudit(tx, {
+    await withAudit(tx, {
       entityType: "WorkCategory",
       entityId: row.id,
       action: "CREATE",

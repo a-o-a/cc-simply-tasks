@@ -37,13 +37,13 @@ export const PATCH = withErrorHandler(
     const input = teamMemberUpdateSchema.parse(await req.json());
     const updatedAt = now();
 
-    const updated = db.transaction((tx) => {
-      const before = tx
+    const updated = await db.transaction(async (tx) => {
+      const beforeRows = await tx
         .select()
         .from(teamMembers)
         .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
-        .limit(1)
-        .get();
+        .limit(1);
+      const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
 
       const after = {
@@ -53,8 +53,8 @@ export const PATCH = withErrorHandler(
         updatedAt,
       };
 
-      tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id)).run();
-      withAudit(tx, {
+      await tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id));
+      await withAudit(tx, {
         entityType: "TeamMember",
         entityId: after.id,
         action: "UPDATE",
@@ -81,18 +81,18 @@ export const DELETE = withErrorHandler(
     const actor = getActorContext(req);
     const deletedAt = now();
 
-    db.transaction((tx) => {
-      const before = tx
+    await db.transaction(async (tx) => {
+      const beforeRows = await tx
         .select()
         .from(teamMembers)
         .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
-        .limit(1)
-        .get();
+        .limit(1);
+      const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
 
       const after = { ...before, updatedAt: deletedAt, deletedAt };
-      tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id)).run();
-      withAudit(tx, {
+      await tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id));
+      await withAudit(tx, {
         entityType: "TeamMember",
         entityId: after.id,
         action: "DELETE",

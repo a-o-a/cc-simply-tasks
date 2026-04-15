@@ -120,7 +120,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const input = workItemCreateSchema.parse(await req.json());
   const timestamp = now();
 
-  const created = db.transaction((tx) => {
+  const created = await db.transaction(async (tx) => {
     const row = {
       id: newId(),
       title: input.title,
@@ -142,10 +142,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       updatedAt: timestamp,
       deletedAt: null,
     } satisfies typeof workItems.$inferInsert;
-    tx.insert(workItems).values(row).run();
+    await tx.insert(workItems).values(row);
 
     if (input.tickets?.length) {
-      tx.insert(workTickets).values(
+      await tx.insert(workTickets).values(
         input.tickets.map((ticket) => ({
           id: newId(),
           workItemId: row.id,
@@ -155,10 +155,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
           updatedAt: timestamp,
           deletedAt: null,
         })),
-      ).run();
+      );
     }
 
-    withAudit(tx, {
+    await withAudit(tx, {
       entityType: "WorkItem",
       entityId: row.id,
       action: "CREATE",

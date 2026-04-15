@@ -34,22 +34,22 @@ export const PATCH = withErrorHandler(
     const input = calendarEventUpdateSchema.parse(await req.json());
     const updatedAt = now();
 
-    db.transaction((tx) => {
-      const before = tx
+    await db.transaction(async (tx) => {
+      const beforeRows = await tx
         .select()
         .from(calendarEvents)
         .where(and(eq(calendarEvents.id, params.id), isNull(calendarEvents.deletedAt)))
-        .limit(1)
-        .get();
+        .limit(1);
+      const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
 
       // memberIds가 제공된 경우 기존 팀원 교체
       if (input.memberIds !== undefined) {
-        tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, params.id)).run();
+        await tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, params.id));
         if (input.memberIds.length > 0) {
-          tx.insert(calendarEventMembers).values(
+          await tx.insert(calendarEventMembers).values(
             input.memberIds.map((memberId) => ({ eventId: params.id, memberId })),
-          ).run();
+          );
         }
       }
 
@@ -65,8 +65,8 @@ export const PATCH = withErrorHandler(
         ...(input.note !== undefined ? { note: input.note } : {}),
         updatedAt,
       };
-      tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, params.id)).run();
-      withAudit(tx, {
+      await tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, params.id));
+      await withAudit(tx, {
         entityType: "CalendarEvent",
         entityId: after.id,
         action: "UPDATE",
@@ -96,18 +96,18 @@ export const DELETE = withErrorHandler(
     const actor = getActorContext(req);
     const deletedAt = now();
 
-    db.transaction((tx) => {
-      const before = tx
+    await db.transaction(async (tx) => {
+      const beforeRows = await tx
         .select()
         .from(calendarEvents)
         .where(and(eq(calendarEvents.id, params.id), isNull(calendarEvents.deletedAt)))
-        .limit(1)
-        .get();
+        .limit(1);
+      const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
 
       const after = { ...before, updatedAt: deletedAt, deletedAt };
-      tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, params.id)).run();
-      withAudit(tx, {
+      await tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, params.id));
+      await withAudit(tx, {
         entityType: "CalendarEvent",
         entityId: after.id,
         action: "DELETE",

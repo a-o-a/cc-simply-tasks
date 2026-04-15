@@ -39,16 +39,15 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
     updates.push({ key: "service_name", value: input.service_name });
   }
 
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     for (const { key, value } of updates) {
-      tx
+      await tx
         .insert(settings)
         .values({ key, value, updatedAt })
         .onConflictDoUpdate({
           target: settings.key,
           set: { value, updatedAt },
-        })
-        .run();
+        });
     }
   });
 

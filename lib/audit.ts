@@ -12,11 +12,12 @@ import { createId } from "@paralleldrive/cuid2";
  *   - 본 엔티티 write와 같은 트랜잭션에 묶여 "엔티티는 바뀌었는데 로그가 없음" 방지.
  *
  * 사용 예:
- *   db.transaction((tx) => {
- *     const before = tx.select().from(workItems).where(eq(workItems.id, id)).get();
+ *   await db.transaction(async (tx) => {
+ *     const rows = await tx.select().from(workItems).where(eq(workItems.id, id)).limit(1);
+ *     const before = rows[0];
  *     const after = { ...before, title: "changed" };
- *     tx.update(workItems).set(after).where(eq(workItems.id, id)).run();
- *     withAudit(tx, {
+ *     await tx.update(workItems).set(after).where(eq(workItems.id, id));
+ *     await withAudit(tx, {
  *       entityType: "WorkItem",
  *       entityId: id,
  *       action: "UPDATE",
@@ -28,13 +29,11 @@ type AuditInsertClient = {
   insert: (
     table: typeof auditLogs,
   ) => {
-    values: (value: typeof auditLogs.$inferInsert) => {
-      run: () => unknown;
-    };
+    values: (value: typeof auditLogs.$inferInsert) => Promise<unknown>;
   };
 };
 
-export function withAudit(
+export async function withAudit(
   tx: AuditInsertClient,
   params: {
     entityType: AuditEntityType;
@@ -44,7 +43,7 @@ export function withAudit(
     after?: Record<string, unknown> | null;
     actor: ActorContext;
   },
-): void {
+): Promise<void> {
   const { entityType, entityId, action, before, after, actor } = params;
 
   const diff = computeDiff(before ?? null, after ?? null);
@@ -55,7 +54,7 @@ export function withAudit(
     return;
   }
 
-  tx.insert(auditLogs).values({
+  await tx.insert(auditLogs).values({
     id: createId(),
     entityType,
     entityId,
@@ -66,5 +65,5 @@ export function withAudit(
     actorName: actor.actorName,
     actorIp: actor.actorIp,
     userAgent: actor.userAgent,
-  }).run();
+  });
 }

@@ -16,18 +16,18 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
   const input = workSystemUpdateSchema.parse(await req.json());
   const updatedAt = now();
 
-  const updated = db.transaction((tx) => {
-    const before = tx
+  const updated = await db.transaction(async (tx) => {
+    const beforeRows = await tx
       .select()
       .from(workSystems)
       .where(and(eq(workSystems.id, params.id), isNull(workSystems.deletedAt)))
-      .limit(1)
-      .get();
+      .limit(1);
+    const before = beforeRows[0];
     if (!before) throw new HttpError("NOT_FOUND", "작업 시스템을 찾을 수 없습니다");
 
     const after = { ...before, ...input, updatedAt };
-    tx.update(workSystems).set(after).where(eq(workSystems.id, params.id)).run();
-    withAudit(tx, {
+    await tx.update(workSystems).set(after).where(eq(workSystems.id, params.id));
+    await withAudit(tx, {
       entityType: "WorkSystem",
       entityId: after.id,
       action: "UPDATE",
@@ -46,18 +46,18 @@ export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Para
   const actor = getActorContext(req);
   const deletedAt = now();
 
-  db.transaction((tx) => {
-    const before = tx
+  await db.transaction(async (tx) => {
+    const beforeRows = await tx
       .select()
       .from(workSystems)
       .where(and(eq(workSystems.id, params.id), isNull(workSystems.deletedAt)))
-      .limit(1)
-      .get();
+      .limit(1);
+    const before = beforeRows[0];
     if (!before) throw new HttpError("NOT_FOUND", "작업 시스템을 찾을 수 없습니다");
 
     const after = { ...before, updatedAt: deletedAt, deletedAt };
-    tx.update(workSystems).set(after).where(eq(workSystems.id, params.id)).run();
-    withAudit(tx, {
+    await tx.update(workSystems).set(after).where(eq(workSystems.id, params.id));
+    await withAudit(tx, {
       entityType: "WorkSystem",
       entityId: after.id,
       action: "DELETE",

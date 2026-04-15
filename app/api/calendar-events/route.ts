@@ -64,7 +64,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const input = calendarEventCreateSchema.parse(await req.json());
   const timestamp = now();
 
-  const created = db.transaction((tx) => {
+  const created = await db.transaction(async (tx) => {
     const row = {
       id: newId(),
       title: input.title,
@@ -77,16 +77,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       updatedAt: timestamp,
       deletedAt: null,
     } satisfies typeof calendarEvents.$inferInsert;
-    tx.insert(calendarEvents).values(row).run();
+    await tx.insert(calendarEvents).values(row);
     if (input.memberIds.length > 0) {
-      tx.insert(calendarEventMembers).values(
+      await tx.insert(calendarEventMembers).values(
         input.memberIds.map((memberId) => ({
           eventId: row.id,
           memberId,
         })),
-      ).run();
+      );
     }
-    withAudit(tx, {
+    await withAudit(tx, {
       entityType: "CalendarEvent",
       entityId: row.id,
       action: "CREATE",
