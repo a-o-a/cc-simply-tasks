@@ -65,5 +65,6 @@ export async function withAudit(
     actorName: actor.actorName,
     actorIp: actor.actorIp,
     userAgent: actor.userAgent,
+    createdAt: new Date(),
   });
 }

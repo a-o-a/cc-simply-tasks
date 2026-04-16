@@ -1,10 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ApiError, api } from "@/lib/client/api";
-import { formatDate } from "@/lib/client/format";
 import { toast } from "@/lib/client/use-toast";
 import type {
   ListResponse,
@@ -14,11 +21,11 @@ import type {
   WorkItemListItem,
   WorkSystem,
 } from "@/lib/client/types";
-import { STATUS_LABELS } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/work-items/status-badge";
 import { WorkItemDrawer } from "@/components/work-items/work-item-drawer";
 import { WorkItemFormDialog } from "@/components/work-items/work-item-form-dialog";
+import type { Status } from "@/lib/enums";
 
 /**
  * 이관 현황 페이지 — 미팅용.
@@ -42,8 +49,14 @@ type DateGroup = {
 type RequestGroup = {
   requestNumber: string | null; // null = 요청번호 없음
   requestTypes: string[]; // 고유 요청구분 목록
-  requestors: string[];  // 고유 요청자 목록
+  requestors: string[]; // 고유 요청자 목록
   items: WorkItemListItem[];
+};
+
+type BulkStatusResponse = {
+  updatedCount: number;
+  updatedIds: string[];
+  skippedIds: string[];
 };
 
 // ─── 유틸 ──────────────────────────────────────────────────────────────────────
@@ -160,6 +173,8 @@ export function TransferClient() {
   const [drawerReloadKey, setDrawerReloadKey] = React.useState(0);
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<WorkItemListItem | null>(null);
+  const [pendingDate, setPendingDate] = React.useState<string | null>(null);
+  const [confirmingDate, setConfirmingDate] = React.useState<DateGroup | null>(null);
 
   const loadAll = React.useCallback(async () => {
     setLoading(true);
@@ -211,6 +226,52 @@ export function TransferClient() {
   function openEdit(item: WorkItemDetail) {
     setEditing(item);
     setFormOpen(true);
+  }
+
+  function openCompleteConfirm(dateGroup: DateGroup) {
+    setConfirmingDate(dateGroup);
+  }
+
+  async function completeDateGroup(dateGroup: DateGroup) {
+    const ids = dateGroup.requestGroups.flatMap((group) =>
+      group.items
+        .filter((item) => item.status !== "TRANSFERRED")
+        .map((item) => item.id),
+    );
+    if (ids.length === 0) return;
+
+    setConfirmingDate(null);
+    setPendingDate(dateGroup.date);
+    try {
+      const result = await api.post<BulkStatusResponse>("/api/work-items/bulk-status", {
+        ids,
+        status: "TRANSFERRED" satisfies Status,
+      });
+      setItems((prev) =>
+        prev.map((item) =>
+          result.updatedIds.includes(item.id)
+            ? { ...item, status: "TRANSFERRED" }
+            : item,
+        ),
+      );
+      toast({
+        title: "이관완료 처리됨",
+        description:
+          result.updatedCount > 0
+            ? `${dateGroup.label} 작업 ${result.updatedCount}건을 이관완료로 변경했습니다.`
+            : `${dateGroup.label} 작업은 이미 모두 이관완료 상태입니다.`,
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "일괄 상태 변경 실패";
+      toast({
+        title: "이관완료 처리 실패",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setPendingDate((current) => (current === dateGroup.date ? null : current));
+      void loadAll();
+    }
   }
 
   function gotoPrev() {
@@ -280,6 +341,8 @@ export function TransferClient() {
             systemNameByCode={systemNameByCode}
             categoryNameByCode={Object.fromEntries(categories.map((c) => [c.code, c.name]))}
             onOpen={openDrawer}
+            pendingDate={pendingDate}
+            onCompleteDate={openCompleteConfirm}
           />
         )}
       </div>
@@ -315,6 +378,16 @@ export function TransferClient() {
           if (drawerId) setDrawerReloadKey((k) => k + 1);
         }}
       />
+
+      <ConfirmBulkTransferDialog
+        dateGroup={confirmingDate}
+        loading={confirmingDate ? pendingDate === confirmingDate.date : false}
+        onClose={() => setConfirmingDate(null)}
+        onConfirm={() => {
+          if (!confirmingDate) return;
+          void completeDateGroup(confirmingDate);
+        }}
+      />
     </div>
   );
 }
@@ -326,11 +399,15 @@ function TransferTable({
   systemNameByCode,
   categoryNameByCode,
   onOpen,
+  pendingDate,
+  onCompleteDate,
 }: {
   dateGroups: DateGroup[];
   systemNameByCode: Record<string, string>;
   categoryNameByCode: Record<string, string>;
   onOpen: (item: WorkItemListItem) => void;
+  pendingDate: string | null;
+  onCompleteDate: (dateGroup: DateGroup) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -341,6 +418,8 @@ function TransferTable({
           systemNameByCode={systemNameByCode}
           categoryNameByCode={categoryNameByCode}
           onOpen={onOpen}
+          isPending={pendingDate === dateGroup.date}
+          onComplete={() => onCompleteDate(dateGroup)}
         />
       ))}
     </div>
@@ -352,12 +431,20 @@ function DateTable({
   systemNameByCode,
   categoryNameByCode,
   onOpen,
+  isPending,
+  onComplete,
 }: {
   dateGroup: DateGroup;
   systemNameByCode: Record<string, string>;
   categoryNameByCode: Record<string, string>;
   onOpen: (item: WorkItemListItem) => void;
+  isPending: boolean;
+  onComplete: () => void;
 }) {
+  const hasCompletableItems = dateGroup.requestGroups.some((group) =>
+    group.items.some((item) => item.status !== "TRANSFERRED"),
+  );
+
   return (
     <div>
       {/* 날짜 타이틀 */}
@@ -397,6 +484,25 @@ function DateTable({
             ))}
           </div>
         )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          onClick={onComplete}
+          disabled={isPending || !hasCompletableItems}
+        >
+          {isPending ? (
+            <>
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              처리 중
+            </>
+          ) : (
+            <>
+              <Check className="mr-1.5 h-3.5 w-3.5" />
+              전체 이관완료
+            </>
+          )}
+        </Button>
       </div>
 
       {/* 테이블 */}
@@ -534,5 +640,59 @@ function EmptyState() {
       <p className="text-sm font-medium">이관일이 설정된 진행 작업이 없습니다</p>
       <p className="text-xs text-muted-foreground">작업에 이관일을 설정하면 여기에 표시됩니다.</p>
     </div>
+  );
+}
+
+function ConfirmBulkTransferDialog({
+  dateGroup,
+  loading,
+  onClose,
+  onConfirm,
+}: {
+  dateGroup: DateGroup | null;
+  loading: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const completableCount = React.useMemo(
+    () =>
+      dateGroup
+        ? dateGroup.requestGroups.reduce(
+            (count, group) =>
+              count + group.items.filter((item) => item.status !== "TRANSFERRED").length,
+            0,
+          )
+        : 0,
+    [dateGroup],
+  );
+
+  return (
+    <Dialog open={Boolean(dateGroup)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>전체 이관완료 확인</DialogTitle>
+          <DialogDescription>
+            {dateGroup
+              ? `${dateGroup.label}에 표시된 미완료 작업 ${completableCount}건을 이관완료로 변경합니다.`
+              : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            취소
+          </Button>
+          <Button type="button" onClick={onConfirm} disabled={loading || completableCount === 0}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                처리 중
+              </>
+            ) : (
+              "이관완료 처리"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

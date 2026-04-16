@@ -1,6 +1,6 @@
 # 작업 관리 시스템 - 타당성 분석 & 실행 계획
 
-> 리뷰 대상: Next.js 13.5 + Prisma + SQLite 기반 내부용 작업 관리 시스템에 대한 에이전트 리뷰 응답 (상태/감사로그/Gantt/캘린더 포함).
+> 리뷰 대상: Next.js 13.5 + Drizzle ORM + SQLite 기반 내부용 작업 관리 시스템에 대한 에이전트 리뷰 응답 (상태/감사로그/Gantt/캘린더 포함).
 
 ---
 
@@ -37,7 +37,7 @@
 - **CSV export / 대시보드**: 1차 범위에 포함하면 공수가 늘어남. **2차(폴리싱)**로 분리.
 
 ### 1.4 리스크
-1. **감사 로그 우회**: 헬퍼 없이 raw Prisma write를 허용하면 로그가 빠짐 → lint 규칙 또는 repository 레이어 강제.
+1. **감사 로그 우회**: `withAudit()` 없이 직접 write를 허용하면 로그가 빠짐 → lint 규칙 또는 repository 레이어 강제.
 2. **SQLite 동시 write**: 파일 lock 기반이라 write 경합 시 SQLITE_BUSY 발생 가능 → busy_timeout PRAGMA + 재시도.
 3. **타임존**: UTC 저장 / `Asia/Seoul` 표시 원칙이 한 곳에서 깨지면 all-day 이벤트가 하루씩 어긋남.
 4. **낙관적 락 미적용**: 동시 편집 시 마지막 write가 앞 write를 조용히 덮어씀.
@@ -48,11 +48,11 @@
 ## 2. 실행 계획
 
 ### Phase 0 — 프로젝트 부트스트랩 ✅ 완료
-- [x] Next.js 13.5.11 (app router) + TypeScript 5.2 strict + Prisma 5.10.2 + SQLite
+- [x] Next.js 13.5.11 (app router) + TypeScript 5.2 strict + Drizzle ORM + SQLite
 - [x] `engines: { node: ">=16.14 <17" }` + `.nvmrc` (사내 Node 16 제약)
-- [x] `prisma/schema.prisma`, `DATABASE_URL` 환경변수 기반
-- [x] `prisma/dev.db` gitignore, 로컬 `.env` 기반 설정
-- [x] `lib/db.ts` Prisma 싱글톤
+- [x] `lib/db/schema.ts`, `DATABASE_URL` 환경변수 기반
+- [x] `db/dev.db` 로컬 DB 파일, `.env` 기반 설정
+- [x] `lib/db.ts` Drizzle + libsql 싱글톤
 - [x] SQLite PRAGMA는 Phase 2에서 `ensureSqlitePragma()`로 배치
 
 ### Phase 1 — 스키마 확정 ✅ 완료
@@ -91,9 +91,9 @@
 - [x] `lib/db.ts` — `ensureSqlitePragma()`: `journal_mode=WAL`, `busy_timeout=5000`, `foreign_keys=ON` (첫 연결 시 1회)
 - [x] `lib/time.ts` — `APP_TIMEZONE`, `kstDateStringToUtc`, `utcToKstDateString`, `normalizeAllDayRange`, `kstTodayUtc`
 - [x] `lib/actor.ts` — `getActorContext(req)`: `x-forwarded-for` 우선 → IP, `x-actor-name` → 이름, UA
-- [x] `lib/audit.ts` — `withAudit(tx, ...)` 헬퍼. **`Prisma.TransactionClient` 타입 강제**로 트랜잭션 밖 호출 차단. UPDATE 시 diff 없음이면 스킵.
+- [x] `lib/audit.ts` — `withAudit(tx, ...)` 헬퍼. 트랜잭션 클라이언트만 받도록 제한하고 UPDATE 시 diff 없음이면 스킵.
 - [x] `lib/diff.ts` — `computeDiff` + `diffToJsonStrings` (Date ISO 정규화 포함)
-- [x] `lib/http.ts` — `{ error: { code, message, details? } }` + `HttpError` + `withErrorHandler` (ZodError/Prisma P2002/P2025 매핑)
+- [x] `lib/http.ts` — `{ error: { code, message, details? } }` + `HttpError` + `withErrorHandler` (ZodError/SQLite unique/not-found 계열 매핑)
 - [x] `lib/pagination.ts` — cursor 기반, 기본 50 / 최대 200, `parsePagination` + `toPage`
 - [x] `lib/optimisticLock.ts` — `assertIfMatch(req, updatedAt)` 불일치 시 409 + serverUpdatedAt 반환
 - [x] `lib/validation/` — zod: `common`, `teamMember`, `workItem`, `workTicket`, `calendarEvent`
@@ -156,7 +156,7 @@
   - [x] `tsc --noEmit` / `next build` 통과 (members 페이지 5.7kB)
 - [x] **Step 4 — 작업 목록 (테이블 + 칸반 토글) + 필터 + 드로어 + 활동 탭**
   - [x] 프리미티브: `textarea`, `badge`, `sheet`(우측 드로어), `tabs`
-  - [x] `lib/client/types.ts` — 도메인 타입 (Prisma client 직접 import 금지)
+  - [x] `lib/client/types.ts` — 도메인 타입 (서버 ORM 타입 직접 import 금지)
   - [x] `lib/client/format.ts` — KST 일/시 포맷 + `<input type=date>` ↔ ISO 변환
   - [x] `components/work-items/status-badge.tsx` — globals.css의 status semantic 변수 사용
   - [x] `WorkItemFormDialog` — 생성/수정 통합, KST 자정 → UTC ISO 직렬화

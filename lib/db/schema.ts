@@ -184,9 +184,7 @@ export const auditLogs = sqliteTable(
     actorName: text("actorName"),
     actorIp: text("actorIp"),
     userAgent: text("userAgent"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`CURRENT_TIMESTAMP`),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => ({
     entityIdx: index("AuditLog_entityType_entityId_createdAt_idx").on(

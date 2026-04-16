@@ -182,7 +182,7 @@ function BackupTab() {
       <div className="rounded-lg border bg-card p-6">
         <h2 className="mb-2 text-sm font-semibold">데이터베이스 백업</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          현재 SQLite DB 파일을 그대로 다운로드합니다. 복구 시 <code className="rounded bg-muted px-1 py-0.5 text-xs">prisma/dev.db</code>에 덮어쓰면 됩니다.
+          현재 SQLite DB 파일을 그대로 다운로드합니다. 복구 시 <code className="rounded bg-muted px-1 py-0.5 text-xs">db/dev.db</code>에 덮어쓰면 됩니다.
         </p>
         <a href="/api/backup" download>
           <Button variant="outline">

@@ -9,7 +9,7 @@ CREATE TABLE `AuditLog` (
 	`actorName` text,
 	`actorIp` text,
 	`userAgent` text,
-	`createdAt` integer DEFAULT CURRENT_TIMESTAMP NOT NULL
+	`createdAt` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE INDEX `AuditLog_entityType_entityId_createdAt_idx` ON `AuditLog` (`entityType`,`entityId`,`createdAt`);--> statement-breakpoint

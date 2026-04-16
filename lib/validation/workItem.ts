@@ -112,8 +112,14 @@ export const workItemListQuerySchema = z.object({
     .optional()
     .transform((v) => v === "true")
     .pipe(z.boolean().optional()),
+  });
+
+export const workItemBulkStatusUpdateSchema = z.object({
+  ids: z.array(cuidSchema).min(1).max(1000),
+  status: z.enum(STATUSES),
 });
 
 export type WorkItemCreateInput = z.infer<typeof workItemCreateSchema>;
 export type WorkItemUpdateInput = z.infer<typeof workItemUpdateSchema>;
+export type WorkItemBulkStatusUpdateInput = z.infer<typeof workItemBulkStatusUpdateSchema>;
 export type WorkItemListQuery = z.infer<typeof workItemListQuerySchema>;

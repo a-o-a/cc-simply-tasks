@@ -1,7 +1,7 @@
 /**
  * Enum 소스 오브 트루스.
  *
- * SQLite는 native enum을 지원하지 않아 Prisma 스키마의 해당 컬럼은 String으로 저장된다.
+ * SQLite는 native enum을 지원하지 않아 Drizzle 스키마의 해당 컬럼은 String으로 저장된다.
  * 런타임 검증은 zod가 이 배열을 기반으로 수행하고, 타입은 여기서 export된 union 타입을 쓴다.
  *
  * Postgres 이관 시:
