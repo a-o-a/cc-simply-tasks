@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Download, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Download, HardDrive, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -116,10 +116,20 @@ function ServiceTab() {
 /* ───────────────────────────── 백업 탭 ───────────────────────────── */
 
 type DbTable = { name: string; label: string; count: number };
+type BackupFile = { filename: string; size: number; date: string };
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function BackupTab() {
   const [tables, setTables] = React.useState<DbTable[] | null>(null);
   const [statsLoading, setStatsLoading] = React.useState(true);
+  const [backupFiles, setBackupFiles] = React.useState<BackupFile[]>([]);
+  const [filesLoading, setFilesLoading] = React.useState(true);
+  const [triggering, setTriggering] = React.useState(false);
 
   const loadStats = React.useCallback(async () => {
     setStatsLoading(true);
@@ -133,7 +143,36 @@ function BackupTab() {
     }
   }, []);
 
-  React.useEffect(() => { void loadStats(); }, [loadStats]);
+  const loadFiles = React.useCallback(async () => {
+    setFilesLoading(true);
+    try {
+      const data = await api.get<{ files: BackupFile[] }>("/api/backup/files");
+      setBackupFiles(data.files);
+    } catch {
+      toast({ title: "백업 파일 목록 조회 실패", variant: "destructive" });
+    } finally {
+      setFilesLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => { void loadStats(); void loadFiles(); }, [loadStats, loadFiles]);
+
+  async function handleTrigger() {
+    setTriggering(true);
+    try {
+      await api.post("/api/backup/trigger", {});
+      toast({ title: "백업이 완료되었습니다" });
+      void loadFiles();
+    } catch (e) {
+      toast({
+        title: "백업 실패",
+        description: e instanceof Error ? e.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setTriggering(false);
+    }
+  }
 
   return (
     <div className="max-w-xl space-y-6">
@@ -178,18 +217,78 @@ function BackupTab() {
         )}
       </div>
 
-      {/* 백업 */}
+      {/* 백업 실행 */}
       <div className="rounded-lg border bg-card p-6">
         <h2 className="mb-2 text-sm font-semibold">데이터베이스 백업</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          현재 SQLite DB 파일을 그대로 다운로드합니다. 복구 시 <code className="rounded bg-muted px-1 py-0.5 text-xs">db/dev.db</code>에 덮어쓰면 됩니다.
+          자동 백업은 매일 서버 시간 기준 02:00에 실행됩니다 (<code className="rounded bg-muted px-1 py-0.5 text-xs">BACKUP_CRON</code> 환경변수로 변경 가능).
+          최근 7일치를 <code className="rounded bg-muted px-1 py-0.5 text-xs">db/</code> 디렉터리에 보관합니다.
         </p>
-        <a href="/api/backup" download>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            DB 파일 다운로드
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleTrigger} disabled={triggering}>
+            <HardDrive className="mr-2 h-4 w-4" />
+            {triggering ? "백업 중…" : "지금 백업"}
           </Button>
-        </a>
+          <a href="/api/backup" download>
+            <Button variant="ghost">
+              <Download className="mr-2 h-4 w-4" />
+              현재 DB 다운로드
+            </Button>
+          </a>
+        </div>
+      </div>
+
+      {/* 백업 파일 목록 */}
+      <div className="rounded-lg border bg-card">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">백업 파일 목록</h2>
+          <button
+            onClick={() => void loadFiles()}
+            disabled={filesLoading}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-40"
+            aria-label="새로고침"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${filesLoading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+        {filesLoading ? (
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
+            ))}
+          </div>
+        ) : backupFiles.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            백업 파일이 없습니다. 위에서 &apos;지금 백업&apos; 버튼을 눌러 첫 백업을 생성하세요.
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="border-b text-left text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">날짜</th>
+                <th className="px-4 py-3 text-right font-medium">크기</th>
+                <th className="px-4 py-3 w-16" />
+              </tr>
+            </thead>
+            <tbody>
+              {backupFiles.map((f) => (
+                <tr key={f.filename} className="border-b last:border-0 hover:bg-accent/30">
+                  <td className="px-4 py-3 font-mono text-xs">{f.date}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                    {formatBytes(f.size)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <a href={`/api/backup/files/${f.filename}`} download={f.filename}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

@@ -200,6 +200,11 @@
 - [x] **설정 페이지** (`/settings`) — 서비스명 / 멤버 / 코드관리(분류+시스템코드) / 백업 4탭
 - [x] **서비스명 동적화** — `Setting` 모델 DB 저장, 사이드바 실시간 반영
 - [x] **DB 백업** — `GET /api/backup` SQLite 파일 직접 다운로드
+- [x] **자동 백업** — `instrumentation.ts` + `node-cron` 기반 스케줄 백업
+  - `BACKUP_CRON` 환경변수로 cron 표현식 설정 (기본: `0 0 2 * * *`, 매일 02:00)
+  - `VACUUM INTO` 방식으로 안전한 스냅샷 생성 → `db/backup_YYYY-MM-DD.db`
+  - 7일 초과분 자동 삭제, 설정 > 백업 탭에서 파일 목록 조회 및 개별 다운로드
+  - `POST /api/backup/trigger` 즉시 백업 실행 API
 - [x] **WorkSystem CRUD** — 티켓 시스템 코드 마스터
 - [x] **WorkCategory CRUD** — 작업 분류 동적화. `CATEGORIES` enum 완전 제거.
 - [x] **Status 8종 개편** — 대기/진행중/내부테스트/현업테스트/QA테스트/이관대기/이관완료/홀딩
