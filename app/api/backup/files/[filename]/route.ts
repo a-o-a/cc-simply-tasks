@@ -14,7 +14,7 @@ export const GET = async (
   const { filename } = params;
 
   // 경로 탐색 공격 방지: 파일명만 허용
-  if (!/^backup_\d{4}-\d{2}-\d{2}\.db$/.test(filename)) {
+  if (!/^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.db$/.test(filename)) {
     return NextResponse.json({ error: "잘못된 파일명입니다" }, { status: 400 });
   }
 

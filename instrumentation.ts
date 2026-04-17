@@ -4,6 +4,18 @@ export async function register() {
 
   const cron = process.env.BACKUP_CRON ?? "0 0 2 * * *";
   const backupRetainDays = 7;
+  const backupFilenameRe = /^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.db$/;
+  const pad2 = (value: number) => String(value).padStart(2, "0");
+  const backupTimestamp = (date = new Date()) => {
+    const yyyy = date.getFullYear();
+    const mm = pad2(date.getMonth() + 1);
+    const dd = pad2(date.getDate());
+    const hh = pad2(date.getHours());
+    const mi = pad2(date.getMinutes());
+    const ss = pad2(date.getSeconds());
+    return `${yyyy}-${mm}-${dd}_${hh}-${mi}-${ss}`;
+  };
+  const localDateStr = (date = new Date()) => backupTimestamp(date).slice(0, 10);
   const runtimeImport = (specifier: string) =>
     (0, eval)(`import(${JSON.stringify(specifier)})`) as Promise<any>;
   const runtimeRequire = eval("require") as NodeRequire;
@@ -23,8 +35,8 @@ export async function register() {
     const filePath = rawUrl.slice("file:".length);
     const dbPath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
     const backupDir = path.dirname(dbPath);
-    const date = new Date().toISOString().slice(0, 10);
-    const destPath = path.join(backupDir, `backup_${date}.db`);
+    const timestamp = backupTimestamp();
+    const destPath = path.join(backupDir, `backup_${timestamp}.db`);
 
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
@@ -39,12 +51,12 @@ export async function register() {
 
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - backupRetainDays);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const cutoffStr = localDateStr(cutoff);
 
     for (const filename of fs.readdirSync(backupDir)) {
-      if (!/^backup_\d{4}-\d{2}-\d{2}\.db$/.test(filename)) continue;
+      if (!backupFilenameRe.test(filename)) continue;
 
-      const backupDate = filename.replace("backup_", "").replace(".db", "");
+      const backupDate = filename.replace("backup_", "").replace(".db", "").slice(0, 10);
       if (backupDate < cutoffStr) {
         try {
           fs.unlinkSync(path.join(backupDir, filename));
