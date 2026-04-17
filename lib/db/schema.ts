@@ -171,6 +171,66 @@ export const workSystems = sqliteTable(
   }),
 );
 
+export const todos = sqliteTable(
+  "Todo",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    note: text("note"),
+    status: text("status").notNull().default("OPEN"),
+    dueDate: integer("dueDate", { mode: "timestamp_ms" }),
+    order: integer("order").notNull().default(0),
+    assigneeId: text("assigneeId").references(() => teamMembers.id, {
+      onDelete: "set null",
+    }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+    deletedAt: integer("deletedAt", { mode: "timestamp_ms" }),
+  },
+  (table) => ({
+    assigneeStatusIdx: index("Todo_assigneeId_status_idx").on(
+      table.assigneeId,
+      table.status,
+    ),
+    deletedAtIdx: index("Todo_deletedAt_idx").on(table.deletedAt),
+    statusIdx: index("Todo_status_idx").on(table.status),
+  }),
+);
+
+export const todoChecklist = sqliteTable(
+  "TodoChecklist",
+  {
+    id: text("id").primaryKey(),
+    todoId: text("todoId")
+      .notNull()
+      .references(() => todos.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    done: integer("done", { mode: "boolean" }).notNull().default(false),
+    order: integer("order").notNull().default(0),
+    assigneeId: text("assigneeId").references(() => teamMembers.id, {
+      onDelete: "set null",
+    }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+    deletedAt: integer("deletedAt", { mode: "timestamp_ms" }),
+  },
+  (table) => ({
+    todoOrderIdx: index("TodoChecklist_todoId_order_idx").on(
+      table.todoId,
+      table.order,
+    ),
+    assigneeDoneIdx: index("TodoChecklist_assigneeId_done_idx").on(
+      table.assigneeId,
+      table.done,
+    ),
+    deletedAtIdx: index("TodoChecklist_deletedAt_idx").on(table.deletedAt),
+  }),
+);
+
 export const auditLogs = sqliteTable(
   "AuditLog",
   {
@@ -205,3 +265,5 @@ export type SettingRow = typeof settings.$inferSelect;
 export type WorkCategoryRow = typeof workCategories.$inferSelect;
 export type WorkSystemRow = typeof workSystems.$inferSelect;
 export type AuditLogRow = typeof auditLogs.$inferSelect;
+export type TodoRow = typeof todos.$inferSelect;
+export type TodoChecklistRow = typeof todoChecklist.$inferSelect;

@@ -48,6 +48,9 @@ export type ActorType = (typeof ACTOR_TYPES)[number];
 export const AUDIT_ACTIONS = ["CREATE", "UPDATE", "DELETE", "RESTORE"] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
+export const TODO_STATUSES = ["OPEN", "DONE"] as const;
+export type TodoStatus = (typeof TODO_STATUSES)[number];
+
 export const AUDIT_ENTITY_TYPES = [
   "WorkItem",
   "WorkTicket",
@@ -55,5 +58,7 @@ export const AUDIT_ENTITY_TYPES = [
   "TeamMember",
   "WorkSystem",
   "WorkCategory",
+  "Todo",
+  "TodoChecklist",
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

@@ -5,7 +5,7 @@
  * UI에서 enum 값을 그대로 렌더링하지 말고 항상 이 라벨을 거치게 한다.
  */
 
-import type { MemberRole, Priority, Status } from "./enums";
+import type { MemberRole, Priority, Status, TodoStatus } from "./enums";
 
 export const STATUS_LABELS: Record<Status, string> = {
   WAITING: "대기",
@@ -31,4 +31,9 @@ export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
   PLANNING: "기획",
   DESIGN: "디자인",
   ETC: "기타",
+};
+
+export const TODO_STATUS_LABELS: Record<TodoStatus, string> = {
+  OPEN: "진행 중",
+  DONE: "완료",
 };

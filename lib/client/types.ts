@@ -9,6 +9,7 @@ import type {
   MemberRole,
   Priority,
   Status,
+  TodoStatus,
   AuditAction,
   AuditEntityType,
 } from "@/lib/enums";
@@ -106,6 +107,33 @@ export type WorkCategory = {
 
 export type AppSettings = {
   service_name: string;
+};
+
+export type TodoChecklistItem = {
+  id: string;
+  todoId: string;
+  content: string;
+  done: boolean;
+  order: number;
+  assigneeId: string | null;
+  assignee: Member | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TodoItem = {
+  id: string;
+  title: string;
+  note: string | null;
+  status: TodoStatus;
+  dueDate: string | null;
+  order: number;
+  assigneeId: string | null;
+  assignee: Member | null;
+  createdAt: string;
+  updatedAt: string;
+  /** `?include=checklist` 또는 상세 응답에만 포함 */
+  checklist?: TodoChecklistItem[];
 };
 
 export type ListResponse<T> = { items: T[]; nextCursor: string | null };

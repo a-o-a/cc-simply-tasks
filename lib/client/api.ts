@@ -12,6 +12,7 @@
 export const ACTOR_NAME_STORAGE_KEY = "cc-simply-tasks:actor-name";
 export const SERVICE_NAME_STORAGE_KEY = "cc-simply-tasks:service-name";
 export const DEFAULT_SERVICE_NAME = "cc-simply-tasks";
+export const TODOS_CHANGED_EVENT = "todos-changed";
 
 export type ApiErrorCode =
   | "VALIDATION_ERROR"
@@ -141,3 +142,8 @@ export const api = {
     options?: Omit<RequestOptions, "body">,
   ) => request<T>("DELETE", path, options),
 };
+
+export function emitTodosChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(TODOS_CHANGED_EVENT));
+}

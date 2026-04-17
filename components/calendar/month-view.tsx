@@ -71,6 +71,7 @@ type Props = {
   today: string;
   eventsByDay: Map<string, CalendarEvent[]>;
   transfersByDay: Map<string, number>;
+  openTodosByDay: Map<string, number>;
   onAddClick: (dayKey: string) => void;
   onEventClick: (event: CalendarEvent) => void;
 };
@@ -166,6 +167,7 @@ export function MonthView({
   today,
   eventsByDay,
   transfersByDay,
+  openTodosByDay,
   onAddClick,
   onEventClick,
 }: Props) {
@@ -200,6 +202,7 @@ export function MonthView({
             const rawEvents = eventsByDay.get(dayKey) ?? [];
             const dayEvents = sortEvents(rawEvents);
             const transferCount = transfersByDay.get(dayKey) ?? 0;
+            const openTodoCount = openTodosByDay.get(dayKey) ?? 0;
             const dayNum = Number(dayKey.slice(8, 10));
             const colIdx = idx % 7;
             const isSunday = colIdx === 0;
@@ -254,6 +257,16 @@ export function MonthView({
                       </span>
                       <span className="text-[11px] font-medium leading-tight text-emerald-600 dark:text-emerald-400">
                         {transferCount}건
+                      </span>
+                    </div>
+                  )}
+                  {openTodoCount > 0 && (
+                    <div className="flex w-full items-center gap-1 rounded bg-amber-500/10 px-1 py-0.5">
+                      <span className="shrink-0 rounded bg-amber-500/20 px-1 text-[9px] font-semibold leading-[14px] text-amber-500">
+                        할일
+                      </span>
+                      <span className="text-[11px] font-medium leading-tight text-amber-700 dark:text-amber-300">
+                        미완료 {openTodoCount}건
                       </span>
                     </div>
                   )}

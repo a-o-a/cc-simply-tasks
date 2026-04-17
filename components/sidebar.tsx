@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   ArrowRightFromLine,
   Calendar,
+  CheckSquare,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
@@ -26,8 +27,11 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   ACTOR_NAME_STORAGE_KEY,
+  api,
+  ApiError,
   DEFAULT_SERVICE_NAME,
   SERVICE_NAME_STORAGE_KEY,
+  TODOS_CHANGED_EVENT,
 } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "홈", icon: LayoutDashboard, exact: true },
   { href: "/work-items", label: "작업", icon: ListChecks },
   { href: "/transfer", label: "이관", icon: ArrowRightFromLine },
+  { href: "/todos", label: "할 일", icon: CheckSquare },
   { href: "/calendar", label: "캘린더", icon: Calendar },
   { href: "/settings", label: "설정", icon: Settings },
 ];
@@ -66,6 +71,19 @@ export function Sidebar() {
   const [mounted, setMounted] = React.useState(false);
   const [nameDialogOpen, setNameDialogOpen] = React.useState(false);
   const [nameDraft, setNameDraft] = React.useState("");
+  const [openTodoCount, setOpenTodoCount] = React.useState(0);
+
+  const loadOpenTodoCount = React.useCallback(async () => {
+    try {
+      const res = await api.get<{ count: number }>("/api/todos/count", {
+        query: { status: "OPEN" },
+      });
+      setOpenTodoCount(res.count);
+    } catch (err) {
+      if (!(err instanceof ApiError)) return;
+      setOpenTodoCount(0);
+    }
+  }, []);
 
   React.useEffect(() => {
     setMounted(true);
@@ -89,6 +107,7 @@ export function Sidebar() {
       setActorName(window.localStorage.getItem(ACTOR_NAME_STORAGE_KEY) ?? "");
     };
     syncActorName();
+    void loadOpenTodoCount();
 
     const syncServiceName = () => {
       const name = window.localStorage.getItem(SERVICE_NAME_STORAGE_KEY) ?? DEFAULT_SERVICE_NAME;
@@ -98,12 +117,22 @@ export function Sidebar() {
     window.addEventListener("storage", syncActorName);
     window.addEventListener("actor-name-changed", syncActorName);
     window.addEventListener("settings-changed", syncServiceName);
+    window.addEventListener("focus", loadOpenTodoCount);
+    window.addEventListener("visibilitychange", loadOpenTodoCount);
+    window.addEventListener(TODOS_CHANGED_EVENT, loadOpenTodoCount);
     return () => {
       window.removeEventListener("storage", syncActorName);
       window.removeEventListener("actor-name-changed", syncActorName);
       window.removeEventListener("settings-changed", syncServiceName);
+      window.removeEventListener("focus", loadOpenTodoCount);
+      window.removeEventListener("visibilitychange", loadOpenTodoCount);
+      window.removeEventListener(TODOS_CHANGED_EVENT, loadOpenTodoCount);
     };
-  }, []);
+  }, [loadOpenTodoCount]);
+
+  React.useEffect(() => {
+    void loadOpenTodoCount();
+  }, [pathname, loadOpenTodoCount]);
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -168,7 +197,7 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+                "relative flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
                 active
                   ? "bg-secondary text-secondary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
@@ -177,7 +206,20 @@ export function Sidebar() {
               title={collapsed ? item.label : undefined}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed ? <span>{item.label}</span> : null}
+              {!collapsed ? (
+                <>
+                  <span className="min-w-0 flex-1">{item.label}</span>
+                  {item.href === "/todos" && openTodoCount > 0 ? (
+                    <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white tabular-nums">
+                      {openTodoCount > 99 ? "99+" : openTodoCount}
+                    </span>
+                  ) : null}
+                </>
+              ) : item.href === "/todos" && openTodoCount > 0 ? (
+                <span className="absolute right-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
+                  {openTodoCount > 9 ? "9+" : openTodoCount}
+                </span>
+              ) : null}
             </Link>
           );
         })}

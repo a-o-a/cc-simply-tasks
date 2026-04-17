@@ -242,13 +242,18 @@ export function DatePicker({
           tabIndex={disabled ? -1 : 0}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
           className={cn(
-            "flex h-9 w-full cursor-pointer items-center rounded-md border border-input bg-background px-3 text-sm transition-colors",
+            "flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors",
             "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
             disabled && "cursor-not-allowed opacity-50",
             className,
           )}
         >
-          <span className={cn("flex-1 truncate", !value && "text-muted-foreground")}>
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate tabular-nums",
+              !value && "text-muted-foreground",
+            )}
+          >
             {displayLabel || placeholder}
           </span>
           {clearable && value && !disabled && (
@@ -256,12 +261,12 @@ export function DatePicker({
               type="button"
               tabIndex={-1}
               onClick={(e) => { e.stopPropagation(); onChange(""); }}
-              className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
-          <CalendarDays className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
         </div>
       </Popover.Trigger>
 
@@ -453,13 +458,18 @@ export function DateTimePicker({
           tabIndex={disabled ? -1 : 0}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
           className={cn(
-            "flex h-9 w-full cursor-pointer items-center rounded-md border border-input bg-background px-3 text-sm transition-colors",
+            "flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors",
             "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
             disabled && "cursor-not-allowed opacity-50",
             className,
           )}
         >
-          <span className={cn("flex-1 truncate", !value && "text-muted-foreground")}>
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate tabular-nums",
+              !value && "text-muted-foreground",
+            )}
+          >
             {displayLabel || placeholder}
           </span>
           {clearable && value && !disabled && (
@@ -467,12 +477,12 @@ export function DateTimePicker({
               type="button"
               tabIndex={-1}
               onClick={(e) => { e.stopPropagation(); onChange(""); }}
-              className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
-          <CalendarDays className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
         </div>
       </Popover.Trigger>
 
