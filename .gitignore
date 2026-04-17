@@ -28,4 +28,5 @@ npm-debug.log*
 # editor
 .vscode
 .idea
+.claude
 .DS_Store
