@@ -1,7 +1,7 @@
 import path from "path";
 import { pathToFileURL } from "url";
-import { createClient, type Client } from "@libsql/client/node";
 import { drizzle } from "drizzle-orm/libsql";
+import type { Client } from "@libsql/client/node";
 import * as schema from "./db/schema";
 
 type DbClient = ReturnType<typeof drizzle>;
@@ -11,6 +11,13 @@ type DatabaseState = {
 };
 
 const globalForDb = globalThis as unknown as DatabaseState;
+
+function loadLibsqlClient() {
+  // Keep libsql out of the webpack graph so Next.js doesn't try to parse
+  // native-package support files like README.md or .d.ts during server builds.
+  const runtimeRequire = eval("require") as NodeRequire;
+  return runtimeRequire("@libsql/client/node") as typeof import("@libsql/client/node");
+}
 
 function resolveSqliteFilePath() {
   const rawUrl = process.env.DATABASE_URL ?? "file:./db/dev.db";
@@ -32,6 +39,7 @@ function initDb() {
     return { sqlite: globalForDb.sqlite, db: globalForDb.db };
   }
 
+  const { createClient } = loadLibsqlClient();
   const sqlite = createClient({
     url: resolveSqliteClientUrl(),
   });
