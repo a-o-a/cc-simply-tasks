@@ -250,7 +250,7 @@ export function TodosClient() {
               onChange={(e) =>
                 setFilters((f) => ({ ...f, title: e.target.value }))
               }
-              placeholder="제목 검색"
+              placeholder=""
               className="h-7 text-xs"
             />
           </div>
