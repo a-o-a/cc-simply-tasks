@@ -253,7 +253,7 @@ function MemberFormDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={100}
-              placeholder="예: 김지원"
+              placeholder=""
             />
           </div>
           <div className="space-y-2">

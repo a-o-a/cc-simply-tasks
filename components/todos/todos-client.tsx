@@ -239,6 +239,7 @@ export function TodosClient() {
                   }))
                 }
                 onClear={() => setFilters((f) => ({ ...f, assigneeId: [] }))}
+                className="h-7 px-2 text-xs"
               />
             </div>
           </div>

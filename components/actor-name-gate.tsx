@@ -70,7 +70,7 @@ export function ActorNameGate() {
               autoFocus
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="예: 김지원"
+              placeholder=""
               maxLength={32}
             />
           </div>

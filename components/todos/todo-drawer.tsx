@@ -465,7 +465,7 @@ export function TodoDrawer({
               id="todo-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 4/25 회식 참석 확인"
+              placeholder=""
             />
           </div>
 

@@ -111,27 +111,39 @@ export function DashboardClient() {
     const todayFromMs = kstDateStringToUtcMs(todayKst);
     const todayToMs = todayFromMs + DAY_MS;
 
-    Promise.all([
-      loadWorkItems(),
-      api.get<ListResponse<AuditLog>>("/api/audit-logs"),
-      api.get<{ items: CalendarEvent[] }>("/api/calendar-events", {
-        query: {
-          from: new Date(todayFromMs).toISOString(),
-          to: new Date(todayToMs).toISOString(),
-        },
-      }),
-      api.get<ListResponse<Member>>("/api/team-members"),
-      api.get<{ items: WorkCategory[] }>("/api/work-categories"),
-      api.get<{ items: WorkSystem[] }>("/api/work-systems"),
-    ])
-      .then(([, logsRes, calRes, membersRes, catRes, sysRes]) => {
+    loadWorkItems().catch((err) => {
+      if (cancelled) return;
+      toast({
+        title: "작업 현황 조회 실패",
+        description: err instanceof ApiError ? err.message : undefined,
+        variant: "destructive",
+      });
+      setCounts({ byStatus: {}, total: 0 });
+      setDueThisWeek([]);
+      setInProgress([]);
+    });
+
+    api.get<ListResponse<AuditLog>>("/api/audit-logs")
+      .then((res) => { if (!cancelled) setLogs(res.items.slice(0, 10)); })
+      .catch((err) => {
         if (cancelled) return;
-        setLogs(logsRes.items.slice(0, 10));
-        setMembers(membersRes.items);
-        setCategories(catRes.items);
-        setSystems(sysRes.items);
-        // 종일 우선 → 카테고리 순 → 제목 asc
-        const sorted = calRes.items.slice().sort((a, b) => {
+        toast({
+          title: "활동 로그 조회 실패",
+          description: err instanceof ApiError ? err.message : undefined,
+          variant: "destructive",
+        });
+        setLogs([]);
+      });
+
+    api.get<{ items: CalendarEvent[] }>("/api/calendar-events", {
+      query: {
+        from: new Date(todayFromMs).toISOString(),
+        to: new Date(todayToMs).toISOString(),
+      },
+    })
+      .then((res) => {
+        if (cancelled) return;
+        const sorted = res.items.slice().sort((a, b) => {
           if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
           const catDiff = (CAT_ORDER[a.category] ?? 99) - (CAT_ORDER[b.category] ?? 99);
           if (catDiff !== 0) return catDiff;
@@ -142,15 +154,31 @@ export function DashboardClient() {
       .catch((err) => {
         if (cancelled) return;
         toast({
-          title: "대시보드 데이터 조회 실패",
+          title: "오늘 일정 조회 실패",
           description: err instanceof ApiError ? err.message : undefined,
           variant: "destructive",
         });
-        setCounts({ byStatus: {}, total: 0 });
-        setDueThisWeek([]);
-        setInProgress([]);
-        setLogs([]);
         setCalEvents([]);
+      });
+
+    Promise.all([
+      api.get<ListResponse<Member>>("/api/team-members"),
+      api.get<{ items: WorkCategory[] }>("/api/work-categories"),
+      api.get<{ items: WorkSystem[] }>("/api/work-systems"),
+    ])
+      .then(([membersRes, catRes, sysRes]) => {
+        if (cancelled) return;
+        setMembers(membersRes.items);
+        setCategories(catRes.items);
+        setSystems(sysRes.items);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        toast({
+          title: "참조 데이터 조회 실패",
+          description: err instanceof ApiError ? err.message : undefined,
+          variant: "destructive",
+        });
       });
     return () => { cancelled = true; };
   }, [todayKst, loadWorkItems]);

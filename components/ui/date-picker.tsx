@@ -135,7 +135,7 @@ function CalendarGrid({
 // ─────────────────────── 공통 트리거 래퍼 스타일 ───────────────────────
 
 const popoverContentClass = cn(
-  "z-50 w-64 rounded-lg border bg-popover p-3 text-popover-foreground shadow-md",
+  "z-50 w-72 rounded-lg border bg-popover p-3 text-popover-foreground shadow-md",
   "data-[state=open]:animate-in data-[state=closed]:animate-out",
   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
   "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -322,7 +322,7 @@ export function DatePicker({
                   e.stopPropagation();
                   applyDraftInput();
                 }}
-                className="rounded border border-input px-2 py-1 text-xs font-medium hover:bg-accent"
+                className="self-stretch flex items-center whitespace-nowrap rounded border border-input px-3 text-xs font-medium hover:bg-accent"
               >
                 적용
               </button>
@@ -537,7 +537,7 @@ export function DateTimePicker({
                   e.stopPropagation();
                   applyDraftDate();
                 }}
-                className="rounded border border-input px-2 py-1 text-xs font-medium hover:bg-accent"
+                className="self-stretch flex items-center whitespace-nowrap rounded border border-input px-3 text-xs font-medium hover:bg-accent"
               >
                 적용
               </button>

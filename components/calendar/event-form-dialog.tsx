@@ -303,7 +303,7 @@ export function EventFormDialog({
                 value={state.title}
                 onChange={(e) => update("title", e.target.value)}
                 maxLength={300}
-                placeholder="예: 대시보드에 요약정보 표시 영역 추가"
+                placeholder=""
               />
             </div>
             <div className="flex flex-col gap-2">

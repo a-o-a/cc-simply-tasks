@@ -685,6 +685,7 @@ function FilterBar({
                 set("assigneeId", next);
               }}
               onClear={() => set("assigneeId", [])}
+              className="h-7 px-2 text-xs"
             />
           </div>
         </div>
@@ -704,7 +705,7 @@ function FilterBar({
         {/* 이관일 */}
         <div className="flex-1 space-y-1.5 pl-3">
           <Label className="text-xs">이관일</Label>
-          <DatePicker value={filters.transferDate} onChange={(v) => set("transferDate", v)} placeholder="날짜 선택" />
+          <DatePicker value={filters.transferDate} onChange={(v) => set("transferDate", v)} placeholder="날짜 선택" className="h-7 text-xs" />
         </div>
       </div>
 
@@ -717,7 +718,7 @@ function FilterBar({
         <div className="flex-1 space-y-1.5 pr-3">
           <Label className="text-xs">제목</Label>
           <Input
-            placeholder="제목 검색"
+            placeholder=""
             className="h-7 text-xs"
             {...textInputProps("title", localTitle, setLocalTitle)}
           />
@@ -740,7 +741,7 @@ function FilterBar({
         <div className="flex-1 space-y-1.5 px-3">
           <Label className="text-xs">요청구분</Label>
           <Input
-            placeholder="요청구분 검색"
+            placeholder=""
             className="h-7 text-xs"
             {...textInputProps("requestType", localRequestType, setLocalRequestType)}
           />
@@ -750,7 +751,7 @@ function FilterBar({
         <div className="flex-1 space-y-1.5 px-3">
           <Label className="text-xs">요청자</Label>
           <Input
-            placeholder="요청자 검색"
+            placeholder=""
             className="h-7 text-xs"
             {...textInputProps("requestor", localRequestor, setLocalRequestor)}
           />
@@ -760,7 +761,7 @@ function FilterBar({
         <div className="flex-1 space-y-1.5 pl-3">
           <Label className="text-xs">요청번호</Label>
           <Input
-            placeholder="요청번호 검색"
+            placeholder=""
             className="h-7 text-xs"
             {...textInputProps("requestNumber", localRequestNumber, setLocalRequestNumber)}
           />

@@ -470,7 +470,7 @@ function WorkCategoryDialog({
               id="wc-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="a-service"
+              placeholder=""
               maxLength={100}
               disabled={!!editing}
             />
@@ -483,7 +483,7 @@ function WorkCategoryDialog({
               autoFocus={!!editing}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="A 서비스"
+              placeholder=""
               maxLength={100}
             />
           </div>
@@ -684,7 +684,7 @@ function WorkSystemDialog({
               id="ws-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="xxx-channel-api"
+              placeholder=""
               maxLength={100}
               disabled={!!editing}
             />
@@ -697,7 +697,7 @@ function WorkSystemDialog({
               autoFocus={!!editing}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="채널API"
+              placeholder=""
               maxLength={100}
             />
           </div>

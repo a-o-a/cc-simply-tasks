@@ -270,7 +270,7 @@ export function Sidebar() {
                 autoFocus
                 value={nameDraft}
                 onChange={(e) => setNameDraft(e.target.value)}
-                placeholder="예: 김지원"
+                placeholder=""
                 maxLength={32}
               />
             </div>
