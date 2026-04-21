@@ -210,13 +210,13 @@ export function Sidebar() {
                 <>
                   <span className="min-w-0 flex-1">{item.label}</span>
                   {item.href === "/todos" && openTodoCount > 0 ? (
-                    <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white tabular-nums">
+                    <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-muted text-muted-foreground px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums">
                       {openTodoCount > 99 ? "99+" : openTodoCount}
                     </span>
                   ) : null}
                 </>
               ) : item.href === "/todos" && openTodoCount > 0 ? (
-                <span className="absolute right-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
+                <span className="absolute right-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-muted text-muted-foreground px-1 text-[10px] font-semibold leading-none tabular-nums">
                   {openTodoCount > 9 ? "9+" : openTodoCount}
                 </span>
               ) : null}
