@@ -167,7 +167,7 @@ npm run dev
 - 운영에서는 **앱 배포 디렉터리와 SQLite DB 파일 경로를 분리**하는 것을 권장합니다.
 - 현재 개발 기본값은 `.env`의 `DATABASE_URL="file:./db/dev.db"`이며, 실제 파일은 프로젝트 루트의 `db/dev.db`입니다.
 - 이 값을 운영에서도 그대로 쓰면 배포 과정에서 프로젝트 디렉터리를 통째로 교체할 때 DB가 함께 유실될 수 있습니다.
-- 따라서 운영에서는 예를 들어 `DATABASE_URL="file:/var/lib/cc-simply-tasks/prod.db"`처럼 **배포 산출물 바깥의 영속 경로**를 사용하세요.
+- 따라서 운영에서는 예를 들어 `DATABASE_URL="file:/var/lib/cc-simply-tasks/dev.db"`처럼 **배포 산출물 바깥의 영속 경로**를 사용하세요.
 
 ### 권장 디렉터리 예시
 
@@ -177,13 +177,13 @@ npm run dev
 ├── releases/2026-04-14/      # 배포 버전별 코드
 └── shared/
     ├── .env.production
-    └── prod.db               # 운영 DB (영속 파일)
+    └── dev.db                # 운영 DB (영속 파일)
 ```
 
 예시 `.env.production`:
 
 ```bash
-DATABASE_URL="file:/srv/cc-simply-tasks/shared/prod.db"
+DATABASE_URL="file:/srv/cc-simply-tasks/shared/dev.db"
 NODE_ENV=production
 ```
 
