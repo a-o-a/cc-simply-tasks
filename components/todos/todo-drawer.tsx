@@ -88,10 +88,12 @@ function createDraftChecklistItem(): DraftChecklistItem {
 }
 
 function sanitizeChecklistDraft(items: DraftChecklistItem[]): DraftChecklistItem[] {
-  return items.map((item) => ({
-    ...item,
-    content: item.content.trim(),
-  }));
+  return items
+    .map((item) => ({
+      ...item,
+      content: item.content.trim(),
+    }))
+    .filter((item) => item.content.length > 0);
 }
 
 export function TodoDrawer({
@@ -217,12 +219,10 @@ export function TodoDrawer({
     setStatus(newStatus);
   }
 
-  async function syncChecklist(todoId: string) {
-    const trimmedChecklist = sanitizeChecklistDraft(checklist);
-
+  async function syncChecklist(todoId: string, nextChecklist: DraftChecklistItem[]) {
     const originalChecklist = originalSnapshotRef.current?.checklist ?? [];
     const originalById = new Map(originalChecklist.map((item) => [item.id, item]));
-    const nextIds = new Set(trimmedChecklist.map((item) => item.id));
+    const nextIds = new Set(nextChecklist.map((item) => item.id));
 
     for (const originalItem of originalChecklist) {
       if (!nextIds.has(originalItem.id)) {
@@ -230,8 +230,8 @@ export function TodoDrawer({
       }
     }
 
-    for (let index = 0; index < trimmedChecklist.length; index += 1) {
-      const item = trimmedChecklist[index];
+    for (let index = 0; index < nextChecklist.length; index += 1) {
+      const item = nextChecklist[index];
       const originalItem = originalById.get(item.id);
       if (!originalItem || item._isNew) {
         await api.post<TodoChecklistItem>(`/api/todos/${todoId}/checklist`, {
@@ -266,29 +266,22 @@ export function TodoDrawer({
     return true;
   }
 
-  async function saveDraft(options?: { closeAfterSave?: boolean }) {
+  async function saveDraft(options?: { closeAfterSave?: boolean; title?: string }) {
     if (saving) return false;
-    if (!title.trim()) {
+    const nextTitle = options?.title ?? title;
+    if (!nextTitle.trim()) {
       toast({ title: "제목을 입력하세요", variant: "destructive" });
       return false;
     }
 
     const payload = {
-      title,
+      title: nextTitle,
       note: note || null,
       status,
       assigneeId,
       dueDate: dueDate ? fromDateInputValue(dueDate) : null,
     };
     const normalizedChecklist = sanitizeChecklistDraft(checklist);
-    if (normalizedChecklist.some((item) => item.content.length === 0)) {
-      toast({
-        title: "빈 체크리스트 항목이 있습니다",
-        description: "내용을 입력하거나 빈 항목을 삭제한 뒤 저장하세요.",
-        variant: "destructive",
-      });
-      return false;
-    }
 
     try {
       setSaving(true);
@@ -305,7 +298,7 @@ export function TodoDrawer({
       } else if (detail) {
         await api.patch<TodoItem>(`/api/todos/${detail.id}`, payload);
         setChecklist(normalizedChecklist);
-        const synced = await syncChecklist(detail.id);
+        const synced = await syncChecklist(detail.id, normalizedChecklist);
         if (!synced) return false;
       }
 
@@ -371,8 +364,17 @@ export function TodoDrawer({
     }
   }
 
-  async function handleCreate() {
-    await saveDraft({ closeAfterSave: true });
+  async function handleCreate(titleOverride?: string) {
+    await saveDraft({ closeAfterSave: true, title: titleOverride });
+  }
+
+  async function handleTitleSubmit(titleOverride: string) {
+    if (mode === "create") {
+      await handleCreate(titleOverride);
+      return;
+    }
+
+    await saveDraft({ closeAfterSave: true, title: titleOverride });
   }
 
   async function handleDelete() {
@@ -459,15 +461,32 @@ export function TodoDrawer({
             loading && "pointer-events-none opacity-60",
           )}
         >
-          <div className="space-y-1.5">
+          <form
+            className="space-y-1.5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleTitleSubmit(title);
+            }}
+          >
             <Label htmlFor="todo-title">제목</Label>
             <Input
               id="todo-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (
+                  e.key !== "Enter" ||
+                  e.shiftKey ||
+                  e.nativeEvent.isComposing
+                ) {
+                  return;
+                }
+                e.preventDefault();
+                void handleTitleSubmit(e.currentTarget.value);
+              }}
               placeholder=""
             />
-          </div>
+          </form>
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
             <div className="min-w-0 space-y-1.5">

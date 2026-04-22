@@ -36,7 +36,7 @@ app/api/<resource>/[id]/route.ts
 
 - 공용 DB 객체는 [`lib/db.ts`](../lib/db.ts) 의 `db`를 사용한다.
 - DB 연결은 `DATABASE_URL=file:...` 값을 `file://` URL로 변환해 `@libsql/client`에 전달한다.
-- API 코드에서는 관성적으로 `await ensureSqlitePragma()`를 호출해도 되지만, 현재는 no-op이다.
+- API 코드에서는 DB 접근 전 `await ensureSqlitePragma()`를 호출한다. 최초 호출 시 SQLite PRAGMA(`busy_timeout`, `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`)를 한 번 적용한다.
 
 ### 3.2 스키마
 

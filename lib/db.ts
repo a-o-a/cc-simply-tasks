@@ -68,8 +68,23 @@ export const db = new Proxy({} as DbClient, {
   },
 });
 
-export function ensureSqlitePragma(): Promise<void> {
-  return Promise.resolve();
+let pragmaPromise: Promise<void> | undefined;
+
+export async function ensureSqlitePragma(): Promise<void> {
+  if (!pragmaPromise) {
+    pragmaPromise = (async () => {
+      const sqlite = getSqlite();
+      await sqlite.execute("PRAGMA busy_timeout = 5000");
+      await sqlite.execute("PRAGMA journal_mode = WAL");
+      await sqlite.execute("PRAGMA synchronous = NORMAL");
+      await sqlite.execute("PRAGMA foreign_keys = ON");
+    })().catch((error) => {
+      pragmaPromise = undefined;
+      throw error;
+    });
+  }
+
+  await pragmaPromise;
 }
 
 export function getSqliteDbPath() {
