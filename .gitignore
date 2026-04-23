@@ -20,6 +20,7 @@ build
 # sqlite
 db/*.db
 db/*.db-*
+!db/dev.db.clean
 
 # logs
 *.log

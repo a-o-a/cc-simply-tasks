@@ -291,6 +291,7 @@ export const PATCH = withErrorHandler(
 ## 8. 마이그레이션 / DB 파일
 
 - 개발 기본 DB: `db/dev.db`
+- 최초 실행용 깨끗한 DB 템플릿: `db/dev.db.clean`
 - 운영에서는 `DATABASE_URL`을 영속 경로로 바꿔 사용한다.
 - 스키마 수정 후:
 
@@ -299,6 +300,7 @@ npm run db:generate
 npm run db:migrate
 ```
 
+- migration이 추가되면 `db/dev.db.clean`도 새 스키마 기준으로 다시 생성해 커밋한다.
 - 백업/복구는 `DATABASE_URL`이 가리키는 실제 파일 기준으로 처리한다.
 
 ## 9. 수동 검증 체크리스트
