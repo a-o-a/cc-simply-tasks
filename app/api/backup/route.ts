@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { readFileSync, existsSync } from "fs";
 import { getSqliteDbPath } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 /**
  * GET /api/backup
  * SQLite DB 파일을 그대로 다운로드.
@@ -23,6 +26,7 @@ export const GET = async () => {
       "Content-Type": "application/octet-stream",
       "Content-Disposition": `attachment; filename="backup-${date}.db"`,
       "Content-Length": String(file.byteLength),
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     },
   });
 };

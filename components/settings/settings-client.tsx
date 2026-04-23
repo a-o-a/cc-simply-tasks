@@ -157,12 +157,28 @@ function BackupTab() {
 
   React.useEffect(() => { void loadStats(); void loadFiles(); }, [loadStats, loadFiles]);
 
+  React.useEffect(() => {
+    const refreshVisibleBackupFiles = () => {
+      if (document.visibilityState === "visible") {
+        void loadFiles();
+      }
+    };
+
+    window.addEventListener("focus", refreshVisibleBackupFiles);
+    document.addEventListener("visibilitychange", refreshVisibleBackupFiles);
+
+    return () => {
+      window.removeEventListener("focus", refreshVisibleBackupFiles);
+      document.removeEventListener("visibilitychange", refreshVisibleBackupFiles);
+    };
+  }, [loadFiles]);
+
   async function handleTrigger() {
     setTriggering(true);
     try {
       await api.post("/api/backup/trigger", {});
       toast({ title: "백업이 완료되었습니다" });
-      void loadFiles();
+      await loadFiles();
     } catch (e) {
       toast({
         title: "백업 실패",
