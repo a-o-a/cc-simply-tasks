@@ -205,11 +205,6 @@ export function CalendarClient() {
     setSelectedDate(today);
     setCursor(cursorFromDateStr(today));
   }
-  function handleDateSelect(dayKey: string) {
-    setSelectedDate(dayKey);
-    setCursor(cursorFromDateStr(dayKey));
-  }
-
   // ── 팀원 필터 ───────────────────────────────────────────────────────────────
 
   function toggleMember(memberId: string) {

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, inArray, isNull, ne } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { now } from "@/lib/db/helpers";
 import { workItems } from "@/lib/db/schema";

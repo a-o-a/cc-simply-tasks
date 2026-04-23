@@ -29,7 +29,6 @@ import type {
 } from "@/lib/client/types";
 import {
   PRIORITIES,
-  STATUSES,
   type Priority,
   type Status,
 } from "@/lib/enums";
@@ -256,11 +255,6 @@ export function WorkItemsClient() {
 
   function openCreate() {
     setEditing(null);
-    setFormOpen(true);
-  }
-
-  function openEditFromList(item: WorkItemListItem) {
-    setEditing(item);
     setFormOpen(true);
   }
 
@@ -847,16 +841,6 @@ function SystemFilter({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  );
-}
-
-function SkeletonBlock() {
-  return (
-    <div className="space-y-2 rounded-lg border bg-card p-4">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-10 animate-pulse rounded bg-muted" />
-      ))}
-    </div>
   );
 }
 

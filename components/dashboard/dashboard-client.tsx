@@ -377,13 +377,6 @@ export function DashboardClient() {
                       {formatDateTime(log.createdAt)}
                     </span>
                   </div>
-                  {/*
-                  {summarizeAuditLog(log) ? (
-                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground/65">
-                      {summarizeAuditLog(log)}
-                    </div>
-                  ) : null}
-                   */}
                 </li>
               ))}
             </ul>
@@ -504,49 +497,6 @@ const ENTITY_LABELS: Record<string, string> = {
 
 function shortEntityId(id: string) {
   return id.length > 8 ? id.slice(-8) : id;
-}
-
-function prettifyAuditValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "비어 있음";
-  if (typeof value === "boolean") return value ? "예" : "아니오";
-  if (Array.isArray(value)) return `${value.length}개`;
-  if (typeof value === "object") return "변경됨";
-  return String(value);
-}
-
-function summarizeAuditLog(log: AuditLog): string | null {
-  try {
-    const before = log.beforeJson ? JSON.parse(log.beforeJson) as Record<string, unknown> : {};
-    const after = log.afterJson ? JSON.parse(log.afterJson) as Record<string, unknown> : {};
-    const keys = [...new Set([...Object.keys(after), ...Object.keys(before)])];
-    const preferredKeys = [
-      "title",
-      "name",
-      "status",
-      "category",
-      "priority",
-      "requestNumber",
-      "requestor",
-      "role",
-      "startDateTime",
-      "endDateTime",
-      "startDate",
-      "endDate",
-      "transferDate",
-    ];
-    const key = preferredKeys.find((item) => keys.includes(item)) ?? keys[0];
-    if (!key) return null;
-
-    if (log.action === "CREATE") {
-      return `${key}: ${prettifyAuditValue(after[key])}`;
-    }
-    if (log.action === "DELETE") {
-      return `${key}: ${prettifyAuditValue(before[key])}`;
-    }
-    return `${key}: ${prettifyAuditValue(before[key])} -> ${prettifyAuditValue(after[key])}`;
-  } catch {
-    return null;
-  }
 }
 
 function SkeletonRows() {

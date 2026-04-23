@@ -171,7 +171,6 @@ export function GanttView({
   // 오늘 열 인덱스
   const todayMs = toDayStart(new Date().toISOString());
   const todayCol = Math.floor((todayMs - window.startMs) / DAY_MS);
-  const todayInRange = todayCol >= 0 && todayCol < totalDays;
 
   return (
     <div className="relative">

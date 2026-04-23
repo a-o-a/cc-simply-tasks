@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, asc, eq, exists, gt, inArray, isNull, lt } from "drizzle-orm";
+import { and, asc, eq, exists, gt, isNull, lt } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { newId, now } from "@/lib/db/helpers";
 import { hydrateCalendarEvents } from "@/lib/db/queries";
