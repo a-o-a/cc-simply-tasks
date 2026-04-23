@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { CalendarClock, CalendarDays, ListChecks, Loader2 } from "lucide-react";
-import { ApiError, api } from "@/lib/client/api";
+import { ApiError, api, WORK_ITEMS_CHANGED_EVENT } from "@/lib/client/api";
 import { formatDateTime } from "@/lib/client/format";
 import {
   kstDateStringToUtcMs,
@@ -182,6 +182,23 @@ export function DashboardClient() {
       });
     return () => { cancelled = true; };
   }, [todayKst, loadWorkItems]);
+
+  React.useEffect(() => {
+    const reload = () => {
+      void loadWorkItems();
+    };
+    const reloadWhenVisible = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    window.addEventListener(WORK_ITEMS_CHANGED_EVENT, reload);
+    window.addEventListener("focus", reload);
+    document.addEventListener("visibilitychange", reloadWhenVisible);
+    return () => {
+      window.removeEventListener(WORK_ITEMS_CHANGED_EVENT, reload);
+      window.removeEventListener("focus", reload);
+      document.removeEventListener("visibilitychange", reloadWhenVisible);
+    };
+  }, [loadWorkItems]);
 
   // 이관일 라벨
   function transferDateLabel(transferDate: string) {

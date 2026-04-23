@@ -17,7 +17,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MemberFilter } from "@/components/member-filter";
-import { ApiError, api } from "@/lib/client/api";
+import { ApiError, api, emitWorkItemsChanged } from "@/lib/client/api";
 import { toast } from "@/lib/client/use-toast";
 import type {
   ListResponse,
@@ -289,6 +289,7 @@ export function WorkItemsClient() {
             item.id === id ? { ...item, ...updated, assignee: item.assignee } : item
           )
         );
+        emitWorkItemsChanged();
         toast({
           title: "상태 변경됨",
           description: `${originalItem.title}의 상태가 ${STATUS_LABELS[status]}으로 변경되었습니다.`,

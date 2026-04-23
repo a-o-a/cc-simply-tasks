@@ -9,6 +9,9 @@ import { withErrorHandler } from "@/lib/http";
  * 삭제되지 않은 작업의 상태별 카운트를 반환.
  * { byStatus: Record<string, number>, total: number }
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async () => {
   await ensureSqlitePragma();
 
@@ -28,5 +31,12 @@ export const GET = withErrorHandler(async () => {
     total += Number(row.count);
   }
 
-  return NextResponse.json({ byStatus, total });
+  return NextResponse.json(
+    { byStatus, total },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      },
+    },
+  );
 });

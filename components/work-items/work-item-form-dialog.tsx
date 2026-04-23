@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { MemberFilter } from "@/components/member-filter";
-import { ApiError, api } from "@/lib/client/api";
+import { ApiError, api, emitWorkItemsChanged } from "@/lib/client/api";
 import { fromDateInputValue, toDateInputValue } from "@/lib/client/format";
 import { toast } from "@/lib/client/use-toast";
 import type {
@@ -287,10 +287,12 @@ export function WorkItemFormDialog({
           payload
         );
         toast({ title: "작업을 수정했습니다" });
+        emitWorkItemsChanged();
         onSaved(updated);
       } else {
         await api.post("/api/work-items", payload);
         toast({ title: "작업을 추가했습니다" });
+        emitWorkItemsChanged();
         onSaved();
       }
     } catch (err) {

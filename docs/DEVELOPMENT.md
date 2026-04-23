@@ -269,6 +269,15 @@ export const PATCH = withErrorHandler(
 - `x-actor-name`, `x-forwarded-for`, `user-agent`를 사용한다.
 - 인증이 없으므로 현재 `actorType`은 `ANONYMOUS`다.
 
+### 5.8 카운트 API와 클라이언트 변경 이벤트
+
+- DB 상태를 그대로 보여줘야 하는 카운트/통계 GET 라우트는 Next Route Handler 캐시가 끼지 않게 명시한다.
+- 예: [`GET /api/work-items/count`](../app/api/work-items/count/route.ts)는 `dynamic = "force-dynamic"`, `revalidate = 0`, `Cache-Control: no-store`를 함께 둔다.
+- 클라이언트 fetch wrapper도 `cache: "no-store"`를 사용하지만, 서버 Route Handler의 정적 캐시 가능성은 라우트 파일에서 별도로 차단한다.
+- 작업 생성/수정/삭제/상태 변경처럼 다른 화면의 통계에 영향을 주는 write 성공 후에는 [`emitWorkItemsChanged()`](../lib/client/api.ts)를 호출한다.
+- 대시보드처럼 같은 탭에서 오래 열려 있을 수 있는 화면은 `WORK_ITEMS_CHANGED_EVENT`, `focus`, `visibilitychange`에서 필요한 데이터를 다시 조회한다.
+- TODO 뱃지는 같은 패턴으로 `emitTodosChanged()` / `TODOS_CHANGED_EVENT`를 사용한다.
+
 ## 6. 관계 조회 규칙
 
 관계 응답은 한 번에 암묵적으로 끌어오지 않고, 현재 코드처럼 명시적으로 하이드레이션한다.
@@ -343,6 +352,7 @@ curl -s 'localhost:3000/api/audit-logs?pageSize=10'
 - [ ] soft delete 필터가 필요한 곳에 `isNull(deletedAt)`가 있다
 - [ ] 에러 처리는 `withErrorHandler` / `HttpError`를 따른다
 - [ ] 관계 응답 shape가 기존 클라이언트 기대와 일치한다
+- [ ] 카운트/통계 라우트는 캐시 차단과 변경 이벤트 갱신 경로가 있다
 - [ ] README / 관련 문서도 함께 갱신했다
 
 ## 11. 안티 패턴

@@ -19,7 +19,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ApiError, api } from "@/lib/client/api";
+import { ApiError, api, emitWorkItemsChanged } from "@/lib/client/api";
 import { formatDate, formatDateTime } from "@/lib/client/format";
 import { toast } from "@/lib/client/use-toast";
 import type {
@@ -99,6 +99,7 @@ export function WorkItemDrawer({
     try {
       await api.delete(`/api/work-items/${detail.id}`);
       toast({ title: "작업을 삭제했습니다" });
+      emitWorkItemsChanged();
       setConfirmDelete(false);
       onDeleted();
       onMutated();

@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ApiError, api } from "@/lib/client/api";
+import { ApiError, api, emitWorkItemsChanged } from "@/lib/client/api";
 import { toast } from "@/lib/client/use-toast";
 import type {
   ListResponse,
@@ -254,6 +254,7 @@ export function TransferClient() {
             : item,
         ),
       );
+      if (result.updatedCount > 0) emitWorkItemsChanged();
       toast({
         title: "이관완료 처리됨",
         description:

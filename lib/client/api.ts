@@ -13,6 +13,7 @@ export const ACTOR_NAME_STORAGE_KEY = "cc-simply-tasks:actor-name";
 export const SERVICE_NAME_STORAGE_KEY = "cc-simply-tasks:service-name";
 export const DEFAULT_SERVICE_NAME = "cc-simply-tasks";
 export const TODOS_CHANGED_EVENT = "todos-changed";
+export const WORK_ITEMS_CHANGED_EVENT = "work-items-changed";
 
 export type ApiErrorCode =
   | "VALIDATION_ERROR"
@@ -146,4 +147,9 @@ export const api = {
 export function emitTodosChanged() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(TODOS_CHANGED_EVENT));
+}
+
+export function emitWorkItemsChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(WORK_ITEMS_CHANGED_EVENT));
 }
