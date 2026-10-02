@@ -154,6 +154,7 @@ export function EventFormDialog({
   const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   React.useEffect(() => {
+    setConfirmDelete(false);
     if (!open) return;
     setState(editing ? fromEvent(editing) : emptyState(defaultDate));
   }, [open, editing, defaultDate]);
@@ -191,6 +192,7 @@ export function EventFormDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     const title = state.title.trim();
     if (!title) return;
 
@@ -251,7 +253,8 @@ export function EventFormDialog({
   }
 
   async function handleDelete() {
-    if (!editing) return;
+    if (!editing || submitting) return;
+    setSubmitting(true);
     try {
       await api.delete(
         `/api/calendar-events/${editing.id}`
@@ -265,13 +268,15 @@ export function EventFormDialog({
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent>
+      <Dialog open={open} onOpenChange={(o) => !o && !submitting && onClose()}>
+        <DialogContent hideCloseButton={submitting}>
           <DialogHeader>
             <DialogTitle>
               {editing ? "이벤트 수정" : "이벤트 추가"}
@@ -280,7 +285,8 @@ export function EventFormDialog({
               팀원의 일정을 캘린더에 표시합니다. (KST)
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} aria-busy={submitting}>
+            <fieldset disabled={submitting} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="ce-category">카테고리</Label>
               <Select
@@ -303,6 +309,7 @@ export function EventFormDialog({
                 value={state.title}
                 onChange={(e) => update("title", e.target.value)}
                 maxLength={300}
+                required
                 placeholder=""
               />
             </div>
@@ -325,7 +332,7 @@ export function EventFormDialog({
                 type="checkbox"
                 checked={state.allDay}
                 onChange={(e) => update("allDay", e.target.checked)}
-                className="h-4 w-4 rounded border-input"
+                className="h-4 w-4 rounded-sm border-input"
               />
               종일 일정
             </label>
@@ -406,12 +413,13 @@ export function EventFormDialog({
                 </Button>
               </div>
             </DialogFooter>
+            </fieldset>
           </form>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <DialogContent>
+      <Dialog open={confirmDelete} onOpenChange={(value) => !submitting && setConfirmDelete(value)}>
+        <DialogContent hideCloseButton={submitting}>
           <DialogHeader>
             <DialogTitle>이벤트 삭제</DialogTitle>
             <DialogDescription>
@@ -420,11 +428,11 @@ export function EventFormDialog({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            <Button variant="ghost" disabled={submitting} onClick={() => setConfirmDelete(false)}>
               취소
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              삭제
+            <Button variant="destructive" disabled={submitting} onClick={handleDelete}>
+              {submitting ? "삭제 중..." : "삭제"}
             </Button>
           </DialogFooter>
         </DialogContent>

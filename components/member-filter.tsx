@@ -29,6 +29,9 @@ type Props = {
   placeholder?: string;
   mode?: "multi" | "single";
   className?: string;
+  disabled?: boolean;
+  id?: string;
+  "aria-label"?: string;
 };
 
 export function MemberFilter({
@@ -39,6 +42,9 @@ export function MemberFilter({
   placeholder = "팀원",
   mode = "multi",
   className,
+  disabled = false,
+  id,
+  "aria-label": ariaLabel,
 }: Props) {
   const [open, setOpen] = React.useState(false);
   const count = selectedIds.size;
@@ -69,6 +75,10 @@ export function MemberFilter({
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
+          type="button"
+          id={id}
+          disabled={disabled}
+          aria-label={ariaLabel}
           className={cn(
             "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors",
             count > 0
@@ -87,12 +97,14 @@ export function MemberFilter({
         <Popover.Content
           align="start"
           sideOffset={6}
-          className="z-50 rounded-md border bg-popover p-2 shadow-md animate-in fade-in-0 zoom-in-95"
+          className="z-50 max-h-[min(24rem,70vh)] overflow-y-auto rounded-md border bg-popover p-2 shadow-md animate-in fade-in-0 zoom-in-95"
         >
           <div className={cn("grid gap-1", mode === "multi" ? "grid-cols-5" : "grid-cols-4")}>
             {/* 전체 버튼 — multi 모드에서만 표시 */}
             {mode === "multi" && (
               <button
+                type="button"
+                aria-pressed={count === 0}
                 onClick={() => { onClear(); }}
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-accent",
@@ -115,6 +127,8 @@ export function MemberFilter({
               const initials = m.name.slice(0, 2);
               return (
                 <button
+                  type="button"
+                  aria-pressed={selected}
                   key={m.id}
                   onClick={() => handleToggle(m.id)}
                   className={cn(

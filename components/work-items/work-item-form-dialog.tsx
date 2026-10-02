@@ -42,7 +42,6 @@ import {
  * 작업 생성/수정 다이얼로그.
  *
  * - editing이 null이면 생성, 있으면 수정
- * - 수정 시 `If-Match: editing.updatedAt` 자동 처리
  * - tickets 배열을 payload에 포함해 한 트랜잭션으로 sync
  */
 
@@ -115,10 +114,6 @@ function fromWorkItem(w: WorkItemListItem | WorkItemDetail): FormState {
   };
 }
 
-function hasTickets(w: WorkItemListItem | WorkItemDetail): w is WorkItemDetail {
-  return "tickets" in w;
-}
-
 export function WorkItemFormDialog({
   open,
   editing,
@@ -131,9 +126,7 @@ export function WorkItemFormDialog({
   const [state, setState] = React.useState<FormState>(EMPTY);
   const [tickets, setTickets] = React.useState<TicketRow[]>([]);
   const [submitting, setSubmitting] = React.useState(false);
-
-  // 수정 시 detail의 tickets를 가져오기 위해 필요하면 별도 fetch
-  const [loadingTickets, setLoadingTickets] = React.useState(false);
+  const submittingRef = React.useRef(false);
 
   // ─── 드래그 ────────────────────────────────────────────────
   const [dragPos, setDragPos] = React.useState({ x: 0, y: 0 });
@@ -174,33 +167,12 @@ export function WorkItemFormDialog({
     }
     setState(fromWorkItem(editing));
 
-    if (hasTickets(editing)) {
-      // DrawerBody에서 넘겨준 경우 — tickets 포함
-      setTickets(
+    setTickets(
         editing.tickets.map((t) => ({
           systemName: t.systemName,
           ticketNumber: t.ticketNumber,
         })),
-      );
-    } else {
-      // 목록에서 직접 수정 클릭 — detail 별도 fetch
-      setLoadingTickets(true);
-      api
-        .get<WorkItemDetail>(`/api/work-items/${editing.id}`)
-        .then((detail) => {
-          setTickets(
-            detail.tickets.map((t) => ({
-              systemName: t.systemName,
-              ticketNumber: t.ticketNumber,
-            })),
-          );
-        })
-        .catch(() => {
-          // tickets 로드 실패는 비치명적 — 빈 배열로 fallback
-          setTickets([]);
-        })
-        .finally(() => setLoadingTickets(false));
-    }
+    );
   }, [open, editing]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -215,6 +187,7 @@ export function WorkItemFormDialog({
 
   // ─── 티켓 행 조작 ──────────────────────────────────────────
   function addTicketRow() {
+    if (tickets.length >= 1000) return;
     setTickets((prev) => [...prev, { systemName: "", ticketNumber: "" }]);
   }
 
@@ -244,6 +217,7 @@ export function WorkItemFormDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
     const title = state.title.trim();
     if (!title) return;
 
@@ -279,6 +253,7 @@ export function WorkItemFormDialog({
       tickets: validTickets,
     };
 
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       if (editing) {
@@ -302,12 +277,13 @@ export function WorkItemFormDialog({
         variant: "destructive",
       });
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !submittingRef.current) onClose(); }}>
       <DialogContent
         className="sm:max-w-2xl max-h-[90vh] flex flex-col"
         style={{ translate: `${dragPos.x}px ${dragPos.y}px` } as React.CSSProperties}
@@ -332,7 +308,7 @@ export function WorkItemFormDialog({
           onSubmit={handleSubmit}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="subtle-scrollbar flex-1 overflow-y-auto space-y-4 px-1 pb-1 pr-2">
+          <fieldset disabled={submitting} className="subtle-scrollbar min-w-0 flex-1 overflow-y-auto space-y-4 px-1 pb-1 pr-2">
           {/* 분류 — 맨 위 단독 */}
           <div className="space-y-2">
             <Label htmlFor="wi-category">분류</Label>
@@ -440,8 +416,10 @@ export function WorkItemFormDialog({
               </Select>
             </div>
             <div className="space-y-2 self-end">
-              <Label className="block">담당자</Label>
+              <Label className="block" htmlFor="wi-assignee">담당자</Label>
               <MemberFilter
+                id="wi-assignee"
+                disabled={submitting}
                 members={members}
                 selectedIds={assigneeSet}
                 onToggle={(id) => update("assigneeId", id)}
@@ -463,7 +441,7 @@ export function WorkItemFormDialog({
                   variant="ghost"
                   size="sm"
                   onClick={addTicketRow}
-                  disabled={tickets.length >= systems.length}
+                  disabled={submitting || tickets.length >= Math.min(systems.length, 1000)}
                   className="h-7 px-2 text-xs"
                 >
                   <Plus className="mr-1 h-3 w-3" />
@@ -476,8 +454,6 @@ export function WorkItemFormDialog({
               <p className="text-xs text-muted-foreground">
                 설정 &gt; 코드관리에서 작업시스템을 먼저 추가하세요.
               </p>
-            ) : loadingTickets ? (
-              <div className="h-9 animate-pulse rounded-md bg-muted" />
             ) : tickets.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 연동된 시스템이 없습니다.{" "}
@@ -494,6 +470,7 @@ export function WorkItemFormDialog({
                 {tickets.map((row, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <Select
+                      aria-label={`연동 시스템 ${index + 1}`}
                       value={row.systemName}
                       onChange={(e) =>
                         updateTicketRow(index, "systemName", e.target.value)
@@ -514,6 +491,7 @@ export function WorkItemFormDialog({
                       ))}
                     </Select>
                     <Input
+                      aria-label={`티켓번호 ${index + 1}`}
                       value={row.ticketNumber}
                       onChange={(e) =>
                         updateTicketRow(index, "ticketNumber", e.target.value)
@@ -592,10 +570,10 @@ export function WorkItemFormDialog({
             />
           </div>
 
-          </div>
+          </fieldset>
 
           <DialogFooter className="shrink-0 border-t pt-4">
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
               취소
             </Button>
             <Button type="submit" disabled={submitting || !state.title.trim()}>

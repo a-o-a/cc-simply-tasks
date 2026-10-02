@@ -3,7 +3,7 @@ import { asc, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { newId, now } from "@/lib/db/helpers";
 import { workSystems } from "@/lib/db/schema";
-import { withErrorHandler } from "@/lib/http";
+import { withErrorHandler, readJsonBody } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { workSystemCreateSchema } from "@/lib/validation/workSystem";
@@ -12,6 +12,9 @@ import { workSystemCreateSchema } from "@/lib/validation/workSystem";
  * GET /api/work-systems
  * 삭제되지 않은 작업 시스템 목록 (code 오름차순).
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async () => {
   await ensureSqlitePragma();
   const items = await db
@@ -28,7 +31,7 @@ export const GET = withErrorHandler(async () => {
 export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
-  const input = workSystemCreateSchema.parse(await req.json());
+  const input = workSystemCreateSchema.parse(await readJsonBody(req));
   const timestamp = now();
 
   const created = await db.transaction(async (tx) => {
@@ -63,7 +66,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     await withAudit(tx, {
       entityType: "WorkSystem",
       entityId: row.id,
-      action: "CREATE",
+      action: existing ? existing.deletedAt ? "RESTORE" : "UPDATE" : "CREATE",
+      before: existing,
       after: row as unknown as Record<string, unknown>,
       actor,
     });

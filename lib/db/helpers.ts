@@ -16,3 +16,11 @@ function escapeLike(value: string) {
 export function contains(column: AnyColumn, value: string) {
   return sql`${column} like ${`%${escapeLike(value)}%`} escape '\\'`;
 }
+
+export function ticketSummaries(tickets: Array<{ systemName: string; ticketNumber: string }>) {
+  return tickets.map(({ systemName, ticketNumber }) => ({ systemName, ticketNumber })).sort((a, b) => {
+    const left = JSON.stringify(a);
+    const right = JSON.stringify(b);
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+}

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   ArrowRightFromLine,
   Calendar,
-  CheckSquare,
+  SquareCheck,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
@@ -28,12 +28,13 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import {
   ACTOR_NAME_STORAGE_KEY,
   api,
-  ApiError,
+  isAbortError,
   DEFAULT_SERVICE_NAME,
   SERVICE_NAME_STORAGE_KEY,
   TODOS_CHANGED_EVENT,
 } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
+import { useRequestController } from "@/lib/client/use-request-controller";
 
 /**
  * 좌측 사이드바.
@@ -56,7 +57,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "홈", icon: LayoutDashboard, exact: true },
   { href: "/work-items", label: "작업", icon: ListChecks },
   { href: "/transfer", label: "이관", icon: ArrowRightFromLine },
-  { href: "/todos", label: "할 일", icon: CheckSquare },
+  { href: "/todos", label: "할 일", icon: SquareCheck },
   { href: "/calendar", label: "캘린더", icon: Calendar },
   { href: "/settings", label: "설정", icon: Settings },
 ];
@@ -72,18 +73,24 @@ export function Sidebar() {
   const [nameDialogOpen, setNameDialogOpen] = React.useState(false);
   const [nameDraft, setNameDraft] = React.useState("");
   const [openTodoCount, setOpenTodoCount] = React.useState(0);
+  const [countError, setCountError] = React.useState<string | null>(null);
+  const { beginRequest } = useRequestController();
 
   const loadOpenTodoCount = React.useCallback(async () => {
+    const request = beginRequest();
     try {
       const res = await api.get<{ count: number }>("/api/todos/count", {
+        signal: request.signal,
         query: { status: "OPEN" },
       });
+      if (!request.isCurrent()) return;
       setOpenTodoCount(res.count);
+      setCountError(null);
     } catch (err) {
-      if (!(err instanceof ApiError)) return;
-      setOpenTodoCount(0);
+      if (!request.isCurrent() || isAbortError(err)) return;
+      setCountError("미완료 할 일 개수를 불러오지 못했습니다.");
     }
-  }, []);
+  }, [beginRequest]);
 
   React.useEffect(() => {
     setMounted(true);
@@ -94,12 +101,14 @@ export function Sidebar() {
     if (cached) setServiceName(cached);
 
     // API에서 최신 서비스명 동기화
-    fetch("/api/settings")
-      .then((r) => r.json())
+    const settingsController = new AbortController();
+    api.get<{ service_name: string }>("/api/settings", { signal: settingsController.signal })
       .then((data) => {
+        if (settingsController.signal.aborted) return;
         const name = data.service_name ?? DEFAULT_SERVICE_NAME;
         setServiceName(name);
         window.localStorage.setItem(SERVICE_NAME_STORAGE_KEY, name);
+        window.dispatchEvent(new CustomEvent("settings-changed"));
       })
       .catch(() => {/* 실패 시 캐시값 유지 */});
 
@@ -107,7 +116,6 @@ export function Sidebar() {
       setActorName(window.localStorage.getItem(ACTOR_NAME_STORAGE_KEY) ?? "");
     };
     syncActorName();
-    void loadOpenTodoCount();
 
     const syncServiceName = () => {
       const name = window.localStorage.getItem(SERVICE_NAME_STORAGE_KEY) ?? DEFAULT_SERVICE_NAME;
@@ -121,6 +129,7 @@ export function Sidebar() {
     window.addEventListener("visibilitychange", loadOpenTodoCount);
     window.addEventListener(TODOS_CHANGED_EVENT, loadOpenTodoCount);
     return () => {
+      settingsController.abort();
       window.removeEventListener("storage", syncActorName);
       window.removeEventListener("actor-name-changed", syncActorName);
       window.removeEventListener("settings-changed", syncServiceName);
@@ -203,21 +212,22 @@ export function Sidebar() {
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 collapsed && "justify-center px-0",
               )}
-              title={collapsed ? item.label : undefined}
+              aria-current={active ? "page" : undefined}
+              title={item.href === "/todos" && countError ? countError : collapsed ? item.label : undefined}
             >
               <Icon className="h-4 w-4 shrink-0" />
               {!collapsed ? (
                 <>
                   <span className="min-w-0 flex-1">{item.label}</span>
-                  {item.href === "/todos" && openTodoCount > 0 ? (
+                  {item.href === "/todos" && (openTodoCount > 0 || countError) ? (
                     <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-muted text-muted-foreground px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums">
-                      {openTodoCount > 99 ? "99+" : openTodoCount}
+                      {countError ? "?" : openTodoCount > 99 ? "99+" : openTodoCount}
                     </span>
                   ) : null}
                 </>
-              ) : item.href === "/todos" && openTodoCount > 0 ? (
+              ) : item.href === "/todos" && (openTodoCount > 0 || countError) ? (
                 <span className="absolute right-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-muted text-muted-foreground px-1 text-[10px] font-semibold leading-none tabular-nums">
-                  {openTodoCount > 9 ? "9+" : openTodoCount}
+                  {countError ? "?" : openTodoCount > 9 ? "9+" : openTodoCount}
                 </span>
               ) : null}
             </Link>

@@ -1,374 +1,102 @@
-# Development Guide
-
-이 문서는 현재 코드베이스의 서버/API 구현 규칙을 정리합니다. 기준 스택은 `Next.js + Drizzle ORM + @libsql/client + SQLite(file)`입니다.
-
-- 레퍼런스 구현: [`app/api/work-items/`](../app/api/work-items/)
-- DB 진입점: [`lib/db.ts`](../lib/db.ts)
-- 스키마: [`lib/db/schema.ts`](../lib/db/schema.ts)
-- 조회/관계 하이드레이션 헬퍼: [`lib/db/queries.ts`](../lib/db/queries.ts)
-- 감사 로그: [`lib/audit.ts`](../lib/audit.ts)
-
-## 1. 핵심 원칙
-
-1. 모든 write는 `await db.transaction(async (tx) => { ... })` 안에서 실행한다.
-2. write와 감사 로그는 같은 트랜잭션 안에서 `withAudit(tx, ...)`로 묶는다.
-3. Soft delete만 사용한다. 실제 삭제 대신 `deletedAt`을 업데이트한다.
-4. 모든 외부 입력은 zod로 검증한다.
-5. 에러 응답은 `withErrorHandler`로 통일한다.
-6. 시간은 DB에 UTC `Date`, UI 표시는 KST로 처리한다.
-7. SQLite 경로 기본값은 `.env`의 `DATABASE_URL="file:./db/dev.db"`다.
-
-## 2. 디렉터리 규칙
-
-```text
-app/api/<resource>/route.ts
-app/api/<resource>/[id]/route.ts
-```
-
-- collection route: `GET(list)`, `POST(create)`
-- item route: `GET(detail)`, `PATCH(update)`, `DELETE(soft delete)`
-
-복잡한 관계 조회는 라우트에서 직접 전부 풀지 말고 `lib/db/queries.ts` 같은 공통 헬퍼로 뺀다.
-
-## 3. DB 레이어 규칙
-
-### 3.1 연결
-
-- 공용 DB 객체는 [`lib/db.ts`](../lib/db.ts) 의 `db`를 사용한다.
-- DB 연결은 `DATABASE_URL=file:...` 값을 `file://` URL로 변환해 `@libsql/client`에 전달한다.
-- API 코드에서는 DB 접근 전 `await ensureSqlitePragma()`를 호출한다. 최초 호출 시 SQLite PRAGMA(`busy_timeout`, `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`)를 한 번 적용한다.
-
-### 3.2 스키마
-
-- 테이블 정의는 [`lib/db/schema.ts`](../lib/db/schema.ts)만 소스 오브 트루스로 본다.
-- 새 컬럼/테이블 추가 시 이 파일을 먼저 수정한다.
-- enum 비슷한 값은 SQLite native enum이 없으므로 문자열 컬럼 + [`lib/enums.ts`](../lib/enums.ts) + zod 조합으로 관리한다.
-
-### 3.3 쓰기 쿼리
-
-`libsql` 기반 Drizzle에서는 모든 write를 `await`로 실행한다.
-
-```ts
-await tx.insert(teamMembers).values(row);
-await tx.update(workItems).set(after).where(eq(workItems.id, id));
-await tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, id));
-```
-
-`await`를 빼먹으면 의도한 순서대로 반영되지 않거나 감사 로그와 분리될 수 있다.
-
-## 4. 표준 라우트 패턴
-
-### 4.1 Collection route
-
-```ts
-import { NextResponse, type NextRequest } from "next/server";
-import { and, asc, eq, isNull } from "drizzle-orm";
-import { db, ensureSqlitePragma } from "@/lib/db";
-import { newId, now } from "@/lib/db/helpers";
-import { teamMembers } from "@/lib/db/schema";
-import { withErrorHandler } from "@/lib/http";
-import { getActorContext } from "@/lib/actor";
-import { withAudit } from "@/lib/audit";
-import { parsePagination, slicePageAfterCursor } from "@/lib/pagination";
-import {
-  teamMemberCreateSchema,
-  teamMemberListQuerySchema,
-} from "@/lib/validation/teamMember";
-
-export const GET = withErrorHandler(async (req: NextRequest) => {
-  await ensureSqlitePragma();
-  const { searchParams } = new URL(req.url);
-  const filters = teamMemberListQuerySchema.parse(
-    Object.fromEntries(searchParams),
-  );
-  const { take, cursor } = parsePagination(searchParams);
-
-  const rows = await db
-    .select()
-    .from(teamMembers)
-    .where(
-      and(
-        isNull(teamMembers.deletedAt),
-        filters.role ? eq(teamMembers.role, filters.role) : undefined,
-      ),
-    )
-    .orderBy(asc(teamMembers.name), asc(teamMembers.id));
-
-  const { items, nextCursor } = slicePageAfterCursor(rows, cursor, take);
-  return NextResponse.json({ items, nextCursor });
-});
-
-export const POST = withErrorHandler(async (req: NextRequest) => {
-  await ensureSqlitePragma();
-  const actor = getActorContext(req);
-  const input = teamMemberCreateSchema.parse(await req.json());
-  const createdAt = now();
-
-  const created = await db.transaction(async (tx) => {
-    const row = {
-      id: newId(),
-      name: input.name,
-      role: input.role,
-      createdAt,
-      updatedAt: createdAt,
-      deletedAt: null,
-    } satisfies typeof teamMembers.$inferInsert;
-
-    await tx.insert(teamMembers).values(row);
-    await withAudit(tx, {
-      entityType: "TeamMember",
-      entityId: row.id,
-      action: "CREATE",
-      after: row as unknown as Record<string, unknown>,
-      actor,
-    });
-    return row;
-  });
-
-  return NextResponse.json(created, { status: 201 });
-});
-```
-
-### 4.2 Item route
-
-```ts
-import { NextResponse, type NextRequest } from "next/server";
-import { and, eq, isNull } from "drizzle-orm";
-import { db, ensureSqlitePragma } from "@/lib/db";
-import { now } from "@/lib/db/helpers";
-import { teamMembers } from "@/lib/db/schema";
-import { withErrorHandler, HttpError } from "@/lib/http";
-import { getActorContext } from "@/lib/actor";
-import { withAudit } from "@/lib/audit";
-import { teamMemberUpdateSchema } from "@/lib/validation/teamMember";
-
-type Params = { params: { id: string } };
-
-export const GET = withErrorHandler(
-  async (_req: NextRequest, { params }: Params) => {
-    await ensureSqlitePragma();
-    const row = await db
-      .select()
-      .from(teamMembers)
-      .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
-      .limit(1);
-
-    if (!row[0]) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
-    return NextResponse.json(row[0]);
-  },
-);
-
-export const PATCH = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
-    await ensureSqlitePragma();
-    const actor = getActorContext(req);
-    const input = teamMemberUpdateSchema.parse(await req.json());
-    const updatedAt = now();
-
-    const updated = await db.transaction(async (tx) => {
-      const beforeRows = await tx
-        .select()
-        .from(teamMembers)
-        .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
-        .limit(1);
-      const before = beforeRows[0];
-      if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
-
-      const after = {
-        ...before,
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.role !== undefined ? { role: input.role } : {}),
-        updatedAt,
-      };
-
-      await tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id));
-      await withAudit(tx, {
-        entityType: "TeamMember",
-        entityId: after.id,
-        action: "UPDATE",
-        before: before as unknown as Record<string, unknown>,
-        after: after as unknown as Record<string, unknown>,
-        actor,
-      });
-      return after;
-    });
-
-    return NextResponse.json(updated);
-  },
-);
-```
-
-패턴 요약:
-
-- `ensureSqlitePragma`
-- 입력 파싱
-- write면 `getActorContext`
-- `db.transaction`
-- `before` 조회
-- `await insert/update/delete`
-- `withAudit`
-- `NextResponse.json(...)`
-
-## 5. 공통 규칙 상세
-
-### 5.1 에러 처리
-
-| 상황 | code | HTTP |
-|---|---|---|
-| zod 검증 실패 | `VALIDATION_ERROR` | 400 |
-| 잘못된 요청 | `BAD_REQUEST` | 400 |
-| 리소스 없음 | `NOT_FOUND` | 404 |
-| 유니크 충돌 / 중복 | `CONFLICT` | 409 |
-| 서버 내부 오류 | `INTERNAL` | 500 |
-
-- 직접 에러 JSON을 만들기보다 `throw new HttpError(...)`를 사용한다.
-- 라우트는 반드시 `withErrorHandler`로 감싼다.
-- SQLite unique 에러는 `withErrorHandler`가 `CONFLICT`로 매핑한다.
-
-### 5.2 성공 응답
-
-| 동작 | status | body |
-|---|---|---|
-| list | 200 | `{ items, nextCursor }` 또는 `{ items }` |
-| get | 200 | `row` |
-| create | 201 | `row` |
-| update | 200 | `row` |
-| delete | 204 | empty |
-
-페이지네이션이 없는 목록 API는 `{ items }`를 사용한다.
-
-### 5.3 페이지네이션
-
-- `parsePagination(searchParams)` → `{ take, cursor }`
-- Drizzle에서는 cursor-skip을 DB에 직접 밀지 않고, 현재 코드베이스처럼 정렬된 결과를 `slicePageAfterCursor()`로 잘라낸다.
-- 항상 안정 정렬을 유지한다.
-
-### 5.4 Soft delete
-
-- 삭제는 `deletedAt: now()` 업데이트다.
-- 목록/상세 조회는 기본적으로 `isNull(table.deletedAt)`를 넣는다.
-- soft delete된 레코드는 상세 조회에서 `404`로 본다.
-
-### 5.5 감사 로그
-
-- `CREATE`: `after`
-- `UPDATE`: `before`, `after`
-- `DELETE`: `before`, `after`
-- 변경 diff가 비면 `UPDATE` 로그는 자동 스킵된다.
-- 그래도 write 패턴에서는 `withAudit` 호출 자체를 유지한다.
-
-### 5.6 시간 처리
-
-- DB에는 `Date` 객체를 그대로 넣는다.
-- all-day 여부와 KST/UTC 변환은 [`lib/time.ts`](../lib/time.ts)와 validation 레이어 기준으로 처리한다.
-- 라우트에서 임의 시간대 계산을 반복하지 않는다.
-
-### 5.7 액터 컨텍스트
-
-- 모든 write API는 `getActorContext(req)`를 호출한다.
-- `x-actor-name`, `x-forwarded-for`, `user-agent`를 사용한다.
-- 인증이 없으므로 현재 `actorType`은 `ANONYMOUS`다.
-
-### 5.8 카운트 API와 클라이언트 변경 이벤트
-
-- DB 상태를 그대로 보여줘야 하는 카운트/통계 GET 라우트는 Next Route Handler 캐시가 끼지 않게 명시한다.
-- 예: [`GET /api/work-items/count`](../app/api/work-items/count/route.ts)는 `dynamic = "force-dynamic"`, `revalidate = 0`, `Cache-Control: no-store`를 함께 둔다.
-- 클라이언트 fetch wrapper도 `cache: "no-store"`를 사용하지만, 서버 Route Handler의 정적 캐시 가능성은 라우트 파일에서 별도로 차단한다.
-- 작업 생성/수정/삭제/상태 변경처럼 다른 화면의 통계에 영향을 주는 write 성공 후에는 [`emitWorkItemsChanged()`](../lib/client/api.ts)를 호출한다.
-- 대시보드처럼 같은 탭에서 오래 열려 있을 수 있는 화면은 `WORK_ITEMS_CHANGED_EVENT`, `focus`, `visibilitychange`에서 필요한 데이터를 다시 조회한다.
-- TODO 뱃지는 같은 패턴으로 `emitTodosChanged()` / `TODOS_CHANGED_EVENT`를 사용한다.
-
-## 6. 관계 조회 규칙
-
-관계 응답은 한 번에 암묵적으로 끌어오지 않고, 현재 코드처럼 명시적으로 하이드레이션한다.
-
-예:
-
-- WorkItem + assignee + tickets: [`hydrateWorkItems`](../lib/db/queries.ts)
-- CalendarEvent + members: [`hydrateCalendarEvents`](../lib/db/queries.ts)
-
-관계 응답 shape가 여러 라우트에서 반복되면 공통 헬퍼로 뺀다.
-
-## 7. WorkItem 특화 규칙
-
-- `tickets`는 공개 서브 리소스 API가 아니라 `WorkItem` payload 안에서 함께 처리한다.
-- `PATCH`에서 `tickets`가 오면 부분 병합이 아니라 전체 대체다.
-- 목록은 `scope=active|transferred|all`을 지원한다.
-- `scope=transferred`는 `transferDate desc` 정렬을 우선한다.
-- ticket/systemCode 필터는 `exists(...)` 서브쿼리로 구현한다.
-
-## 8. 마이그레이션 / DB 파일
-
-- 개발 기본 DB: `db/dev.db`
-- 최초 실행용 깨끗한 DB 템플릿: `db/dev.db.clean`
-- 운영에서는 `DATABASE_URL`을 영속 경로로 바꿔 사용한다.
-- 스키마 수정 후:
+# 개발 가이드
+
+현재 코드를 기준으로 한 구현 규칙입니다. 기능·실행 방법은 [README](../README.md), 배포·복구는 [운영 가이드](OPERATIONS.md)를 참고합니다.
+
+## 수정 진입점
+
+페이지는 `app/*/page.tsx`, 화면 상태와 동작은 `components/<feature>`, HTTP 계약은 `app/api/<resource>`, DB 정의는 `lib/db/schema.ts`에 둡니다. 브라우저 타입은 `lib/client/types.ts`에 따로 정의합니다. 필드를 추가할 때 스키마·검증·응답 타입·폼 payload·표시를 함께 확인합니다.
+
+Node 22 LTS와 Next.js 16을 기준으로 합니다. 동적 Route Handler의 `params`는 Promise이며 핸들러 안에서 먼저 `await`합니다. 버전별 변경은 설치된 `node_modules/next/dist/docs/`와 [의존성 가이드](DEPENDENCIES.md)를 확인합니다.
+
+관계가 반복되는 조회는 `lib/db/queries.ts`로 모읍니다. API별 정렬·필터는 해당 라우트에서 명시합니다. 단순 차이를 숨기기 위한 범용 CRUD 프레임워크는 도입하지 않습니다.
+
+## API 공통 흐름
+
+1. `withErrorHandler`로 라우트를 감쌉니다. 이 단계에서 브라우저 변경 요청의 출처를 검사합니다.
+2. DB 접근 전 `await ensureSqlitePragma()`를 호출합니다.
+3. 본문은 `await readJsonBody(req)`, 쿼리는 Zod로 파싱합니다.
+4. 쓰기는 `getActorContext(req)`로 액터를 읽고 `await db.transaction(...)` 안에서 수행합니다.
+5. 기존 행을 읽고 입력을 병합한 최종 상태를 검증합니다.
+6. 쓰기 쿼리와 `withAudit(tx, ...)`를 같은 트랜잭션에서 모두 `await`합니다.
+7. 응답 형식에 맞춰 `NextResponse`를 반환합니다.
+
+직접 DB 파일을 읽거나 예외 메시지·서버 절대경로를 클라이언트로 반환하지 않습니다. Next.js의 동적 렌더링 제어 예외는 일반 500으로 변환하지 않습니다.
+
+프레임워크를 사용하지 않는 공통 모듈은 `lib/errors.ts`의 오류 타입을 사용합니다. 백업 스냅샷·파일 스트림·스케줄러를 별도 모듈로 유지하며 Route Handler에서 스트림과 응답을 연결합니다. 다운로드의 파일 핸들과 임시 디렉터리는 완료·취소·실패 모두에서 정리합니다.
+
+## 응답과 오류
+
+| 동작 | 응답 |
+|---|---|
+| 목록 | `200 { items, nextCursor }` 또는 페이지가 없는 `{ items }` |
+| 상세·수정 | `200 row` |
+| 생성 | `201 row` |
+| 삭제 | `204` |
+
+오류는 `{ error: { code, message, details? } }`입니다. `VALIDATION_ERROR`/`BAD_REQUEST`는 400, `FORBIDDEN`은 403, `NOT_FOUND`는 404, `CONFLICT`는 409, `PAYLOAD_TOO_LARGE`는 413, `INTERNAL`은 500입니다. 업무 오류는 `HttpError`, 필드 검증은 Zod를 사용합니다.
+
+JSON 요청은 `application/json` 또는 `application/*+json`, 최대 256 KiB입니다. 실제 스트림 바이트도 제한하므로 Content-Length를 신뢰하지 않습니다. 티켓·체크리스트·멤버 배열의 항목 제한은 `MAX_CHILD_ITEMS`로 관리합니다.
+
+## 조회·페이지네이션·캐시
+
+실시간 DB 데이터를 반환하는 API는 `dynamic = "force-dynamic"`, `revalidate = 0`으로 정적 생성을 막습니다. 클라이언트의 `cache: "no-store"`만으로 서버 라우트 캐시를 해제할 수 없습니다.
+
+목록은 기본 50, 최대 200건입니다. `createCursorPagination()`에서 정렬 키와 방향을 정의하고 같은 키를 쿼리 `orderBy`와 cursor 조건에 사용합니다. 항상 ID를 마지막 tie-breaker로 포함합니다.
+
+- SQL에 cursor 조건과 `limit(take + 1)`을 적용합니다.
+- 관계 하이드레이션은 반환할 페이지에만 수행합니다.
+- 다음 cursor는 정렬값을 포함하는 `page:` 토큰입니다. 프론트는 내용을 해석하지 않습니다.
+- 날짜의 NULL 정렬, 같은 timestamp, 삭제된 마지막 행을 고려합니다.
+- 이전 버전의 ID cursor를 지원하지만 새 응답은 정렬값 cursor를 반환합니다.
+- 필터·정렬이 바뀌면 클라이언트 페이지를 초기화합니다.
+
+전체 집계가 필요할 때는 전용 count API를 우선 사용합니다. 전체 목록이 필요한 칸반·간트·월 집계는 `getAllPages`로 제한된 페이지를 순회하고 요청 취소와 반복 cursor 방어를 적용합니다. 거대한 단일 pageSize를 사용하지 않습니다.
+
+## 트랜잭션과 감사 로그
+
+주요 엔티티 삭제는 `deletedAt` 갱신입니다. 목록·상세는 삭제된 행을 제외합니다. 연결 테이블 재구성은 트랜잭션 안에서 처리합니다.
+
+`withAudit`는 CREATE/UPDATE/DELETE/RESTORE의 이전·이후 변경값을 기록합니다. `updatedAt`만 바뀐 저장은 로그를 만들지 않습니다. 부모의 관계 변경도 before/after에 의미 있는 값이 있어야 합니다.
+
+- 작업의 `tickets` 입력은 기존 티켓을 대체합니다. 부모 감사 diff에는 정렬된 시스템·티켓번호 목록을 넣습니다.
+- 일정의 `memberIds` 변경은 이전·이후 멤버 ID를 기록합니다.
+- TODO PATCH의 `checklist` 생략은 기존 목록 유지, `[]`는 전체 삭제, 배열은 전체 동기화입니다.
+- checklist의 기존 항목은 `id`를 보내고 새 항목은 생략합니다. 다른 TODO에 속한 ID는 거부합니다.
+- TODO 본문과 자식 변경은 한 번의 PATCH와 같은 트랜잭션으로 저장하고 상세 응답을 반환합니다. 기존 개별 checklist API도 유지합니다.
+
+현재 `updatedAt`은 버전 비교용 잠금이 아닙니다. `If-Match` 자동 처리나 409 동시 편집 보호가 있다고 가정하지 않습니다.
+
+## 날짜와 코드
+
+DB 시간 컬럼은 UTC epoch 밀리초를 Drizzle `Date`로 다룹니다. 표시·날짜 입력은 KST 규칙을 `lib/time.ts`, `lib/client/format.ts`, validation에 모읍니다.
+
+- 작업 시작·종료는 같은 날짜를 허용합니다.
+- 일정 종료 시간은 시작 시간보다 뒤여야 합니다.
+- 한쪽 날짜만 PATCH해도 기존 행과 병합한 전체 범위를 다시 검사합니다.
+- 종일 일정은 종료일 다음 날을 제외하는 `[start, end)` 구간입니다.
+- YYYY-MM-DD는 실제 존재하는 날짜인지 검사합니다.
+- enum은 `lib/enums.ts`, 동적 분류·시스템은 코드 사전입니다. 사전 연결은 현재 문자열이며 DB 외래키가 아닙니다.
+
+## UI와 접근성
+
+사용자 수정 성공 후 `emitWorkItemsChanged()` 또는 `emitTodosChanged()`를 호출합니다. 구독·focus·visibilitychange에서 재조회가 필요한 데이터를 새로 읽습니다. 일정은 SSE도 사용합니다.
+
+요청은 가능한 한 AbortSignal을 전달하고 오래된 응답이 최신 필터 상태를 덮지 않도록 합니다. 취소는 오류 토스트로 표시하지 않습니다. 로딩·빈 결과·실패를 구분하며 실패 시 재시도 동작을 제공합니다.
+
+아이콘 버튼에는 이름을 지정하고 폼 안의 보조 버튼은 `type="button"`을 사용합니다. 저장·삭제의 중복 실행을 막고 처리 중 상태를 알립니다.
+
+## 검증과 스키마 변경
 
 ```bash
-npm run db:generate
-npm run db:migrate
+npm run typecheck
+npm run lint
+npm run test:lint
+npm test
+npm run test:integration
 ```
 
-- migration이 추가되면 `db/dev.db.clean`도 새 스키마 기준으로 다시 생성해 커밋한다.
-- 백업/복구는 `DATABASE_URL`이 가리키는 실제 파일 기준으로 처리한다.
+`npm test`는 TypeScript CLI로 테스트를 임시 폴더에 컴파일해 Node assert로 실행합니다. 컴파일에는 NodeNext 해석을 사용하며 Node 22의 fetch·Web Streams를 사용합니다. 테스트와 순수 helper import는 상대경로를 사용합니다. 각 테스트 파일은 실행 함수 `run*`을 export해야 합니다. 추가 테스트 프레임워크는 필요하지 않습니다.
 
-## 9. 수동 검증 체크리스트
+통합 검사는 임시 DB로 실제 프로덕션 빌드·HTTP 요청을 실행합니다. 커서 조회, 최신 DB 건수, 부분 날짜 수정, 관계 감사 로그, TODO 원자적 저장과 rollback, 요청 보호, 백업 무결성을 검사합니다.
 
-```bash
-# settings
-curl -s localhost:3000/api/settings
-
-# team member create
-curl -sX POST localhost:3000/api/team-members \
-  -H 'content-type: application/json' \
-  -H 'x-actor-name: alice' \
-  -d '{"name":"Alice","role":"WEB_DEV"}'
-
-# work item list
-curl -s 'localhost:3000/api/work-items?pageSize=20'
-
-# work item detail
-curl -s localhost:3000/api/work-items/<id>
-
-# work item patch
-curl -sX PATCH localhost:3000/api/work-items/<id> \
-  -H 'content-type: application/json' \
-  -H 'x-actor-name: alice' \
-  -d '{"status":"IN_PROGRESS"}'
-
-# calendar range
-curl -s 'localhost:3000/api/calendar-events?from=2026-04-19T00:00:00Z&to=2026-04-21T00:00:00Z'
-
-# audit
-curl -s 'localhost:3000/api/audit-logs?pageSize=10'
-```
-
-## 10. 리뷰 체크리스트
-
-- [ ] write가 모두 `await db.transaction(async (tx) => ...)` 안에 있다
-- [ ] write 쿼리에 `await`가 빠진 곳이 없다
-- [ ] `withAudit(tx, ...)`가 write와 같은 트랜잭션에 있다
-- [ ] 입력은 zod로 검증한다
-- [ ] soft delete 필터가 필요한 곳에 `isNull(deletedAt)`가 있다
-- [ ] 에러 처리는 `withErrorHandler` / `HttpError`를 따른다
-- [ ] 관계 응답 shape가 기존 클라이언트 기대와 일치한다
-- [ ] 카운트/통계 라우트는 캐시 차단과 변경 이벤트 갱신 경로가 있다
-- [ ] README / 관련 문서도 함께 갱신했다
-
-## 11. 안티 패턴
-
-```ts
-// ❌ transaction 밖 write + audit 분리
-await db.insert(workItems).values(row);
-withAudit(tx, ...);
-
-// ❌ write builder만 만들고 실행 안 함
-tx.insert(teamMembers).values(row);
-
-// ❌ soft delete 필터 누락
-db.select().from(workItems);
-
-// ❌ 라우트마다 관계 조립 로직 복붙
-const tickets = await db.select().from(workTickets) ...
-const assignees = await db.select().from(teamMembers) ...
-```
+스키마 변경은 `lib/db/schema.ts` → migration 생성·검토 → 임시 DB 적용·검증 → 운영 적용 계획 순서입니다. migration을 추가했다면 `db/dev.db.clean`도 같은 기준으로 다시 생성합니다. 이번 유지보수 변경은 스키마 migration이 필요하지 않습니다.

@@ -3,17 +3,21 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { now } from "@/lib/db/helpers";
 import { workCategories } from "@/lib/db/schema";
-import { withErrorHandler, HttpError } from "@/lib/http";
+import { withErrorHandler, HttpError, readJsonBody } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { workCategoryUpdateSchema } from "@/lib/validation/workCategory";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
-export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Params) => {
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export const PATCH = withErrorHandler(async (req: NextRequest, { params: paramsPromise }: Params) => {
+  const params = await paramsPromise;
   await ensureSqlitePragma();
   const actor = getActorContext(req);
-  const input = workCategoryUpdateSchema.parse(await req.json());
+  const input = workCategoryUpdateSchema.parse(await readJsonBody(req));
   const updatedAt = now();
 
   const updated = await db.transaction(async (tx) => {
@@ -41,7 +45,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
   return NextResponse.json(updated);
 });
 
-export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Params) => {
+export const DELETE = withErrorHandler(async (req: NextRequest, { params: paramsPromise }: Params) => {
+  const params = await paramsPromise;
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const deletedAt = now();

@@ -1,17 +1,13 @@
 import { z } from "zod";
 import { PRIORITIES, STATUSES } from "../enums";
-import { cuidSchema, optionalIsoDateTimeSchema } from "./common";
+import { cuidSchema, optionalIsoDateTimeSchema, kstDateStringSchema, MAX_CHILD_ITEMS } from "./common";
+import { workTicketCreateSchema as ticketRowSchema } from "./workTicket";
 
 export const WORK_ITEM_SCOPES = ["all", "active", "transferred"] as const;
 
-const ticketRowSchema = z.object({
-  systemName: z.string().min(1).max(100),
-  ticketNumber: z.string().max(100),
-});
-
 export const workItemCreateSchema = z
   .object({
-    title: z.string().min(1).max(300),
+    title: z.string().trim().min(1).max(300),
     description: z.string().max(10_000).optional().nullable(),
     additionalNotes: z.string().max(10_000).optional().nullable(),
     category: z.string().max(100).default(""),
@@ -28,7 +24,7 @@ export const workItemCreateSchema = z
     requestNumber: z.string().max(200).optional().nullable(),
     requestContent: z.string().max(10_000).optional().nullable(),
     // 시스템 연동 티켓 (생성 시 함께 처리)
-    tickets: z.array(ticketRowSchema).optional(),
+    tickets: z.array(ticketRowSchema).max(MAX_CHILD_ITEMS).optional(),
   })
   .refine(
     (v) =>
@@ -40,7 +36,7 @@ export const workItemCreateSchema = z
 
 export const workItemUpdateSchema = z
   .object({
-    title: z.string().min(1).max(300).optional(),
+    title: z.string().trim().min(1).max(300).optional(),
     description: z.string().max(10_000).nullable().optional(),
     additionalNotes: z.string().max(10_000).nullable().optional(),
     category: z.string().max(100).optional(),
@@ -57,7 +53,7 @@ export const workItemUpdateSchema = z
     requestNumber: z.string().max(200).nullable().optional(),
     requestContent: z.string().max(10_000).nullable().optional(),
     // 시스템 연동 티켓 (수정 시 전체 대체)
-    tickets: z.array(ticketRowSchema).optional(),
+    tickets: z.array(ticketRowSchema).max(MAX_CHILD_ITEMS).optional(),
   })
   .refine(
     (v) =>
@@ -73,7 +69,7 @@ function csvEnum<T extends string>(values: readonly [T, ...T[]]) {
     .string()
     .optional()
     .transform((v) =>
-      v ? (v.split(",").filter((s) => (values as readonly string[]).includes(s)) as T[]) : undefined,
+      v ? v.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
     )
     .pipe(z.array(z.enum(values)).optional());
 }
@@ -93,8 +89,8 @@ export const workItemListQuerySchema = z.object({
     .pipe(z.array(z.string()).optional()),
   priority: csvEnum(PRIORITIES),
   ticket: z.string().min(1).optional(),
-  transferDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  transferDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  transferDate: kstDateStringSchema.optional(),
+  transferDateTo: kstDateStringSchema.optional(),
   // 텍스트 검색
   title: z.string().max(300).optional(),
   requestType: z.string().max(200).optional(),
@@ -108,11 +104,13 @@ export const workItemListQuerySchema = z.object({
     .pipe(z.array(z.string()).optional()),
   // 이관일 있는 항목만 조회
   hasTransferDate: z
-    .string()
+    .enum(["true", "false"])
     .optional()
     .transform((v) => v === "true")
-    .pipe(z.boolean().optional()),
-  });
+    .pipe(z.boolean()),
+}).refine((value) => !value.transferDate || !value.transferDateTo || value.transferDate <= value.transferDateTo, {
+  path: ["transferDateTo"], message: "조회 종료일은 시작일 이후여야 합니다",
+});
 
 export const workItemBulkStatusUpdateSchema = z.object({
   ids: z.array(cuidSchema).min(1).max(1000),

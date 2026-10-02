@@ -4,19 +4,24 @@ import { db, ensureSqlitePragma } from "@/lib/db";
 import { now } from "@/lib/db/helpers";
 import { loadCalendarEventDetail } from "@/lib/db/queries";
 import { calendarEventMembers, calendarEvents } from "@/lib/db/schema";
-import { withErrorHandler, HttpError } from "@/lib/http";
+import { withErrorHandler, HttpError, readJsonBody } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { emitCalendarChanged } from "@/lib/calendar-bus";
 import { calendarEventUpdateSchema } from "@/lib/validation/calendarEvent";
+import { assertDateOrder } from "@/lib/validation/common";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 /**
  * GET /api/calendar-events/:id
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(
-  async (_req: NextRequest, { params }: Params) => {
+  async (_req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const row = await loadCalendarEventDetail(params.id);
     if (!row) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
@@ -28,10 +33,11 @@ export const GET = withErrorHandler(
  * PATCH /api/calendar-events/:id
  */
 export const PATCH = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
-    const input = calendarEventUpdateSchema.parse(await req.json());
+    const input = calendarEventUpdateSchema.parse(await readJsonBody(req));
     const updatedAt = now();
 
     await db.transaction(async (tx) => {
@@ -43,6 +49,10 @@ export const PATCH = withErrorHandler(
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
 
+      const beforeMemberIds = input.memberIds !== undefined
+        ? (await tx.select({ memberId: calendarEventMembers.memberId }).from(calendarEventMembers)
+          .where(eq(calendarEventMembers.eventId, params.id))).map((row) => row.memberId).sort()
+        : undefined;
       // memberIds가 제공된 경우 기존 팀원 교체
       if (input.memberIds !== undefined) {
         await tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, params.id));
@@ -65,15 +75,16 @@ export const PATCH = withErrorHandler(
         ...(input.note !== undefined ? { note: input.note } : {}),
         updatedAt,
       };
+      assertDateOrder(after.startDateTime, after.endDateTime, "endDateTime");
       await tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, params.id));
       await withAudit(tx, {
         entityType: "CalendarEvent",
         entityId: after.id,
         action: "UPDATE",
-        before: before as unknown as Record<string, unknown>,
+        before: { ...before, ...(beforeMemberIds !== undefined ? { memberIds: beforeMemberIds } : {}) },
         after: {
           ...after,
-          ...(input.memberIds !== undefined ? { memberIds: input.memberIds } : {}),
+          ...(input.memberIds !== undefined ? { memberIds: [...input.memberIds].sort() } : {}),
         } as unknown as Record<string, unknown>,
         actor,
       });
@@ -91,7 +102,8 @@ export const PATCH = withErrorHandler(
  * soft delete.
  */
 export const DELETE = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const deletedAt = now();

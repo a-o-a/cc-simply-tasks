@@ -1,22 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
-import { newId, now } from "@/lib/db/helpers";
+import { newId, now, ticketSummaries } from "@/lib/db/helpers";
 import { loadWorkItemDetail } from "@/lib/db/queries";
 import { workItems, workTickets } from "@/lib/db/schema";
-import { withErrorHandler, HttpError } from "@/lib/http";
+import { withErrorHandler, HttpError, readJsonBody } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { workItemUpdateSchema } from "@/lib/validation/workItem";
+import { assertDateOrder } from "@/lib/validation/common";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 /**
  * GET /api/work-items/:id
  * 상세 조회. soft delete된 레코드는 404. 티켓은 deletedAt:null만 include.
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(
-  async (_req: NextRequest, { params }: Params) => {
+  async (_req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const row = await loadWorkItemDetail(params.id);
     if (!row) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
@@ -26,14 +31,15 @@ export const GET = withErrorHandler(
 
 /**
  * PATCH /api/work-items/:id
- * 부분 업데이트. If-Match 필수.
- * tickets 배열이 있으면 기존 티켓을 soft delete 후 새로 생성(전체 대체).
+ * 부분 업데이트.
+ * tickets 배열이 변경되면 기존 티켓을 soft delete 후 새로 생성(전체 대체).
  */
 export const PATCH = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
-    const input = workItemUpdateSchema.parse(await req.json());
+    const input = workItemUpdateSchema.parse(await readJsonBody(req));
     const updatedAt = now();
 
     const updated = await db.transaction(async (tx) => {
@@ -68,17 +74,30 @@ export const PATCH = withErrorHandler(
           : {}),
         updatedAt,
       };
+      assertDateOrder(after.startDate, after.endDate, "endDate", true);
       await tx.update(workItems).set(after).where(eq(workItems.id, params.id));
 
-      // tickets 배열이 전달된 경우: 기존 soft delete 후 전체 재생성
+      // 티켓 값이 바뀐 경우에만 전체 대체하고 관계 변경도 감사 로그에 남긴다.
+      let beforeTickets: Array<{ systemName: string; ticketNumber: string }> | undefined;
+      let afterTickets: Array<{ systemName: string; ticketNumber: string }> | undefined;
       if (input.tickets !== undefined) {
-        await tx
-          .update(workTickets)
-          .set({ deletedAt: updatedAt, updatedAt })
+        const existing = await tx.select().from(workTickets)
           .where(and(eq(workTickets.workItemId, params.id), isNull(workTickets.deletedAt)));
-        if (input.tickets.length > 0) {
-          await tx.insert(workTickets).values(
-            input.tickets.map((ticket) => ({
+        beforeTickets = ticketSummaries(existing);
+        afterTickets = ticketSummaries(input.tickets);
+        if (JSON.stringify(beforeTickets) !== JSON.stringify(afterTickets)) {
+          await tx
+            .update(workTickets)
+            .set({ deletedAt: updatedAt, updatedAt })
+            .where(and(eq(workTickets.workItemId, params.id), isNull(workTickets.deletedAt)));
+          for (const ticket of existing) {
+            await withAudit(tx, {
+              entityType: "WorkTicket", entityId: ticket.id, action: "DELETE",
+              before: ticket, after: { ...ticket, deletedAt: updatedAt, updatedAt }, actor,
+            });
+          }
+          for (const ticket of input.tickets) {
+            const ticketRow = {
               id: newId(),
               workItemId: params.id,
               systemName: ticket.systemName,
@@ -86,8 +105,10 @@ export const PATCH = withErrorHandler(
               createdAt: updatedAt,
               updatedAt,
               deletedAt: null,
-            })),
-          );
+            };
+            await tx.insert(workTickets).values(ticketRow);
+            await withAudit(tx, { entityType: "WorkTicket", entityId: ticketRow.id, action: "CREATE", after: ticketRow, actor });
+          }
         }
       }
 
@@ -95,23 +116,26 @@ export const PATCH = withErrorHandler(
         entityType: "WorkItem",
         entityId: after.id,
         action: "UPDATE",
-        before: before as unknown as Record<string, unknown>,
-        after: after as unknown as Record<string, unknown>,
+        before: { ...before, ...(beforeTickets ? { tickets: beforeTickets } : {}) },
+        after: { ...after, ...(afterTickets ? { tickets: afterTickets } : {}) },
         actor,
       });
       return after;
     });
 
-    return NextResponse.json(updated);
+    const detail = await loadWorkItemDetail(updated.id);
+    if (!detail) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
+    return NextResponse.json(detail);
   },
 );
 
 /**
  * DELETE /api/work-items/:id
- * soft delete. If-Match 필수.
+ * soft delete.
  */
 export const DELETE = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const deletedAt = now();
@@ -127,6 +151,16 @@ export const DELETE = withErrorHandler(
 
       const after = { ...before, updatedAt: deletedAt, deletedAt };
       await tx.update(workItems).set(after).where(eq(workItems.id, params.id));
+      const tickets = await tx.select().from(workTickets)
+        .where(and(eq(workTickets.workItemId, params.id), isNull(workTickets.deletedAt)));
+      await tx.update(workTickets).set({ deletedAt, updatedAt: deletedAt })
+        .where(and(eq(workTickets.workItemId, params.id), isNull(workTickets.deletedAt)));
+      for (const ticket of tickets) {
+        await withAudit(tx, {
+          entityType: "WorkTicket", entityId: ticket.id, action: "DELETE", before: ticket,
+          after: { ...ticket, deletedAt, updatedAt: deletedAt }, actor,
+        });
+      }
       await withAudit(tx, {
         entityType: "WorkItem",
         entityId: after.id,

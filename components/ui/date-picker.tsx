@@ -72,13 +72,13 @@ function CalendarGrid({
     <>
       {/* 헤더 */}
       <div className="mb-2 flex items-center justify-between">
-        <button type="button" onClick={onPrev} className="rounded p-1 hover:bg-accent">
+        <button type="button" onClick={onPrev} className="rounded-sm p-1 hover:bg-accent">
           <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-medium">
           {viewYear}년 {String(viewMonth).padStart(2, "0")}월
         </span>
-        <button type="button" onClick={onNext} className="rounded p-1 hover:bg-accent">
+        <button type="button" onClick={onNext} className="rounded-sm p-1 hover:bg-accent">
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -114,7 +114,7 @@ function CalendarGrid({
                   type="button"
                   onClick={() => onSelect(day)}
                   className={cn(
-                    "rounded py-1 text-xs transition-colors hover:bg-accent",
+                    "rounded-sm py-1 text-xs transition-colors hover:bg-accent",
                     isSelected && "bg-primary text-primary-foreground hover:bg-primary/90",
                     isToday && !isSelected && "font-bold underline underline-offset-2",
                     !isSelected && ci === 0 && "text-red-500 dark:text-red-400",
@@ -243,7 +243,7 @@ export function DatePicker({
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
           className={cn(
             "flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors",
-            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            "focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring",
             disabled && "cursor-not-allowed opacity-50",
             className,
           )}
@@ -261,7 +261,7 @@ export function DatePicker({
               type="button"
               tabIndex={-1}
               onClick={(e) => { e.stopPropagation(); onChange(""); }}
-              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+              className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -311,8 +311,8 @@ export function DatePicker({
                   }
                 }}
                 className={cn(
-                  "flex-1 rounded border border-input bg-background px-2 py-1 text-sm",
-                  "focus:outline-none focus:ring-1 focus:ring-ring",
+                  "flex-1 rounded-sm border border-input bg-background px-2 py-1 text-sm",
+                  "focus:outline-hidden focus:ring-1 focus:ring-ring",
                   inputError && "border-destructive focus:ring-destructive",
                 )}
               />
@@ -322,7 +322,7 @@ export function DatePicker({
                   e.stopPropagation();
                   applyDraftInput();
                 }}
-                className="self-stretch flex items-center whitespace-nowrap rounded border border-input px-3 text-xs font-medium hover:bg-accent"
+                className="self-stretch flex items-center whitespace-nowrap rounded-sm border border-input px-3 text-xs font-medium hover:bg-accent"
               >
                 적용
               </button>
@@ -459,7 +459,7 @@ export function DateTimePicker({
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
           className={cn(
             "flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors",
-            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            "focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring",
             disabled && "cursor-not-allowed opacity-50",
             className,
           )}
@@ -477,7 +477,7 @@ export function DateTimePicker({
               type="button"
               tabIndex={-1}
               onClick={(e) => { e.stopPropagation(); onChange(""); }}
-              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+              className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -526,8 +526,8 @@ export function DateTimePicker({
                   }
                 }}
                 className={cn(
-                  "flex-1 rounded border border-input bg-background px-2 py-1 text-sm",
-                  "focus:outline-none focus:ring-1 focus:ring-ring",
+                  "flex-1 rounded-sm border border-input bg-background px-2 py-1 text-sm",
+                  "focus:outline-hidden focus:ring-1 focus:ring-ring",
                   dateError && "border-destructive focus:ring-destructive",
                 )}
               />
@@ -537,7 +537,7 @@ export function DateTimePicker({
                   e.stopPropagation();
                   applyDraftDate();
                 }}
-                className="self-stretch flex items-center whitespace-nowrap rounded border border-input px-3 text-xs font-medium hover:bg-accent"
+                className="self-stretch flex items-center whitespace-nowrap rounded-sm border border-input px-3 text-xs font-medium hover:bg-accent"
               >
                 적용
               </button>
@@ -550,8 +550,8 @@ export function DateTimePicker({
                 onChange={(e) => handleTimeChange(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
                 className={cn(
-                  "flex-1 rounded border border-input bg-background px-2 py-1 text-sm",
-                  "focus:outline-none focus:ring-1 focus:ring-ring",
+                  "flex-1 rounded-sm border border-input bg-background px-2 py-1 text-sm",
+                  "focus:outline-hidden focus:ring-1 focus:ring-ring",
                 )}
               />
             </div>

@@ -104,19 +104,21 @@ function DraggableChip({
 
   return (
     <button
+      type="button"
       ref={setNodeRef}
       {...listeners}
       {...attributes}
       onClick={onClick}
+      aria-label={`${dayKey} ${event.title}, ${event.allDay ? "종일" : kstTime(event.startDateTime)}${memberText ? `, ${memberText}` : ""}`}
       className={cn(
-        "flex w-full flex-col rounded bg-muted/60 px-1 py-0.5 text-left hover:bg-muted touch-none select-none gap-0.5",
+        "flex w-full flex-col rounded-sm bg-muted/60 px-1 py-0.5 text-left hover:bg-muted touch-none select-none gap-0.5",
         isDragging && "opacity-40",
       )}
     >
       <div className="flex items-center gap-1 min-w-0">
         <span
           className={cn(
-            "shrink-0 rounded px-1 text-[9px] font-semibold leading-[14px]",
+            "shrink-0 rounded-sm px-1 text-[9px] font-semibold leading-[14px]",
             badge.className,
           )}
         >
@@ -152,6 +154,8 @@ function DroppableCell({
   return (
     <div
       ref={setNodeRef}
+      role="group"
+      aria-label={`${dayKey} 일정`}
       className={cn(className, isOver && "ring-2 ring-primary/30 ring-inset")}
     >
       {children}
@@ -242,17 +246,18 @@ export function MonthView({
                     )}
                   </div>
                   <button
+                    type="button"
                     onClick={() => onAddClick(dayKey)}
-                    className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"
-                    aria-label="이벤트 추가"
+                    className="shrink-0 rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                    aria-label={`${dayKey} 이벤트 추가`}
                   >
                     <Plus className="h-3 w-3" />
                   </button>
                 </div>
                 <div className="mt-1 space-y-0.5">
                   {transferCount > 0 && (
-                    <div className="flex w-full items-center gap-1 rounded bg-emerald-500/10 px-1 py-0.5">
-                      <span className="shrink-0 rounded px-1 text-[9px] font-semibold leading-[14px] bg-emerald-500/20 text-emerald-500">
+                    <div className="flex w-full items-center gap-1 rounded-sm bg-emerald-500/10 px-1 py-0.5">
+                      <span className="shrink-0 rounded-sm px-1 text-[9px] font-semibold leading-[14px] bg-emerald-500/20 text-emerald-500">
                         이관
                       </span>
                       <span className="text-[11px] font-medium leading-tight text-emerald-600 dark:text-emerald-400">
@@ -261,8 +266,8 @@ export function MonthView({
                     </div>
                   )}
                   {openTodoCount > 0 && (
-                    <div className="flex w-full items-center gap-1 rounded bg-amber-500/10 px-1 py-0.5">
-                      <span className="shrink-0 rounded bg-amber-500/20 px-1 text-[9px] font-semibold leading-[14px] text-amber-500">
+                    <div className="flex w-full items-center gap-1 rounded-sm bg-amber-500/10 px-1 py-0.5">
+                      <span className="shrink-0 rounded-sm bg-amber-500/20 px-1 text-[9px] font-semibold leading-[14px] text-amber-500">
                         할일
                       </span>
                       <span className="text-[11px] font-medium leading-tight text-amber-700 dark:text-amber-300">

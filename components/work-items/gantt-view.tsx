@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { api } from "@/lib/client/api";
+import { api, isAbortError } from "@/lib/client/api";
+import { QueryError } from "@/components/ui/query-state";
 import { eventDayKeys } from "@/lib/client/calendar";
 import type { CalendarEvent, WorkItemListItem } from "@/lib/client/types";
 import { STATUS_LABELS } from "@/lib/enum-labels";
@@ -56,15 +57,22 @@ export function GanttView({
 
   // 휴일 날짜 세트 (yyyy-mm-dd)
   const [holidayDates, setHolidayDates] = React.useState<Set<string>>(new Set());
+  const [holidayError, setHolidayError] = React.useState<string | null>(null);
+  const [holidayReloadKey, setHolidayReloadKey] = React.useState(0);
 
   React.useEffect(() => {
+    if (scheduled.length === 0) return;
+    const controller = new AbortController();
+    setHolidayError(null);
     const from = new Date(window.startMs).toISOString();
     const to = new Date(window.startMs + window.totalDays * DAY_MS).toISOString();
     api
       .get<{ items: CalendarEvent[] }>("/api/calendar-events", {
+        signal: controller.signal,
         query: { from, to },
       })
       .then((res) => {
+        if (controller.signal.aborted) return;
         const dates = new Set<string>();
         for (const ev of res.items) {
           if (ev.category !== "HOLIDAY") continue;
@@ -72,8 +80,11 @@ export function GanttView({
         }
         setHolidayDates(dates);
       })
-      .catch(() => {});
-  }, [window.startMs, window.totalDays]);
+      .catch((error) => {
+        if (!controller.signal.aborted && !isAbortError(error)) setHolidayError("휴일 정보를 불러오지 못했습니다.");
+      });
+    return () => controller.abort();
+  }, [window.startMs, window.totalDays, holidayReloadKey, scheduled.length]);
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = React.useState(false);
@@ -173,12 +184,17 @@ export function GanttView({
   const todayCol = Math.floor((todayMs - window.startMs) / DAY_MS);
 
   return (
+    <div className="space-y-3">
+      {holidayError && <QueryError message={holidayError} onRetry={() => setHolidayReloadKey((key) => key + 1)} />}
+      {scheduled.length < items.length && <p className="text-xs text-muted-foreground">시작일·종료일이 없는 {items.length - scheduled.length}건은 테이블에서 확인할 수 있습니다.</p>}
     <div className="relative">
       {/* 좌측 화살표 — 담당자 고정 영역 오른쪽에 아이콘만 */}
       {canLeft && (
         <button
+          type="button"
+          aria-label="간트 왼쪽으로 이동"
           onClick={() => scrollBy(-320)}
-          className="absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center h-6 w-6 rounded-full bg-card border shadow-sm hover:bg-accent"
+          className="absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center h-6 w-6 rounded-full bg-card border shadow-xs hover:bg-accent"
           style={{ left: LABEL_WIDTH + 4 }}
         >
           <ChevronLeft className="h-4 w-4 text-muted-foreground" />
@@ -188,8 +204,10 @@ export function GanttView({
       {/* 우측 화살표 */}
       {canRight && (
         <button
+          type="button"
+          aria-label="간트 오른쪽으로 이동"
           onClick={() => scrollBy(320)}
-          className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-4 bg-gradient-to-l from-card via-card/70 to-transparent"
+          className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-4 bg-linear-to-l from-card via-card/70 to-transparent"
         >
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
         </button>
@@ -328,7 +346,7 @@ export function GanttView({
                           key={item.id}
                           onClick={() => onOpen(item)}
                           title={`${item.title} · ${STATUS_LABELS[item.status]}`}
-                          className="group relative flex h-6 items-center overflow-hidden rounded text-left text-[11px] font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+                          className="group relative flex h-6 items-center overflow-hidden rounded-sm text-left text-[11px] font-medium text-white shadow-xs transition-opacity hover:opacity-90"
                           style={{
                             marginLeft: startCol * COL_WIDTH,
                             width: spanDays * COL_WIDTH - 2,
@@ -346,6 +364,7 @@ export function GanttView({
           })}
         </div>
       </div>
+    </div>
     </div>
   );
 }

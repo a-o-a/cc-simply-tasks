@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 const ToastProvider = ToastPrimitive.Provider;
 
 const ToastViewport = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitive.Viewport>,
+  React.ComponentRef<typeof ToastPrimitive.Viewport>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitive.Viewport>
 >(({ className, ...props }, ref) => (
   <ToastPrimitive.Viewport
@@ -38,7 +38,7 @@ const toastVariants = cva(
 );
 
 const Toast = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitive.Root>,
+  React.ComponentRef<typeof ToastPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitive.Root> &
     VariantProps<typeof toastVariants>
 >(({ className, variant, ...props }, ref) => (
@@ -51,13 +51,13 @@ const Toast = React.forwardRef<
 Toast.displayName = ToastPrimitive.Root.displayName;
 
 const ToastClose = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitive.Close>,
+  React.ComponentRef<typeof ToastPrimitive.Close>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitive.Close>
 >(({ className, ...props }, ref) => (
   <ToastPrimitive.Close
     ref={ref}
     className={cn(
-      "absolute right-1 top-1 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100",
+      "absolute right-1 top-1 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-hidden focus:ring-2 group-hover:opacity-100",
       className,
     )}
     toast-close=""
@@ -69,7 +69,7 @@ const ToastClose = React.forwardRef<
 ToastClose.displayName = ToastPrimitive.Close.displayName;
 
 const ToastTitle = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitive.Title>,
+  React.ComponentRef<typeof ToastPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitive.Title>
 >(({ className, ...props }, ref) => (
   <ToastPrimitive.Title
@@ -81,7 +81,7 @@ const ToastTitle = React.forwardRef<
 ToastTitle.displayName = ToastPrimitive.Title.displayName;
 
 const ToastDescription = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitive.Description>,
+  React.ComponentRef<typeof ToastPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitive.Description>
 >(({ className, ...props }, ref) => (
   <ToastPrimitive.Description
@@ -93,7 +93,9 @@ const ToastDescription = React.forwardRef<
 ToastDescription.displayName = ToastPrimitive.Description.displayName;
 
 type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>;
-type ToastActionElement = React.ReactElement<typeof ToastPrimitive.Action>;
+type ToastActionElement = React.ReactElement<
+  React.ComponentPropsWithoutRef<typeof ToastPrimitive.Action>
+>;
 
 export {
   type ToastProps,

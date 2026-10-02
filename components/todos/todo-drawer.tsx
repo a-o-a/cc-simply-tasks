@@ -18,12 +18,15 @@ import { Select } from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { MemberFilter } from "@/components/member-filter";
-import { ApiError, api, emitTodosChanged } from "@/lib/client/api";
+import { ApiError, api, emitTodosChanged, isAbortError } from "@/lib/client/api";
+import { useRequestController } from "@/lib/client/use-request-controller";
+import { LoadingState, QueryError } from "@/components/ui/query-state";
 import {
   fromDateInputValue,
   toDateInputValue,
@@ -31,7 +34,6 @@ import {
 import { toast } from "@/lib/client/use-toast";
 import type {
   Member,
-  TodoChecklistItem,
   TodoItem,
 } from "@/lib/client/types";
 import { TODO_STATUSES, type TodoStatus } from "@/lib/enums";
@@ -41,12 +43,8 @@ import { cn } from "@/lib/utils";
 /**
  * TodoDrawer — 생성/수정 통합 드로어.
  *
- * - `mode="create"`: 저장 시 POST (부모+자식 batch), 저장 완료 후 edit 모드로 전환
- * - `mode="edit"`:   모든 편집이 debounce 500ms 후 PATCH (자동 저장)
- *
- * 체크리스트는 mode에 따라 다르게 동작:
- *   create — 로컬 state에만 누적, 최종 저장 시 batch POST
- *   edit   — 각 변경 즉시 개별 PATCH/POST/DELETE
+ * 본문과 체크리스트를 로컬 드래프트로 편집한 뒤 하나의 요청으로 저장합니다.
+ * 닫기 전에 저장되지 않은 변경을 확인합니다.
  */
 
 type Mode = "create" | "edit";
@@ -107,6 +105,10 @@ export function TodoDrawer({
   const [detail, setDetail] = React.useState<TodoItem | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const savingRef = React.useRef(false);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [reloadKey, setReloadKey] = React.useState(0);
+  const { beginRequest, cancelRequest } = useRequestController();
   const [confirmCloseOpen, setConfirmCloseOpen] = React.useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
 
@@ -118,9 +120,34 @@ export function TodoDrawer({
   const [dueDate, setDueDate] = React.useState<string>(""); // yyyy-mm-dd
   const [checklist, setChecklist] = React.useState<DraftChecklistItem[]>([]);
 
-  const checklistInputRefs = React.useRef(new Map<string, HTMLInputElement | null>());
+  const checklistInputRefs = React.useRef(new Map<string, HTMLInputElement>());
   const [pendingFocusChecklistId, setPendingFocusChecklistId] = React.useState<string | null>(null);
-  const originalSnapshotRef = React.useRef<DraftSnapshot | null>(null);
+  const [originalSnapshot, setOriginalSnapshot] = React.useState<DraftSnapshot | null>(null);
+
+  const applyTodo = React.useCallback((data: TodoItem) => {
+    const nextChecklist = (data.checklist ?? []).map((item) => ({
+      id: item.id,
+      content: item.content,
+      done: item.done,
+      assigneeId: item.assigneeId,
+    }));
+    const snapshot = {
+      title: data.title,
+      note: data.note ?? "",
+      status: data.status,
+      assigneeId: data.assigneeId,
+      dueDate: data.dueDate ? toDateInputValue(data.dueDate) : "",
+      checklist: nextChecklist,
+    };
+    setOriginalSnapshot(snapshot);
+    setDetail(data);
+    setTitle(snapshot.title);
+    setNote(snapshot.note);
+    setStatus(snapshot.status);
+    setAssigneeId(snapshot.assigneeId);
+    setDueDate(snapshot.dueDate);
+    setChecklist(nextChecklist);
+  }, []);
 
   const buildSnapshot = React.useCallback((): DraftSnapshot => ({
     title,
@@ -148,14 +175,17 @@ export function TodoDrawer({
         checklist.length > 0,
       );
     }
-    const original = originalSnapshotRef.current;
-    if (!original) return false;
-    return JSON.stringify(buildSnapshot()) !== JSON.stringify(original);
-  }, [mode, title, note, status, assigneeId, dueDate, checklist, buildSnapshot]);
+    if (!originalSnapshot) return false;
+    return JSON.stringify(buildSnapshot()) !== JSON.stringify(originalSnapshot);
+  }, [mode, title, note, status, assigneeId, dueDate, checklist, buildSnapshot, originalSnapshot]);
 
   // open / mode / todoId 변화 시 상태 초기화
   React.useEffect(() => {
     if (!open) return;
+    const request = beginRequest();
+    setLoadError(null);
+    setDetail(null);
+    setOriginalSnapshot(null);
     setConfirmCloseOpen(false);
     setConfirmDeleteOpen(false);
     if (mode === "create") {
@@ -166,108 +196,39 @@ export function TodoDrawer({
       setAssigneeId(null);
       setDueDate("");
       setChecklist([]);
-      originalSnapshotRef.current = {
+      setLoading(false);
+      setOriginalSnapshot({
         title: "",
         note: "",
         status: "OPEN",
         assigneeId: null,
         dueDate: "",
         checklist: [],
-      };
-      return;
+      });
+      return cancelRequest;
     }
     if (todoId) {
       setLoading(true);
       api
-        .get<TodoItem>(`/api/todos/${todoId}`)
+        .get<TodoItem>(`/api/todos/${todoId}`, { signal: request.signal })
         .then((data) => {
-          const nextChecklist = (data.checklist ?? []).map((c) => ({
-            id: c.id,
-            content: c.content,
-            done: c.done,
-            assigneeId: c.assigneeId,
-          }));
-          setDetail(data);
-          setTitle(data.title);
-          setNote(data.note ?? "");
-          setStatus(data.status);
-          setAssigneeId(data.assigneeId);
-          setDueDate(data.dueDate ? toDateInputValue(data.dueDate) : "");
-          setChecklist(nextChecklist);
-          originalSnapshotRef.current = {
-            title: data.title,
-            note: data.note ?? "",
-            status: data.status,
-            assigneeId: data.assigneeId,
-            dueDate: data.dueDate ? toDateInputValue(data.dueDate) : "",
-            checklist: nextChecklist,
-          };
+          if (request.isCurrent()) applyTodo(data);
         })
         .catch((err) => {
-          toast({
-            title: "TODO 조회 실패",
-            description: err instanceof ApiError ? err.message : undefined,
-            variant: "destructive",
-          });
-          onClose();
+          if (!request.isCurrent() || isAbortError(err)) return;
+          setLoadError(err instanceof ApiError ? err.message : "TODO를 불러오지 못했습니다.");
         })
-        .finally(() => setLoading(false));
+        .finally(() => { if (request.isCurrent()) setLoading(false); });
     }
-  }, [open, mode, todoId, onClose]);
+    return cancelRequest;
+  }, [open, mode, todoId, reloadKey, beginRequest, cancelRequest, applyTodo]);
 
   async function changeStatus(newStatus: TodoStatus) {
     setStatus(newStatus);
   }
 
-  async function syncChecklist(todoId: string, nextChecklist: DraftChecklistItem[]) {
-    const originalChecklist = originalSnapshotRef.current?.checklist ?? [];
-    const originalById = new Map(originalChecklist.map((item) => [item.id, item]));
-    const nextIds = new Set(nextChecklist.map((item) => item.id));
-
-    for (const originalItem of originalChecklist) {
-      if (!nextIds.has(originalItem.id)) {
-        await api.delete(`/api/todos/${todoId}/checklist/${originalItem.id}`);
-      }
-    }
-
-    for (let index = 0; index < nextChecklist.length; index += 1) {
-      const item = nextChecklist[index];
-      const originalItem = originalById.get(item.id);
-      if (!originalItem || item._isNew) {
-        await api.post<TodoChecklistItem>(`/api/todos/${todoId}/checklist`, {
-          content: item.content,
-          done: item.done,
-          order: index,
-          assigneeId: item.assigneeId,
-        });
-        continue;
-      }
-
-      const patch: {
-        content?: string;
-        done?: boolean;
-        order?: number;
-        assigneeId?: string | null;
-      } = {};
-
-      if (originalItem.content !== item.content) patch.content = item.content;
-      if (originalItem.done !== item.done) patch.done = item.done;
-      if ((originalItem.assigneeId ?? null) !== (item.assigneeId ?? null)) {
-        patch.assigneeId = item.assigneeId;
-      }
-      const originalIndex = originalChecklist.findIndex((candidate) => candidate.id === item.id);
-      if (originalIndex !== index) patch.order = index;
-
-      if (Object.keys(patch).length > 0) {
-        await api.patch(`/api/todos/${todoId}/checklist/${item.id}`, patch);
-      }
-    }
-
-    return true;
-  }
-
   async function saveDraft(options?: { closeAfterSave?: boolean; title?: string }) {
-    if (saving) return false;
+    if (savingRef.current || loading || loadError || (mode === "edit" && !detail)) return false;
     const nextTitle = options?.title ?? title;
     if (!nextTitle.trim()) {
       toast({ title: "제목을 입력하세요", variant: "destructive" });
@@ -275,31 +236,31 @@ export function TodoDrawer({
     }
 
     const payload = {
-      title: nextTitle,
+      title: nextTitle.trim(),
       note: note || null,
       status,
       assigneeId,
       dueDate: dueDate ? fromDateInputValue(dueDate) : null,
     };
-    const normalizedChecklist = sanitizeChecklistDraft(checklist);
+    const normalizedChecklist = sanitizeChecklistDraft(checklist).map((item, order) => ({
+      id: item._isNew ? undefined : item.id,
+      content: item.content,
+      done: item.done,
+      assigneeId: item.assigneeId,
+      order,
+    }));
 
     try {
+      savingRef.current = true;
       setSaving(true);
       if (mode === "create") {
         await api.post<TodoItem>("/api/todos", {
           ...payload,
-          checklist: normalizedChecklist.map((item, idx) => ({
-            content: item.content,
-            done: item.done,
-            order: idx,
-            assigneeId: item.assigneeId,
-          })),
+          checklist: normalizedChecklist,
         });
       } else if (detail) {
-        await api.patch<TodoItem>(`/api/todos/${detail.id}`, payload);
-        setChecklist(normalizedChecklist);
-        const synced = await syncChecklist(detail.id, normalizedChecklist);
-        if (!synced) return false;
+        const updated = await api.patch<TodoItem>(`/api/todos/${detail.id}`, { ...payload, checklist: normalizedChecklist });
+        applyTodo(updated);
       }
 
       onMutated();
@@ -308,29 +269,6 @@ export function TodoDrawer({
 
       if (options?.closeAfterSave) {
         onClose();
-      } else if (mode === "edit" && detail) {
-        const fresh = await api.get<TodoItem>(`/api/todos/${detail.id}`);
-        const nextChecklist = (fresh.checklist ?? []).map((c) => ({
-          id: c.id,
-          content: c.content,
-          done: c.done,
-          assigneeId: c.assigneeId,
-        }));
-        setDetail(fresh);
-        setTitle(fresh.title);
-        setNote(fresh.note ?? "");
-        setStatus(fresh.status);
-        setAssigneeId(fresh.assigneeId);
-        setDueDate(fresh.dueDate ? toDateInputValue(fresh.dueDate) : "");
-        setChecklist(nextChecklist);
-        originalSnapshotRef.current = {
-          title: fresh.title,
-          note: fresh.note ?? "",
-          status: fresh.status,
-          assigneeId: fresh.assigneeId,
-          dueDate: fresh.dueDate ? toDateInputValue(fresh.dueDate) : "",
-          checklist: nextChecklist,
-        };
       } else if (mode === "create") {
         onClose();
       }
@@ -344,6 +282,7 @@ export function TodoDrawer({
       });
       return false;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -378,7 +317,9 @@ export function TodoDrawer({
   }
 
   async function handleDelete() {
-    if (!detail) return;
+    if (!detail || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       await api.delete(`/api/todos/${detail.id}`);
       onMutated();
@@ -392,17 +333,25 @@ export function TodoDrawer({
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   }
 
   // ─────── 체크리스트 핸들러 ───────
   function addChecklistItem() {
+    if (checklist.length >= 1000) {
+      toast({ title: "체크리스트는 최대 1000개까지 추가할 수 있습니다.", variant: "destructive" });
+      return;
+    }
     const nextItem = createDraftChecklistItem();
     setChecklist((prev) => [...prev, nextItem]);
     setPendingFocusChecklistId(nextItem.id);
   }
 
   function addChecklistItemAfter(afterId: string) {
+    if (checklist.length >= 1000) return;
     const nextItem = createDraftChecklistItem();
     setChecklist((prev) => {
       const index = prev.findIndex((item) => item.id === afterId);
@@ -454,10 +403,14 @@ export function TodoDrawer({
           <SheetTitle>
             {mode === "create" ? "새 TODO" : detail?.title || "TODO"}
           </SheetTitle>
+          <SheetDescription>본문과 체크리스트를 편집한 뒤 저장하세요.</SheetDescription>
         </SheetHeader>
-        <div
+        {loading && <LoadingState message="할 일을 불러오는 중…" />}
+        {loadError && <QueryError message={loadError} onRetry={() => setReloadKey((key) => key + 1)} />}
+        <fieldset
+          disabled={loading || saving || Boolean(loadError)}
           className={cn(
-            "flex-1 space-y-4 overflow-y-auto p-4",
+            "min-w-0 flex-1 space-y-4 overflow-y-auto p-4",
             loading && "pointer-events-none opacity-60",
           )}
         >
@@ -471,6 +424,8 @@ export function TodoDrawer({
             <Label htmlFor="todo-title">제목</Label>
             <Input
               id="todo-title"
+              required
+              maxLength={300}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -490,8 +445,9 @@ export function TodoDrawer({
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
             <div className="min-w-0 space-y-1.5">
-              <Label>상태</Label>
+              <Label htmlFor="todo-status">상태</Label>
               <Select
+                id="todo-status"
                 value={status}
                 onChange={(e) => void changeStatus(e.target.value as TodoStatus)}
               >
@@ -503,9 +459,11 @@ export function TodoDrawer({
               </Select>
             </div>
             <div className="min-w-0 space-y-1.5">
-              <Label>담당자</Label>
+              <Label htmlFor="todo-assignee">담당자</Label>
               <div>
                 <MemberFilter
+                  id="todo-assignee"
+                  disabled={saving || loading || Boolean(loadError)}
                   members={members}
                   selectedIds={new Set(assigneeId ? [assigneeId] : [])}
                   onToggle={(id) => setAssigneeId(id)}
@@ -516,8 +474,9 @@ export function TodoDrawer({
               </div>
             </div>
             <div className="min-w-0 space-y-1.5">
-              <Label>마감일</Label>
+              <Label htmlFor="todo-due-date">마감일</Label>
               <DatePicker
+                id="todo-due-date"
                 value={dueDate}
                 onChange={setDueDate}
                 placeholder="날짜 선택"
@@ -529,6 +488,7 @@ export function TodoDrawer({
             <Label htmlFor="todo-note">메모</Label>
             <Textarea
               id="todo-note"
+              maxLength={10000}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
@@ -544,13 +504,14 @@ export function TodoDrawer({
                 size="sm"
                 variant="outline"
                 onClick={addChecklistItem}
+                disabled={checklist.length >= 1000 || saving || loading}
               >
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
                 항목 추가
               </Button>
             </div>
             {checklist.length === 0 ? (
-              <p className="rounded border border-dashed py-6 text-center text-xs text-muted-foreground">
+              <p className="rounded-sm border border-dashed py-6 text-center text-xs text-muted-foreground">
                 아직 항목이 없습니다
               </p>
             ) : (
@@ -558,21 +519,25 @@ export function TodoDrawer({
                 {checklist.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-center gap-2 rounded border bg-background p-2"
+                    className="flex items-center gap-2 rounded-sm border bg-background p-2"
                   >
                     <input
                       type="checkbox"
+                      aria-label={`${item.content || "새 항목"} 완료`}
                       checked={item.done}
                       onChange={(e) =>
                         updateChecklistItem(item.id, { done: e.target.checked })
                       }
-                      className="h-4 w-4 cursor-pointer rounded border-input"
+                      className="h-4 w-4 cursor-pointer rounded-sm border-input"
                     />
                     <Input
                       ref={(node) => {
-                        checklistInputRefs.current.set(item.id, node);
+                        if (node) checklistInputRefs.current.set(item.id, node);
+                        else checklistInputRefs.current.delete(item.id);
                       }}
                       value={item.content}
+                      aria-label="체크리스트 내용"
+                      maxLength={500}
                       onChange={(e) =>
                         setChecklist((prev) =>
                           prev.map((c) =>
@@ -604,6 +569,8 @@ export function TodoDrawer({
                       )}
                     />
                     <MemberFilter
+                      aria-label={`${item.content || "새 항목"} 담당자`}
+                      disabled={saving || loading || Boolean(loadError)}
                       members={members}
                       selectedIds={new Set(item.assigneeId ? [item.assigneeId] : [])}
                       onToggle={(id) =>
@@ -619,7 +586,7 @@ export function TodoDrawer({
                     <button
                       type="button"
                       onClick={() => removeChecklistItem(item.id)}
-                      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
+                      className="shrink-0 rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
                       aria-label="항목 삭제"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -629,7 +596,7 @@ export function TodoDrawer({
               </ul>
             )}
           </div>
-        </div>
+        </fieldset>
 
         <div className="flex items-center justify-between border-t bg-card p-3">
           {mode === "edit" && detail ? (
@@ -648,7 +615,7 @@ export function TodoDrawer({
                 <Button type="button" variant="outline" onClick={handleRequestClose} disabled={saving}>
                   취소
                 </Button>
-                <Button type="button" onClick={() => void saveDraft()} disabled={saving || !isDirty}>
+                <Button type="button" onClick={() => void saveDraft()} disabled={saving || loading || Boolean(loadError) || !isDirty}>
                   {saving ? "저장 중..." : "저장"}
                 </Button>
               </div>
@@ -658,7 +625,7 @@ export function TodoDrawer({
               <Button type="button" variant="outline" onClick={handleRequestClose} disabled={saving}>
                 취소
               </Button>
-              <Button type="button" onClick={() => void handleCreate()} disabled={saving}>
+              <Button type="button" onClick={() => void handleCreate()} disabled={saving || loading || Boolean(loadError) || !title.trim()}>
                 {saving ? "생성 중..." : "생성"}
               </Button>
             </>

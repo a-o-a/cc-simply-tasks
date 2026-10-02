@@ -3,18 +3,22 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { now } from "@/lib/db/helpers";
 import { teamMembers } from "@/lib/db/schema";
-import { withErrorHandler, HttpError } from "@/lib/http";
+import { withErrorHandler, HttpError, readJsonBody } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { teamMemberUpdateSchema } from "@/lib/validation/teamMember";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 /**
  * GET /api/team-members/:id
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(
-  async (_req: NextRequest, { params }: Params) => {
+  async (_req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const rows = await db
       .select()
@@ -31,10 +35,11 @@ export const GET = withErrorHandler(
  * PATCH /api/team-members/:id
  */
 export const PATCH = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
-    const input = teamMemberUpdateSchema.parse(await req.json());
+    const input = teamMemberUpdateSchema.parse(await readJsonBody(req));
     const updatedAt = now();
 
     const updated = await db.transaction(async (tx) => {
@@ -71,12 +76,11 @@ export const PATCH = withErrorHandler(
 
 /**
  * DELETE /api/team-members/:id
- * soft delete. WorkItem.assigneeId / CalendarEvent.memberId는
- * 스키마에서 onDelete: SetNull로 정의되어 있으나, soft delete이므로
- * 실제 FK는 유지된다. 필요 시 호출자가 정리.
+ * soft delete. 실제 FK와 과거 업무/일정의 팀원 관계는 유지된다.
  */
 export const DELETE = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const deletedAt = now();

@@ -47,13 +47,14 @@ function KanbanCard({
 
   return (
     <button
+      type="button"
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
       onClick={() => onOpen(item)}
       className={cn(
-        "rounded-md border bg-background p-3 text-left text-sm shadow-sm transition-colors hover:bg-accent/40",
+        "rounded-md border bg-background p-3 text-left text-sm shadow-xs transition-colors hover:bg-accent/40",
         PRIORITY_BORDER[item.priority],
         isDragging && "opacity-50",
       )}
@@ -74,7 +75,7 @@ function KanbanCard({
           {item.tickets.map((t) => (
             <span
               key={t.systemName}
-              className="inline-flex items-center rounded bg-muted px-1 py-px text-[10px] text-muted-foreground"
+              className="inline-flex items-center rounded-sm bg-muted px-1 py-px text-[10px] text-muted-foreground"
             >
               {systemNameByCode[t.systemName] ?? t.systemName}
             </span>
@@ -87,10 +88,10 @@ function KanbanCard({
         <span>{item.assignee?.name ?? "미배정"}</span>
         {item.transferDate && (
           <span className={cn((() => {
-            const today = new Date().toDateString();
-            const transfer = new Date(item.transferDate!).toDateString();
+            const today = formatDate(new Date());
+            const transfer = formatDate(item.transferDate);
             if (transfer === today) return "text-blue-600 font-semibold";
-            if (new Date(item.transferDate!) < new Date()) return "text-red-600 font-semibold";
+            if (transfer < today) return "text-red-600 font-semibold";
             return "";
           })())}>
             이관 {formatDate(item.transferDate)}
@@ -267,7 +268,7 @@ export function KanbanView({
         {canLeft && (
           <button
             onClick={() => scrollBy(-320)}
-            className="absolute left-0 top-0 bottom-0 z-10 flex items-center pl-1 pr-4 bg-gradient-to-r from-background via-background/70 to-transparent"
+            className="absolute left-0 top-0 bottom-0 z-10 flex items-center pl-1 pr-4 bg-linear-to-r from-background via-background/70 to-transparent"
           >
             <ChevronLeft className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -277,7 +278,7 @@ export function KanbanView({
         {canRight && (
           <button
             onClick={() => scrollBy(320)}
-            className="absolute right-0 top-0 bottom-0 z-10 flex items-center pr-1 pl-4 bg-gradient-to-l from-background via-background/70 to-transparent"
+            className="absolute right-0 top-0 bottom-0 z-10 flex items-center pr-1 pl-4 bg-linear-to-l from-background via-background/70 to-transparent"
           >
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </button>

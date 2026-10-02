@@ -5,7 +5,7 @@ import { now } from "@/lib/db/helpers";
 import { workItems } from "@/lib/db/schema";
 import { withAudit } from "@/lib/audit";
 import { getActorContext } from "@/lib/actor";
-import { HttpError, withErrorHandler } from "@/lib/http";
+import { HttpError, withErrorHandler, readJsonBody } from "@/lib/http";
 import { workItemBulkStatusUpdateSchema } from "@/lib/validation/workItem";
 
 type BulkStatusResponse = {
@@ -14,10 +14,13 @@ type BulkStatusResponse = {
   skippedIds: string[];
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
-  const input = workItemBulkStatusUpdateSchema.parse(await req.json());
+  const input = workItemBulkStatusUpdateSchema.parse(await readJsonBody(req));
   const ids = Array.from(new Set(input.ids));
   const updatedAt = now();
 

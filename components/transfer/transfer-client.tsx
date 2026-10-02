@@ -11,15 +11,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ApiError, api, emitWorkItemsChanged } from "@/lib/client/api";
+import { ApiError, api, emitWorkItemsChanged, isAbortError } from "@/lib/client/api";
+import { useRequestController } from "@/lib/client/use-request-controller";
+import { useWorkReferences } from "@/lib/client/use-work-references";
+import { QueryError } from "@/components/ui/query-state";
 import { toast } from "@/lib/client/use-toast";
 import type {
-  ListResponse,
-  Member,
-  WorkCategory,
   WorkItemDetail,
   WorkItemListItem,
-  WorkSystem,
 } from "@/lib/client/types";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/work-items/status-badge";
@@ -30,7 +29,7 @@ import type { Status } from "@/lib/enums";
 /**
  * 이관 현황 페이지 — 미팅용.
  *
- * 이관완료(TRANSFERRED)가 아닌 + 이관일이 설정된 작업을
+ * 이관일이 설정된 작업을 (이관완료 포함)
  * 이관일 → 요청번호 → 작업 순으로 그룹핑해 표시.
  */
 
@@ -70,7 +69,7 @@ function toKstDateStr(iso: string): string {
 
 function formatDateLabel(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00+09:00`);
-  const day = DAY_LABELS[d.getDay()];
+  const day = DAY_LABELS[new Date(d.getTime() + 9 * 60 * 60 * 1000).getUTCDay()];
   return `${dateStr} (${day})`;
 }
 
@@ -159,13 +158,12 @@ function groupItems(items: WorkItemListItem[]): DateGroup[] {
 // ─── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 
 export function TransferClient() {
-  const today = React.useMemo(todayKst, []);
+  const [today] = React.useState(todayKst);
   const [cursor, setCursor] = React.useState(() => cursorFromDateStr(today));
 
   const [items, setItems] = React.useState<WorkItemListItem[]>([]);
-  const [members, setMembers] = React.useState<Member[]>([]);
-  const [categories, setCategories] = React.useState<WorkCategory[]>([]);
-  const [systems, setSystems] = React.useState<WorkSystem[]>([]);
+  const { members, categories, systems, error: referenceError, reload: reloadReferences } = useWorkReferences();
+  const { beginRequest, cancelRequest } = useRequestController();
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -175,8 +173,10 @@ export function TransferClient() {
   const [editing, setEditing] = React.useState<WorkItemListItem | null>(null);
   const [pendingDate, setPendingDate] = React.useState<string | null>(null);
   const [confirmingDate, setConfirmingDate] = React.useState<DateGroup | null>(null);
+  const completingRef = React.useRef(false);
 
   const loadAll = React.useCallback(async () => {
+    const request = beginRequest();
     setLoading(true);
     setError(null);
     try {
@@ -184,33 +184,27 @@ export function TransferClient() {
       const daysInMonth = new Date(cursor.year, cursor.month0 + 1, 0).getDate();
       const toDate = `${cursor.year}-${String(cursor.month0 + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
 
-      const [itemsRes, membersRes, catsRes, sysRes] = await Promise.all([
-        api.get<ListResponse<WorkItemListItem>>("/api/work-items", {
+      const nextItems = await api.getAllPages<WorkItemListItem>("/api/work-items", {
+          signal: request.signal,
           query: {
             hasTransferDate: "true",
             transferDate: fromDate,
             transferDateTo: toDate,
-            pageSize: 10000,
+            pageSize: 100,
           },
-        }),
-        api.get<ListResponse<Member>>("/api/team-members"),
-        api.get<ListResponse<WorkCategory>>("/api/work-categories"),
-        api.get<ListResponse<WorkSystem>>("/api/work-systems"),
-      ]);
-      setItems(itemsRes.items);
-      setMembers(membersRes.items);
-      setCategories(catsRes.items);
-      setSystems(sysRes.items);
+      });
+      if (request.isCurrent()) setItems(nextItems);
     } catch (err) {
+      if (!request.isCurrent() || isAbortError(err)) return;
       const message = err instanceof ApiError ? err.message : "데이터 조회 실패";
       setError(message);
       toast({ title: "이관 현황 조회 실패", description: message, variant: "destructive" });
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, [cursor]);
+  }, [cursor, beginRequest]);
 
-  React.useEffect(() => { void loadAll(); }, [loadAll]);
+  React.useEffect(() => { void loadAll(); return cancelRequest; }, [loadAll, cancelRequest]);
 
   const dateGroups = React.useMemo(() => groupItems(items), [items]);
 
@@ -229,10 +223,12 @@ export function TransferClient() {
   }
 
   function openCompleteConfirm(dateGroup: DateGroup) {
+    if (completingRef.current) return;
     setConfirmingDate(dateGroup);
   }
 
   async function completeDateGroup(dateGroup: DateGroup) {
+    if (completingRef.current) return;
     const ids = dateGroup.requestGroups.flatMap((group) =>
       group.items
         .filter((item) => item.status !== "TRANSFERRED")
@@ -240,36 +236,39 @@ export function TransferClient() {
     );
     if (ids.length === 0) return;
 
+    completingRef.current = true;
     setConfirmingDate(null);
     setPendingDate(dateGroup.date);
+    let updatedCount = 0;
     try {
-      const result = await api.post<BulkStatusResponse>("/api/work-items/bulk-status", {
-        ids,
-        status: "TRANSFERRED" satisfies Status,
-      });
-      setItems((prev) =>
-        prev.map((item) =>
-          result.updatedIds.includes(item.id)
-            ? { ...item, status: "TRANSFERRED" }
-            : item,
-        ),
-      );
-      if (result.updatedCount > 0) emitWorkItemsChanged();
+      for (let offset = 0; offset < ids.length; offset += 200) {
+        const result = await api.post<BulkStatusResponse>("/api/work-items/bulk-status", {
+          ids: ids.slice(offset, offset + 200),
+          status: "TRANSFERRED" satisfies Status,
+        });
+        updatedCount += result.updatedCount;
+        const updatedIds = new Set(result.updatedIds);
+        setItems((prev) =>
+          prev.map((item) => updatedIds.has(item.id) ? { ...item, status: "TRANSFERRED" } : item),
+        );
+      }
       toast({
         title: "이관완료 처리됨",
         description:
-          result.updatedCount > 0
-            ? `${dateGroup.label} 작업 ${result.updatedCount}건을 이관완료로 변경했습니다.`
+          updatedCount > 0
+            ? `${dateGroup.label} 작업 ${updatedCount}건을 이관완료로 변경했습니다.`
             : `${dateGroup.label} 작업은 이미 모두 이관완료 상태입니다.`,
       });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "일괄 상태 변경 실패";
       toast({
         title: "이관완료 처리 실패",
-        description: message,
+        description: updatedCount > 0 ? `${updatedCount}건이 변경된 뒤 중단되었습니다. 현황을 확인하고 다시 시도해주세요. ${message}` : message,
         variant: "destructive",
       });
     } finally {
+      if (updatedCount > 0) emitWorkItemsChanged();
+      completingRef.current = false;
       setPendingDate((current) => (current === dateGroup.date ? null : current));
       void loadAll();
     }
@@ -310,18 +309,18 @@ export function TransferClient() {
         {/* 가운데: 월 선택 */}
         <div className="flex flex-1 items-center justify-center gap-3">
           <div className="flex items-center rounded-md border bg-card">
-            <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전" disabled={loading}>
+            <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전 달" disabled={loading || pendingDate !== null}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="min-w-[10rem] px-3 text-center text-sm font-medium tabular-nums">
               {headerLabel}
             </span>
-            <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음" disabled={loading}>
+            <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음 달" disabled={loading || pendingDate !== null}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
 
-          <Button variant="outline" onClick={gotoToday} disabled={loading}>
+          <Button variant="outline" onClick={gotoToday} disabled={loading || pendingDate !== null}>
             이번 달
           </Button>
         </div>
@@ -329,7 +328,8 @@ export function TransferClient() {
         <div className="flex flex-1 justify-end"></div>
       </header>
 
-      <div className="mt-6">
+      {referenceError && <div className="mt-4"><QueryError message={referenceError} onRetry={() => void reloadReferences()} /></div>}
+      <div className="mt-6" aria-busy={loading}>
         {loading ? (
           <LoadingSkeleton />
         ) : error ? (
@@ -355,7 +355,7 @@ export function TransferClient() {
         systems={systems}
         onClose={() => setDrawerId(null)}
         onEdit={openEdit}
-        onDeleted={() => { setDrawerId(null); void loadAll(); }}
+        onDeleted={() => setDrawerId(null)}
         onMutated={() => void loadAll()}
       />
 
@@ -371,7 +371,7 @@ export function TransferClient() {
           if (updated) {
             setItems((prev) =>
               prev.map((item) =>
-                item.id === updated.id ? { ...item, ...updated, assignee: item.assignee } : item,
+                item.id === updated.id ? { ...item, ...updated } : item,
               ),
             );
           }
@@ -420,6 +420,7 @@ function TransferTable({
           categoryNameByCode={categoryNameByCode}
           onOpen={onOpen}
           isPending={pendingDate === dateGroup.date}
+          busy={pendingDate !== null}
           onComplete={() => onCompleteDate(dateGroup)}
         />
       ))}
@@ -433,6 +434,7 @@ function DateTable({
   categoryNameByCode,
   onOpen,
   isPending,
+  busy,
   onComplete,
 }: {
   dateGroup: DateGroup;
@@ -440,6 +442,7 @@ function DateTable({
   categoryNameByCode: Record<string, string>;
   onOpen: (item: WorkItemListItem) => void;
   isPending: boolean;
+  busy: boolean;
   onComplete: () => void;
 }) {
   const hasCompletableItems = dateGroup.requestGroups.some((group) =>
@@ -463,12 +466,12 @@ function DateTable({
           {dateGroup.label}
         </h2>
         {dateGroup.isToday && (
-          <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          <span className="rounded-sm bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
             오늘
           </span>
         )}
         {dateGroup.isPast && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
             지난날
           </span>
         )}
@@ -478,7 +481,7 @@ function DateTable({
             {dateGroup.systems.map((sysCode) => (
               <span
                 key={sysCode}
-                className="inline-flex items-center rounded bg-foreground/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground/70"
+                className="inline-flex items-center rounded-sm bg-foreground/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground/70"
               >
                 {systemNameByCode[sysCode] ?? sysCode}
               </span>
@@ -490,7 +493,7 @@ function DateTable({
           size="sm"
           className="ml-auto"
           onClick={onComplete}
-          disabled={isPending || !hasCompletableItems}
+          disabled={busy || !hasCompletableItems}
         >
           {isPending ? (
             <>
@@ -507,7 +510,7 @@ function DateTable({
       </div>
 
       {/* 테이블 */}
-      <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+      <div className="overflow-x-auto rounded-lg border bg-card shadow-xs">
         <table className="w-full text-sm text-left">
           <thead className="border-b text-xs uppercase text-muted-foreground bg-muted/40">
             <tr>
@@ -557,11 +560,11 @@ function DateTable({
                     >
                       <div className="flex flex-wrap items-center gap-1.5">
                         {item.category && categoryNameByCode[item.category] && (
-                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                             {categoryNameByCode[item.category]}
                           </span>
                         )}
-                        <span className="font-medium leading-snug">{item.title}</span>
+                        <button type="button" className="text-left font-medium leading-snug hover:underline focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.title}</button>
                       </div>
                       {item.additionalNotes && (
                         <span className="mt-1 block whitespace-pre-wrap text-[11px] text-muted-foreground">
@@ -582,7 +585,7 @@ function DateTable({
                           {item.tickets.map((t) => (
                             <div
                               key={`${t.systemName}-${t.ticketNumber}`}
-                              className="flex w-fit flex-col rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground leading-tight"
+                              className="flex w-fit flex-col rounded-sm bg-muted px-2 py-1 text-[11px] text-muted-foreground leading-tight"
                             >
                               <span className="font-medium text-foreground/80">
                                 {systemNameByCode[t.systemName] ?? t.systemName}

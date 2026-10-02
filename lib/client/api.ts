@@ -4,7 +4,7 @@
  * 책임:
  *  1. `x-actor-name` 헤더를 localStorage에서 자동 주입
  *  2. 표준 에러 응답 `{ error: { code, message, details? } }` 파싱 → `ApiError` throw
- *  4. JSON 직렬화/역직렬화
+ *  3. JSON 직렬화/역직렬화와 취소 가능한 커서 목록 조회
  *
  * 서버 사이드(SSR/RSC)에서 호출하면 안 됨 — `localStorage` 접근이 필요하기 때문.
  */
@@ -20,7 +20,10 @@ export type ApiErrorCode =
   | "NOT_FOUND"
   | "CONFLICT"
   | "BAD_REQUEST"
+  | "FORBIDDEN"
+  | "PAYLOAD_TOO_LARGE"
   | "INTERNAL"
+  | "BAD_RESPONSE"
   | "NETWORK_ERROR";
 
 export class ApiError extends Error {
@@ -35,7 +38,7 @@ export class ApiError extends Error {
   }
 }
 
-interface RequestOptions {
+export interface RequestOptions {
   /** 본문(객체). JSON.stringify 후 전송. */
   body?: unknown;
   /** 추가 헤더. */
@@ -70,6 +73,7 @@ async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  if (options.signal?.aborted) throw createAbortError();
   const headers: Record<string, string> = {
     Accept: "application/json",
     ...(options.headers ?? {}),
@@ -90,6 +94,7 @@ async function request<T>(
       cache: "no-store",
     });
   } catch (err) {
+    if (isAbortError(err)) throw err;
     throw new ApiError(
       "NETWORK_ERROR",
       err instanceof Error ? err.message : "네트워크 오류",
@@ -108,7 +113,9 @@ async function request<T>(
     try {
       payload = JSON.parse(text);
     } catch {
-      // 비-JSON 응답은 그대로 메시지로 취급
+      if (res.ok) {
+        throw new ApiError("BAD_RESPONSE", "서버 응답을 읽을 수 없습니다. 다시 시도해주세요.", res.status);
+      }
     }
   }
 
@@ -128,7 +135,50 @@ async function request<T>(
   return payload as T;
 }
 
+export function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function createAbortError(): Error {
+  const error = new Error("요청이 취소되었습니다.");
+  error.name = "AbortError";
+  return error;
+}
+
+/** 집계·보드처럼 전체 결과가 필요한 화면에서 커서를 끝까지 순회합니다. */
+async function getAllPages<T>(
+  path: string,
+  options: Omit<RequestOptions, "body"> = {},
+): Promise<T[]> {
+  const items: T[] = [];
+  const seenCursors = new Set<string>();
+  let cursor = options.query?.cursor;
+  if (typeof cursor === "string") seenCursors.add(cursor);
+
+  do {
+    const page = await request<{ items: T[]; nextCursor?: string | null }>("GET", path, {
+      ...options,
+      query: { pageSize: 100, ...options.query, cursor },
+    });
+    if (options.signal?.aborted) throw createAbortError();
+    if (!page || !Array.isArray(page.items)) {
+      throw new ApiError("BAD_RESPONSE", "목록 응답 형식이 올바르지 않습니다.", 200);
+    }
+    items.push(...page.items);
+    cursor = page.nextCursor ?? undefined;
+    if (cursor != null) {
+      if (typeof cursor !== "string" || !cursor || seenCursors.has(cursor)) {
+        throw new ApiError("BAD_RESPONSE", "다음 목록을 불러오지 못했습니다. 다시 시도해주세요.", 200);
+      }
+      seenCursors.add(cursor);
+    }
+  } while (cursor != null);
+
+  return items;
+}
+
 export const api = {
+  getAllPages,
   get: <T>(path: string, options?: Omit<RequestOptions, "body">) =>
     request<T>("GET", path, options),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, "body">) =>

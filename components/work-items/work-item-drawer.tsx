@@ -19,7 +19,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ApiError, api, emitWorkItemsChanged } from "@/lib/client/api";
+import { ApiError, api, emitWorkItemsChanged, isAbortError } from "@/lib/client/api";
+import { useRequestController } from "@/lib/client/use-request-controller";
+import { LoadingState, QueryError } from "@/components/ui/query-state";
 import { formatDate, formatDateTime } from "@/lib/client/format";
 import { toast } from "@/lib/client/use-toast";
 import type {
@@ -70,32 +72,41 @@ export function WorkItemDrawer({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const deletingRef = React.useRef(false);
+  const { beginRequest, cancelRequest } = useRequestController();
 
   const loadDetail = React.useCallback(async (id: string) => {
+    const request = beginRequest();
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<WorkItemDetail>(`/api/work-items/${id}`);
-      setDetail(res);
+      const res = await api.get<WorkItemDetail>(`/api/work-items/${id}`, { signal: request.signal });
+      if (request.isCurrent()) setDetail(res);
     } catch (err) {
+      if (!request.isCurrent() || isAbortError(err)) return;
       const message = err instanceof ApiError ? err.message : "상세 조회 실패";
       setError(message);
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   React.useEffect(() => {
+    setConfirmDelete(false);
     if (!workItemId) {
       setDetail(null);
       setError(null);
       return;
     }
     void loadDetail(workItemId);
-  }, [workItemId, reloadKey, loadDetail]);
+    return cancelRequest;
+  }, [workItemId, reloadKey, loadDetail, cancelRequest]);
 
   async function handleDelete() {
-    if (!detail) return;
+    if (!detail || deletingRef.current) return;
+    deletingRef.current = true;
+    setDeleting(true);
     try {
       await api.delete(`/api/work-items/${detail.id}`);
       toast({ title: "작업을 삭제했습니다" });
@@ -109,12 +120,15 @@ export function WorkItemDrawer({
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
     }
   }
 
   return (
     <>
-      <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <Sheet open={open} onOpenChange={(o) => { if (!o && !deletingRef.current) onClose(); }}>
         <SheetContent className="w-full sm:max-w-2xl gap-2">
           {loading ? (
             <DrawerSkeleton />
@@ -143,21 +157,21 @@ export function WorkItemDrawer({
         </SheetContent>
       </Sheet>
 
-      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <Dialog open={confirmDelete} onOpenChange={(next) => { if (!deletingRef.current) setConfirmDelete(next); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>작업 삭제</DialogTitle>
             <DialogDescription>
               <span className="font-medium text-foreground">{detail?.title}</span>
-              {" "}작업을 삭제하시겠습니까? (soft delete)
+              {" "}작업을 삭제하시겠습니까?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            <Button variant="ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>
               취소
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              삭제
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "삭제 중…" : "삭제"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -191,6 +205,7 @@ function DrawerBody({
           <p className="text-xs text-muted-foreground">{categoryName}</p>
         )}
         <SheetTitle className="text-xl">{detail.title}</SheetTitle>
+        <SheetDescription>작업 상세 정보와 변경 기록을 확인합니다.</SheetDescription>
       </SheetHeader>
 
       <div className="flex justify-end gap-2">
@@ -225,7 +240,7 @@ function DrawerBody({
             <DetailPanel detail={detail} systems={systems} />
           </TabsContent>
           <TabsContent value="activity">
-            <ActivityPanel workItemId={detail.id} />
+            <ActivityPanel key={`${detail.id}:${detail.updatedAt}`} workItemId={detail.id} />
           </TabsContent>
         </div>
       </Tabs>
@@ -245,31 +260,34 @@ function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: Wor
     creator: string | null;
     modifier: string | null;
   } | null>(null);
+  const [actorError, setActorError] = React.useState<string | null>(null);
+  const [actorReloadKey, setActorReloadKey] = React.useState(0);
 
   React.useEffect(() => {
-    let cancelled = false;
-    api
-      .get<ListResponse<AuditLog>>("/api/audit-logs", {
-        query: { entityType: "WorkItem", entityId: detail.id, pageSize: 100 },
-      })
-      .then((res) => {
-        if (cancelled) return;
-        // createdAt DESC 정렬 — 첫 번째 CREATE가 등록자, 첫 번째 UPDATE가 최근 수정자
-        const createLog = res.items.find((l) => l.action === "CREATE");
-        const updateLog = res.items.find((l) => l.action === "UPDATE");
+    const controller = new AbortController();
+    setActors(null);
+    setActorError(null);
+    const query = { entityType: "WorkItem", entityId: detail.id, pageSize: 1 };
+    Promise.all([
+      api.get<ListResponse<AuditLog>>("/api/audit-logs", { signal: controller.signal, query: { ...query, action: "CREATE" } }),
+      api.get<ListResponse<AuditLog>>("/api/audit-logs", { signal: controller.signal, query: { ...query, action: "UPDATE" } }),
+    ])
+      .then(([created, updated]) => {
+        if (controller.signal.aborted) return;
         setActors({
-          creator: createLog?.actorName ?? null,
-          modifier: updateLog?.actorName ?? null,
+          creator: created.items[0]?.actorName ?? null,
+          modifier: updated.items[0]?.actorName ?? null,
         });
       })
-      .catch(() => { });
-    return () => {
-      cancelled = true;
-    };
-  }, [detail.id]);
+      .catch((error) => {
+        if (!controller.signal.aborted && !isAbortError(error)) setActorError("등록자·수정자를 불러오지 못했습니다.");
+      });
+    return () => controller.abort();
+  }, [detail.id, detail.updatedAt, actorReloadKey]);
 
   return (
     <div className="mt-4 space-y-3">
+      {actorError && <QueryError message={actorError} onRetry={() => setActorReloadKey((key) => key + 1)} />}
       {/* 기본 정보 */}
       <Section title="기본 정보">
         <dl className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
@@ -402,40 +420,50 @@ function Field({
 function ActivityPanel({ workItemId }: { workItemId: string }) {
   const [logs, setLogs] = React.useState<AuditLog[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [failedCursor, setFailedCursor] = React.useState<string | undefined>();
+  const { beginRequest, cancelRequest } = useRequestController();
+
+  const loadLogs = React.useCallback(async (cursor?: string) => {
+    const request = beginRequest();
+    if (!cursor) setLogs(null);
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get<ListResponse<AuditLog>>("/api/audit-logs", {
+        signal: request.signal,
+        query: { entityType: "WorkItem", entityId: workItemId, pageSize: 30, cursor },
+      });
+      if (!request.isCurrent()) return;
+      setLogs((previous) => cursor ? [...(previous ?? []), ...response.items] : response.items);
+      setNextCursor(response.nextCursor);
+    } catch (error) {
+      if (!request.isCurrent() || isAbortError(error)) return;
+      setError(error instanceof ApiError ? error.message : "활동 로그 조회 실패");
+      setFailedCursor(cursor);
+    } finally {
+      if (request.isCurrent()) setLoading(false);
+    }
+  }, [workItemId, beginRequest]);
 
   React.useEffect(() => {
-    let cancelled = false;
-    setLogs(null);
-    setError(null);
-    api
-      .get<ListResponse<AuditLog>>("/api/audit-logs", {
-        query: { entityType: "WorkItem", entityId: workItemId },
-      })
-      .then((res) => {
-        if (!cancelled) setLogs(res.items);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "활동 로그 조회 실패");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [workItemId]);
+    void loadLogs();
+    return cancelRequest;
+  }, [loadLogs, cancelRequest]);
 
-  if (error) {
-    return <p className="text-sm text-destructive">{error}</p>;
+  if (logs === null && !error) {
+    return <LoadingState message="활동 기록을 불러오는 중…" />;
   }
-  if (logs === null) {
-    return <p className="text-sm text-muted-foreground">불러오는 중...</p>;
-  }
-  if (logs.length === 0) {
+  if (logs?.length === 0 && !error) {
     return <p className="text-sm text-muted-foreground">기록된 활동이 없습니다.</p>;
   }
 
   return (
+    <div className="space-y-3" aria-busy={loading}>
+      {error && <QueryError message={error} onRetry={() => void loadLogs(failedCursor)} />}
     <ol className="space-y-3">
-      {logs.map((log) => (
+      {logs?.map((log) => (
         <li key={log.id} className="rounded-md border p-3 text-sm">
           <div className="flex items-center justify-between">
             <span className="font-medium">
@@ -449,13 +477,15 @@ function ActivityPanel({ workItemId }: { workItemId: string }) {
             {log.actorName ?? "익명"}
           </div>
           {log.afterJson ? (
-            <pre className="mt-2 max-h-40 overflow-auto rounded bg-muted/40 p-2 text-[11px] leading-snug">
+            <pre className="mt-2 max-h-40 overflow-auto rounded-sm bg-muted/40 p-2 text-[11px] leading-snug">
               {prettyJson(log.afterJson)}
             </pre>
           ) : null}
         </li>
       ))}
     </ol>
+      {nextCursor && <Button type="button" className="w-full" variant="outline" disabled={loading} onClick={() => void loadLogs(nextCursor)}>{loading ? "불러오는 중…" : "활동 더보기"}</Button>}
+    </div>
   );
 }
 
@@ -477,13 +507,13 @@ function prettyJson(s: string): string {
 function DrawerSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-      <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
-      <div className="h-9 w-40 animate-pulse rounded bg-muted" />
+      <div className="h-4 w-24 animate-pulse rounded-sm bg-muted" />
+      <div className="h-7 w-2/3 animate-pulse rounded-sm bg-muted" />
+      <div className="h-9 w-40 animate-pulse rounded-sm bg-muted" />
       <div className="space-y-2">
-        <div className="h-3 w-full animate-pulse rounded bg-muted" />
-        <div className="h-3 w-5/6 animate-pulse rounded bg-muted" />
-        <div className="h-3 w-4/6 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-full animate-pulse rounded-sm bg-muted" />
+        <div className="h-3 w-5/6 animate-pulse rounded-sm bg-muted" />
+        <div className="h-3 w-4/6 animate-pulse rounded-sm bg-muted" />
       </div>
     </div>
   );

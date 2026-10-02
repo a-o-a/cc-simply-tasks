@@ -28,6 +28,7 @@ export function TableView({
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
       <table className="w-full text-sm">
+        <caption className="sr-only">작업 목록. 제목을 선택하면 상세 내용을 확인할 수 있습니다.</caption>
         <thead className="border-b text-left text-xs uppercase text-muted-foreground">
           <tr>
             <th className="px-4 py-3 font-medium">분류</th>
@@ -56,7 +57,11 @@ export function TableView({
               <td className="px-4 py-3">
                 <StatusBadge status={item.status} />
               </td>
-              <td className="px-4 py-3 font-medium">{item.title}</td>
+              <td className="px-4 py-3 font-medium">
+                <button type="button" onClick={(event) => { event.stopPropagation(); onOpen(item); }} className="text-left hover:underline focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
+                  {item.title}
+                </button>
+              </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {item.assignee?.name ?? "미배정"}
               </td>

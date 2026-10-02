@@ -1,12 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { CheckSquare, ChevronDown, ChevronRight, Plus, SlidersHorizontal } from "lucide-react";
+import { SquareCheck, ChevronDown, ChevronRight, Plus, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MemberFilter } from "@/components/member-filter";
-import { ApiError, api, emitTodosChanged } from "@/lib/client/api";
+import { ApiError, api, emitTodosChanged, isAbortError } from "@/lib/client/api";
+import { useRequestController } from "@/lib/client/use-request-controller";
+import { useDebouncedValue } from "@/lib/client/use-debounced-value";
+import { LoadingState, QueryError } from "@/components/ui/query-state";
 import { formatDate } from "@/lib/client/format";
 import { toast } from "@/lib/client/use-toast";
 import type {
@@ -45,58 +48,87 @@ export function TodosClient() {
   const [drawerMode, setDrawerMode] = React.useState<"edit" | "create">("edit");
   const [filterVisible, setFilterVisible] = React.useState(true);
   const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [failedCursor, setFailedCursor] = React.useState<string | undefined>();
+  const [memberError, setMemberError] = React.useState<string | null>(null);
+  const [memberReloadKey, setMemberReloadKey] = React.useState(0);
+  const [pendingIds, setPendingIds] = React.useState(new Set<string>());
+  const pendingIdsRef = React.useRef(new Set<string>());
+  const { beginRequest, cancelRequest } = useRequestController();
+  const titleFilter = useDebouncedValue(filters.title);
 
-  const loadMembers = React.useCallback(async () => {
-    try {
-      const res = await api.get<ListResponse<Member>>("/api/team-members");
-      setMembers(res.items);
-    } catch (err) {
-      toast({
-        title: "팀원 조회 실패",
-        description: err instanceof ApiError ? err.message : undefined,
-        variant: "destructive",
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setMemberError(null);
+    api.getAllPages<Member>("/api/team-members", { signal: controller.signal })
+      .then(setMembers)
+      .catch((error) => {
+        if (!controller.signal.aborted && !isAbortError(error)) {
+          setMemberError(error instanceof ApiError ? error.message : "팀원을 불러오지 못했습니다.");
+        }
       });
-    }
-  }, []);
+    return () => controller.abort();
+  }, [memberReloadKey]);
 
   const loadItems = React.useCallback(async (cursor?: string) => {
-    if (cursor) setLoadingMore(true);
-    else setLoading(true);
+    const request = beginRequest();
+    setLoadingMore(Boolean(cursor));
+    setLoading(!cursor);
+    setError(null);
     try {
       const res = await api.get<ListResponse<TodoItem>>("/api/todos", {
+        signal: request.signal,
         query: {
           include: "checklist",
           status: filters.status.length ? filters.status.join(",") : undefined,
           assigneeId: filters.assigneeId.length
             ? filters.assigneeId.join(",")
             : undefined,
-          title: filters.title || undefined,
+          title: titleFilter || undefined,
           pageSize: PAGE_SIZE,
           cursor,
         },
       });
-      setItems((prev) => (cursor ? [...prev, ...res.items] : res.items));
+      if (!request.isCurrent()) return;
+      if (cursor && res.nextCursor === cursor) {
+        throw new ApiError("BAD_RESPONSE", "다음 목록을 불러오지 못했습니다. 다시 시도해주세요.", 200);
+      }
+      setItems((prev) => cursor ? Array.from(new Map([...prev, ...res.items].map((item) => [item.id, item])).values()) : res.items);
       setNextCursor(res.nextCursor);
     } catch (err) {
-      toast({
-        title: "TODO 조회 실패",
-        description: err instanceof ApiError ? err.message : undefined,
-        variant: "destructive",
-      });
+      if (!request.isCurrent() || isAbortError(err)) return;
+      setError(err instanceof ApiError ? err.message : "할 일을 불러오지 못했습니다.");
+      setFailedCursor(cursor);
     } finally {
-      if (cursor) setLoadingMore(false);
-      else setLoading(false);
+      if (request.isCurrent()) {
+        setLoadingMore(false);
+        setLoading(false);
+      }
     }
-  }, [filters]);
-
-  React.useEffect(() => {
-    void loadMembers();
-  }, [loadMembers]);
+  }, [filters.status, filters.assigneeId, titleFilter, beginRequest]);
 
   React.useEffect(() => {
     setExpanded(new Set());
     void loadItems();
-  }, [loadItems]);
+    return cancelRequest;
+  }, [loadItems, cancelRequest]);
+
+  function startMutation(id: string) {
+    if (pendingIdsRef.current.has(id)) return false;
+    pendingIdsRef.current.add(id);
+    setPendingIds(new Set(pendingIdsRef.current));
+    return true;
+  }
+
+  function finishMutation(id: string) {
+    pendingIdsRef.current.delete(id);
+    setPendingIds(new Set(pendingIdsRef.current));
+  }
+
+  const closeDrawer = React.useCallback(() => {
+    setDrawerId(null);
+    setDrawerMode("edit");
+  }, []);
 
   function toggleExpand(id: string) {
     setExpanded((prev) => {
@@ -122,6 +154,7 @@ export function TodosClient() {
     todoId: string,
     item: TodoChecklistItem,
   ) {
+    if (!startMutation(todoId)) return;
     const nextDone = !item.done;
     setItems((prev) =>
       prev.map((todo) =>
@@ -139,6 +172,7 @@ export function TodosClient() {
       await api.patch(`/api/todos/${todoId}/checklist/${item.id}`, {
         done: nextDone,
       });
+      emitTodosChanged();
     } catch (err) {
       // 롤백
       setItems((prev) =>
@@ -158,10 +192,13 @@ export function TodosClient() {
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
+    } finally {
+      finishMutation(todoId);
     }
   }
 
   async function toggleTodoStatus(todo: TodoItem) {
+    if (!startMutation(todo.id)) return;
     const next = todo.status === "DONE" ? "OPEN" : "DONE";
     setItems((prev) =>
       prev.map((t) => (t.id === todo.id ? { ...t, status: next } : t)),
@@ -179,6 +216,8 @@ export function TodosClient() {
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
+    } finally {
+      finishMutation(todo.id);
     }
   }
 
@@ -193,6 +232,7 @@ export function TodosClient() {
         </Button>
       </header>
 
+      {memberError && <div className="mt-4"><QueryError message={memberError} onRetry={() => setMemberReloadKey((key) => key + 1)} /></div>}
       {filterVisible && (
         <div className="mt-4 flex items-start gap-4 rounded-lg border bg-card p-3">
           <div className="flex-1 space-y-1.5">
@@ -202,6 +242,8 @@ export function TodosClient() {
                 const active = filters.status.includes(s);
                 return (
                   <button
+                    type="button"
+                    aria-pressed={active}
                     key={s}
                     onClick={() =>
                       setFilters((f) => ({
@@ -212,7 +254,7 @@ export function TodosClient() {
                       }))
                     }
                     className={cn(
-                      "inline-flex items-center rounded px-2 py-1 text-xs transition-colors",
+                      "inline-flex items-center rounded-sm px-2 py-1 text-xs transition-colors",
                       active
                         ? "bg-primary text-primary-foreground"
                         : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -246,6 +288,8 @@ export function TodosClient() {
           <div className="flex-1 space-y-1.5">
             <Label className="text-xs">제목</Label>
             <Input
+              aria-label="할 일 제목 검색"
+              maxLength={300}
               value={filters.title}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, title: e.target.value }))
@@ -263,6 +307,7 @@ export function TodosClient() {
           variant="outline"
           size="sm"
           onClick={() => setFilterVisible((v) => !v)}
+          aria-expanded={filterVisible}
         >
           <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
           {filterVisible ? "필터 숨기기" : "필터 보기"}
@@ -278,12 +323,16 @@ export function TodosClient() {
       </div>
 
       <section
+        aria-busy={loading || loadingMore}
         className={cn(
           "mt-4 rounded-lg border bg-card",
           loading && "pointer-events-none opacity-60",
         )}
       >
-        {items.length === 0 && !loading ? (
+        {error && <QueryError message={error} onRetry={() => void loadItems(failedCursor)} />}
+        {loading ? (
+          <LoadingState message="할 일을 불러오는 중…" />
+        ) : items.length === 0 && !error ? (
           <EmptyState onCreate={openCreate} />
         ) : (
           <>
@@ -299,16 +348,18 @@ export function TodosClient() {
                       <input
                         type="checkbox"
                         checked={todo.status === "DONE"}
+                        disabled={pendingIds.has(todo.id)}
                         onChange={() => void toggleTodoStatus(todo)}
-                        className="h-4 w-4 shrink-0 cursor-pointer rounded border-input"
-                        aria-label="완료 토글"
+                        className="h-4 w-4 shrink-0 cursor-pointer rounded-sm border-input"
+                        aria-label={`${todo.title} 완료`}
                       />
                       {total > 0 ? (
                         <button
                           type="button"
                           onClick={() => toggleExpand(todo.id)}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-accent"
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-accent"
                           aria-label={isExpanded ? "접기" : "펼치기"}
+                          aria-expanded={isExpanded}
                         >
                           {isExpanded ? (
                             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -322,13 +373,14 @@ export function TodosClient() {
                       <button
                         type="button"
                         onClick={() => openEdit(todo.id)}
+                        disabled={pendingIds.has(todo.id)}
                         className="flex-1 truncate text-left text-sm font-medium hover:underline"
                       >
                         {todo.title}
                       </button>
                       <span
                         className={cn(
-                          "shrink-0 rounded px-1.5 py-0.5 text-[11px]",
+                          "shrink-0 rounded-sm px-1.5 py-0.5 text-[11px]",
                           todo.status === "DONE"
                             ? "bg-muted text-muted-foreground"
                             : "bg-primary/10 text-primary",
@@ -358,8 +410,10 @@ export function TodosClient() {
                             <input
                               type="checkbox"
                               checked={item.done}
+                              disabled={pendingIds.has(todo.id)}
+                              aria-label={`${item.content} 완료`}
                               onChange={() => toggleChecklistItem(todo.id, item)}
-                              className="h-4 w-4 cursor-pointer rounded border-input"
+                              className="h-4 w-4 cursor-pointer rounded-sm border-input"
                             />
                             <span
                               className={cn(
@@ -403,10 +457,7 @@ export function TodosClient() {
         todoId={drawerId}
         members={members}
         open={drawerMode === "create" || drawerId !== null}
-        onClose={() => {
-          setDrawerId(null);
-          setDrawerMode("edit");
-        }}
+        onClose={closeDrawer}
         onMutated={() => void loadItems()}
       />
     </div>
@@ -416,7 +467,7 @@ export function TodosClient() {
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
-      <CheckSquare className="h-8 w-8 text-muted-foreground" />
+      <SquareCheck className="h-8 w-8 text-muted-foreground" />
       <div>
         <p className="text-sm font-medium">등록된 TODO가 없습니다</p>
         <p className="mt-1 text-xs text-muted-foreground">

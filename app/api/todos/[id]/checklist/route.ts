@@ -3,7 +3,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { newId, now } from "@/lib/db/helpers";
 import { todoChecklist, todos } from "@/lib/db/schema";
-import { withErrorHandler, HttpError } from "@/lib/http";
+import { withErrorHandler, HttpError, readJsonBody } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import {
@@ -11,14 +11,18 @@ import {
   todoChecklistReorderSchema,
 } from "@/lib/validation/todo";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 /** POST — 체크리스트 항목 추가 */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const POST = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
-    const input = todoChecklistCreateSchema.parse(await req.json());
+    const input = todoChecklistCreateSchema.parse(await readJsonBody(req));
     const timestamp = now();
 
     const created = await db.transaction(async (tx) => {
@@ -42,7 +46,7 @@ export const POST = withErrorHandler(
         deletedAt: null,
       } satisfies typeof todoChecklist.$inferInsert;
       await tx.insert(todoChecklist).values(row);
-      // 부모 updatedAt도 갱신 (If-Match 동기화)
+      // 부모 목록의 수정 시각도 함께 갱신한다.
       await tx
         .update(todos)
         .set({ updatedAt: timestamp })
@@ -63,13 +67,17 @@ export const POST = withErrorHandler(
 
 /** PATCH — reorder (ids 배열 순서대로 order 0..N-1 재설정) */
 export const PATCH = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
-    const { ids } = todoChecklistReorderSchema.parse(await req.json());
+    const { ids } = todoChecklistReorderSchema.parse(await readJsonBody(req));
     const timestamp = now();
 
     await db.transaction(async (tx) => {
+      const [parent] = await tx.select({ id: todos.id }).from(todos)
+        .where(and(eq(todos.id, params.id), isNull(todos.deletedAt))).limit(1);
+      if (!parent) throw new HttpError("NOT_FOUND", "할 일을 찾을 수 없습니다");
       const existing = await tx
         .select()
         .from(todoChecklist)
@@ -81,6 +89,7 @@ export const PATCH = withErrorHandler(
           ),
         );
       const map = new Map(existing.map((row) => [row.id, row]));
+      if (ids.some((id) => !map.has(id))) throw new HttpError("BAD_REQUEST", "체크리스트 항목이 이 할 일에 속하지 않거나 삭제되었습니다");
       for (let i = 0; i < ids.length; i += 1) {
         const id = ids[i];
         const before = map.get(id);

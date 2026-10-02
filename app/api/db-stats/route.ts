@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import {
   auditLogs as auditLogsTable,
@@ -20,10 +21,13 @@ import { withErrorHandler } from "@/lib/http";
  * GET /api/db-stats
  * 각 테이블의 레코드 수 반환 (deletedAt 무관 전체).
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async () => {
   await ensureSqlitePragma();
 
-  const countTable = async (table: any) => {
+  const countTable = async (table: SQLiteTable) => {
     const rows = await db
       .select({ count: sql<number>`count(*)` })
       .from(table);
@@ -70,5 +74,5 @@ export const GET = withErrorHandler(async () => {
       { name: "Setting",             label: "설정",            count: settings },
       { name: "AuditLog",            label: "감사 로그",       count: auditLogs },
     ],
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 });

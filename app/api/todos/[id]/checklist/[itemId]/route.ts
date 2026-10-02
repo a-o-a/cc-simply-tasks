@@ -3,18 +3,22 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { now } from "@/lib/db/helpers";
 import { todoChecklist, todos } from "@/lib/db/schema";
-import { withErrorHandler, HttpError } from "@/lib/http";
+import { withErrorHandler, HttpError, readJsonBody } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { todoChecklistUpdateSchema } from "@/lib/validation/todo";
 
-type Params = { params: { id: string; itemId: string } };
+type Params = { params: Promise<{ id: string; itemId: string }> };
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const PATCH = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
-    const input = todoChecklistUpdateSchema.parse(await req.json());
+    const input = todoChecklistUpdateSchema.parse(await readJsonBody(req));
     const updatedAt = now();
 
     const updated = await db.transaction(async (tx) => {
@@ -66,7 +70,8 @@ export const PATCH = withErrorHandler(
 );
 
 export const DELETE = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const deletedAt = now();

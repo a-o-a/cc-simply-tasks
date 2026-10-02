@@ -1,32 +1,12 @@
 import { NextResponse } from "next/server";
-import { readFileSync, existsSync } from "fs";
-import { getSqliteDbPath } from "@/lib/db";
+import { createCurrentSnapshot } from "@/lib/backup";
+import { createFileDownloadResponse } from "@/lib/file-download";
+import { withErrorHandler } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/**
- * GET /api/backup
- * SQLite DB 파일을 그대로 다운로드.
- * 내부망 전용이므로 인증 없음.
- */
-export const GET = async () => {
-  const dbPath = getSqliteDbPath();
-
-  if (!existsSync(dbPath)) {
-    return NextResponse.json({ error: { code: "NOT_FOUND", message: "DB 파일을 찾을 수 없습니다" } }, { status: 404 });
-  }
-
-  const file = readFileSync(dbPath);
-  const date = new Date().toISOString().slice(0, 10);
-
-  return new NextResponse(file, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/octet-stream",
-      "Content-Disposition": `attachment; filename="backup-${date}.db"`,
-      "Content-Length": String(file.byteLength),
-      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-    },
-  });
-};
+/** Download a consistent snapshot, including committed changes still in the WAL. */
+export const GET = withErrorHandler(async () => {
+  return createFileDownloadResponse(await createCurrentSnapshot(), ({ body, headers }) => new NextResponse(body, { headers }));
+});

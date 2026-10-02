@@ -23,12 +23,28 @@ type ToasterToast = ToastProps & {
 
 type State = { toasts: ToasterToast[] };
 
-let memoryState: State = { toasts: [] };
-const listeners: Array<(state: State) => void> = [];
+const emptyState: State = { toasts: [] };
+let memoryState: State = emptyState;
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getSnapshot() {
+  return memoryState;
+}
+
+function getServerSnapshot() {
+  return emptyState;
+}
 
 function setState(updater: (prev: State) => State) {
   memoryState = updater(memoryState);
-  for (const listener of listeners) listener(memoryState);
+  for (const listener of listeners) listener();
 }
 
 const removalTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -76,13 +92,6 @@ export function dismissToast(id?: string) {
 }
 
 export function useToast() {
-  const [state, setLocal] = React.useState<State>(memoryState);
-  React.useEffect(() => {
-    listeners.push(setLocal);
-    return () => {
-      const i = listeners.indexOf(setLocal);
-      if (i > -1) listeners.splice(i, 1);
-    };
-  }, []);
+  const state = React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   return { toasts: state.toasts, toast, dismiss: dismissToast };
 }

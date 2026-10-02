@@ -1,9 +1,8 @@
 import { z } from "zod";
 
 export const workTicketCreateSchema = z.object({
-  systemName: z.string().min(1).max(50),
-  ticketNumber: z.string().max(100),
-  ticketUrl: z.string().url().max(1000).optional().nullable(),
+  systemName: z.string().trim().min(1).max(100),
+  ticketNumber: z.string().trim().max(100),
 });
 
 export const workTicketUpdateSchema = workTicketCreateSchema.partial();

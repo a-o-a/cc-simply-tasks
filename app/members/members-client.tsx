@@ -14,7 +14,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { ApiError, api } from "@/lib/client/api";
+import { ApiError, api, isAbortError } from "@/lib/client/api";
+import { useRequestController } from "@/lib/client/use-request-controller";
 import { toast } from "@/lib/client/use-toast";
 import { formatDate } from "@/lib/client/format";
 import { MEMBER_ROLES, type MemberRole } from "@/lib/enums";
@@ -24,16 +25,15 @@ import { cn } from "@/lib/utils";
 /**
  * 팀원 목록/생성/수정/삭제 클라이언트.
  *
- * Phase 4 Step 3 — 가장 단순한 모델로 list/create/edit/delete + 낙관적 락 +
+ * Phase 4 Step 3 — 가장 단순한 모델로 list/create/edit/delete +
  * 토스트 패턴을 검증한다. 이 페이지에서 정착시킨 패턴을 다른 페이지가 답습한다.
  *
- * - GET /api/team-members (cursor 페이지네이션이지만 1차는 첫 페이지만)
+ * - GET /api/team-members (마지막 커서까지 조회)
  * - POST /api/team-members
- * - PATCH /api/team-members/:id (If-Match: updatedAt)
- * - DELETE /api/team-members/:id (If-Match: updatedAt)
+ * - PATCH /api/team-members/:id
+ * - DELETE /api/team-members/:id
  *
- * 낙관적 락 충돌(409)이 나면 최신 데이터를 다시 불러오라는 토스트만 띄우고
- * 자동 reload (간단). 더 정교한 머지 UI는 작업/티켓 단계에서 다룰 예정.
+ * 저장·삭제 실패는 표준 API 에러로 표시한다.
  */
 
 type Member = {
@@ -43,8 +43,6 @@ type Member = {
   createdAt: string;
   updatedAt: string;
 };
-
-type ListResponse = { items: Member[]; nextCursor: string | null };
 
 type DialogState =
   | { mode: "closed" }
@@ -57,25 +55,29 @@ export function MembersClient() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [dialog, setDialog] = React.useState<DialogState>({ mode: "closed" });
+  const { beginRequest, cancelRequest } = useRequestController();
 
   const load = React.useCallback(async () => {
+    const request = beginRequest();
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<ListResponse>("/api/team-members");
-      setItems(res.items);
+      const members = await api.getAllPages<Member>("/api/team-members", { signal: request.signal });
+      if (request.isCurrent()) setItems(members);
     } catch (err) {
+      if (!request.isCurrent() || isAbortError(err)) return;
       const message = err instanceof ApiError ? err.message : "목록 조회 실패";
       setError(message);
       toast({ title: "목록 조회 실패", description: message, variant: "destructive" });
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   React.useEffect(() => {
     void load();
-  }, [load]);
+    return cancelRequest;
+  }, [load, cancelRequest]);
 
   return (
     <div className="max-w-xl">
@@ -89,7 +91,7 @@ export function MembersClient() {
         </Button>
       </div>
 
-      <section className="rounded-lg border bg-card">
+      <section className="rounded-lg border bg-card" aria-busy={loading}>
         {loading ? (
           <SkeletonRows />
         ) : error ? (
@@ -117,6 +119,7 @@ export function MembersClient() {
           />
         ) : (
           <table className="w-full text-sm">
+            <caption className="sr-only">등록된 팀원 {items.length}명</caption>
             <thead className="border-b text-left text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">이름</th>
@@ -141,7 +144,7 @@ export function MembersClient() {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        aria-label="수정"
+                        aria-label={`${m.name} 수정`}
                         onClick={() => setDialog({ mode: "edit", member: m })}
                       >
                         <Pencil className="h-3.5 w-3.5" />
@@ -150,7 +153,7 @@ export function MembersClient() {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-destructive hover:text-destructive"
-                        aria-label="삭제"
+                        aria-label={`${m.name} 삭제`}
                         onClick={() => setDialog({ mode: "delete", member: m })}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -168,6 +171,7 @@ export function MembersClient() {
         state={dialog}
         onClose={() => setDialog({ mode: "closed" })}
         onSaved={() => {
+          window.dispatchEvent(new CustomEvent("reference-data-changed"));
           setDialog({ mode: "closed" });
           void load();
         }}
@@ -176,6 +180,7 @@ export function MembersClient() {
         state={dialog}
         onClose={() => setDialog({ mode: "closed" })}
         onDeleted={() => {
+          window.dispatchEvent(new CustomEvent("reference-data-changed"));
           setDialog({ mode: "closed" });
           void load();
         }}
@@ -199,6 +204,7 @@ function MemberFormDialog({
   const [name, setName] = React.useState("");
   const [role, setRole] = React.useState<MemberRole>("WEB_DEV");
   const [submitting, setSubmitting] = React.useState(false);
+  const submittingRef = React.useRef(false);
 
   // 다이얼로그가 열릴 때마다 초기값 세팅
   React.useEffect(() => {
@@ -213,8 +219,10 @@ function MemberFormDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
     const trimmed = name.trim();
     if (!trimmed) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       if (editing) {
@@ -231,12 +239,13 @@ function MemberFormDialog({
     } catch (err) {
       handleApiError(err, editing ? "팀원 수정 실패" : "팀원 추가 실패");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !submittingRef.current) onClose(); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? "팀원 수정" : "팀원 추가"}</DialogTitle>
@@ -250,6 +259,8 @@ function MemberFormDialog({
             <Input
               id="member-name"
               autoFocus
+              required
+              disabled={submitting}
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={100}
@@ -259,6 +270,7 @@ function MemberFormDialog({
           <div className="space-y-2">
             <Label htmlFor="member-role">역할</Label>
             <Select
+              disabled={submitting}
               id="member-role"
               value={role}
               onChange={(e) => setRole(e.target.value as MemberRole)}
@@ -271,7 +283,7 @@ function MemberFormDialog({
             </Select>
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
               취소
             </Button>
             <Button type="submit" disabled={submitting || !name.trim()}>
@@ -296,9 +308,11 @@ function DeleteMemberDialog({
   const open = state.mode === "delete";
   const member = state.mode === "delete" ? state.member : null;
   const [submitting, setSubmitting] = React.useState(false);
+  const submittingRef = React.useRef(false);
 
   async function handleDelete() {
-    if (!member) return;
+    if (!member || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await api.delete(`/api/team-members/${member.id}`);
@@ -307,19 +321,20 @@ function DeleteMemberDialog({
     } catch (err) {
       handleApiError(err, "팀원 삭제 실패");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !submittingRef.current) onClose(); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>팀원 삭제</DialogTitle>
           <DialogDescription>
             <span className="font-medium text-foreground">{member?.name}</span>
             {" "}님을 삭제하시겠습니까? 작업/캘린더의 담당자 연결은 그대로
-            유지됩니다 (soft delete).
+            유지됩니다.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

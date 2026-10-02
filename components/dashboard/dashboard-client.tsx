@@ -2,23 +2,20 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CalendarClock, CalendarDays, ListChecks, Loader2 } from "lucide-react";
-import { ApiError, api, WORK_ITEMS_CHANGED_EVENT } from "@/lib/client/api";
+import { CalendarClock, CalendarDays, ListChecks, Loader2, RefreshCw } from "lucide-react";
+import { api, TODOS_CHANGED_EVENT, WORK_ITEMS_CHANGED_EVENT } from "@/lib/client/api";
 import { formatDateTime } from "@/lib/client/format";
 import {
   kstDateStringToUtcMs,
   kstWeekContaining,
   utcMsToKstDateString,
 } from "@/lib/client/calendar";
-import { toast } from "@/lib/client/use-toast";
+import { useWorkReferences } from "@/lib/client/use-work-references";
 import type {
   AuditLog,
   CalendarEvent,
   ListResponse,
-  Member,
-  WorkCategory,
   WorkItemListItem,
-  WorkSystem,
 } from "@/lib/client/types";
 import { STATUSES, type Status } from "@/lib/enums";
 import { STATUS_LABELS } from "@/lib/enum-labels";
@@ -28,6 +25,9 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/work-items/status-badge";
 import { WorkItemDrawer } from "@/components/work-items/work-item-drawer";
 import { WorkItemFormDialog } from "@/components/work-items/work-item-form-dialog";
+import { Button } from "@/components/ui/button";
+import { QueryError } from "@/components/ui/query-state";
+import { useDashboardData } from "./use-dashboard-data";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -58,17 +58,10 @@ function kstTimeStr(iso: string) {
 }
 
 export function DashboardClient() {
-  const todayKst = React.useMemo(() => utcMsToKstDateString(Date.now()), []);
+  const [todayKst] = React.useState(() => utcMsToKstDateString(Date.now()));
   const weekDates = React.useMemo(() => kstWeekContaining(todayKst), [todayKst]);
 
-  const [counts, setCounts] = React.useState<WorkItemCounts | null>(null);
-  const [dueThisWeek, setDueThisWeek] = React.useState<WorkItemListItem[] | null>(null);
-  const [inProgress, setInProgress] = React.useState<WorkItemListItem[] | null>(null);
-  const [members, setMembers] = React.useState<Member[]>([]);
-  const [categories, setCategories] = React.useState<WorkCategory[]>([]);
-  const [systems, setSystems] = React.useState<WorkSystem[]>([]);
-  const [logs, setLogs] = React.useState<AuditLog[] | null>(null);
-  const [calEvents, setCalEvents] = React.useState<CalendarEvent[] | null>(null);
+  const { members, categories, systems, error: referencesError, reload: reloadReferences } = useWorkReferences();
 
   // 드로어 + 수정 폼
   const [drawerId, setDrawerId] = React.useState<string | null>(null);
@@ -76,129 +69,122 @@ export function DashboardClient() {
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<WorkItemListItem | null>(null);
 
-  const loadWorkItems = React.useCallback(async () => {
+  const loadWorkItems = React.useCallback(async (signal: AbortSignal) => {
     const weekStart = weekDates[0];
     const weekEnd = weekDates[6];
     const [countsRes, dueRes, inProgressRes] = await Promise.all([
-      api.get<WorkItemCounts>("/api/work-items/count"),
-      api.get<ListResponse<WorkItemListItem>>("/api/work-items", {
+      api.get<WorkItemCounts>("/api/work-items/count", { signal }),
+      api.getAllPages<WorkItemListItem>("/api/work-items", {
+        signal,
         query: {
           scope: "active",
           transferDate: weekStart,
           transferDateTo: weekEnd,
-          pageSize: "200",
+          pageSize: 100,
         },
       }),
-      api.get<ListResponse<WorkItemListItem>>("/api/work-items", {
-        query: { scope: "active", status: "IN_PROGRESS", pageSize: "200" },
+      api.getAllPages<WorkItemListItem>("/api/work-items", {
+        signal,
+        query: { scope: "active", status: "IN_PROGRESS", pageSize: 100 },
       }),
     ]);
-    setCounts(countsRes);
-    setDueThisWeek(
-      dueRes.items
-        .filter((item) => item.status !== "HOLDING")
+    return {
+      counts: countsRes,
+      dueThisWeek: dueRes
+        .filter((item) => item.status !== "HOLDING" && item.transferDate !== null)
         .sort((a, b) => {
           const ad = utcMsToKstDateString(new Date(a.transferDate!).getTime());
           const bd = utcMsToKstDateString(new Date(b.transferDate!).getTime());
           return ad.localeCompare(bd);
         }),
-    );
-    setInProgress(inProgressRes.items);
+      inProgress: inProgressRes,
+    };
   }, [weekDates]);
 
-  React.useEffect(() => {
-    let cancelled = false;
+  const loadLogs = React.useCallback(async (signal: AbortSignal) => {
+    const res = await api.get<ListResponse<AuditLog>>("/api/audit-logs", { signal, query: { pageSize: 10 } });
+    return res.items;
+  }, []);
+
+  const loadCalendarEvents = React.useCallback(async (signal: AbortSignal) => {
     const todayFromMs = kstDateStringToUtcMs(todayKst);
     const todayToMs = todayFromMs + DAY_MS;
 
-    loadWorkItems().catch((err) => {
-      if (cancelled) return;
-      toast({
-        title: "작업 현황 조회 실패",
-        description: err instanceof ApiError ? err.message : undefined,
-        variant: "destructive",
-      });
-      setCounts({ byStatus: {}, total: 0 });
-      setDueThisWeek([]);
-      setInProgress([]);
-    });
-
-    api.get<ListResponse<AuditLog>>("/api/audit-logs")
-      .then((res) => { if (!cancelled) setLogs(res.items.slice(0, 10)); })
-      .catch((err) => {
-        if (cancelled) return;
-        toast({
-          title: "활동 로그 조회 실패",
-          description: err instanceof ApiError ? err.message : undefined,
-          variant: "destructive",
-        });
-        setLogs([]);
-      });
-
-    api.get<{ items: CalendarEvent[] }>("/api/calendar-events", {
+    const res = await api.get<{ items: CalendarEvent[] }>("/api/calendar-events", {
+      signal,
       query: {
         from: new Date(todayFromMs).toISOString(),
         to: new Date(todayToMs).toISOString(),
       },
-    })
-      .then((res) => {
-        if (cancelled) return;
-        const sorted = res.items.slice().sort((a, b) => {
-          if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-          const catDiff = (CAT_ORDER[a.category] ?? 99) - (CAT_ORDER[b.category] ?? 99);
-          if (catDiff !== 0) return catDiff;
-          return a.title.localeCompare(b.title, "ko");
-        });
-        setCalEvents(sorted);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        toast({
-          title: "오늘 일정 조회 실패",
-          description: err instanceof ApiError ? err.message : undefined,
-          variant: "destructive",
-        });
-        setCalEvents([]);
-      });
+    });
+    return res.items.slice().sort((a, b) => {
+      if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+      const catDiff = (CAT_ORDER[a.category] ?? 99) - (CAT_ORDER[b.category] ?? 99);
+      if (catDiff !== 0) return catDiff;
+      return a.title.localeCompare(b.title, "ko");
+    });
+  }, [todayKst]);
 
-    Promise.all([
-      api.get<ListResponse<Member>>("/api/team-members"),
-      api.get<{ items: WorkCategory[] }>("/api/work-categories"),
-      api.get<{ items: WorkSystem[] }>("/api/work-systems"),
-    ])
-      .then(([membersRes, catRes, sysRes]) => {
-        if (cancelled) return;
-        setMembers(membersRes.items);
-        setCategories(catRes.items);
-        setSystems(sysRes.items);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        toast({
-          title: "참조 데이터 조회 실패",
-          description: err instanceof ApiError ? err.message : undefined,
-          variant: "destructive",
-        });
-      });
-    return () => { cancelled = true; };
-  }, [todayKst, loadWorkItems]);
+  const work = useDashboardData(loadWorkItems, "작업 현황을 불러오지 못했습니다.");
+  const activity = useDashboardData(loadLogs, "활동 로그를 불러오지 못했습니다.");
+  const calendar = useDashboardData(loadCalendarEvents, "오늘 일정을 불러오지 못했습니다.");
+  const { reload: reloadWork } = work;
+  const { reload: reloadActivity } = activity;
+  const { reload: reloadCalendar } = calendar;
+  const counts = work.data?.counts ?? null;
+  const dueThisWeek = work.data?.dueThisWeek ?? null;
+  const inProgress = work.data?.inProgress ?? null;
+  const logs = activity.data;
+  const calEvents = calendar.data;
+  const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const refreshWorkItems = React.useCallback(() => {
+    if (refreshTimer.current !== null) return;
+    refreshTimer.current = setTimeout(() => {
+      refreshTimer.current = null;
+      void reloadWork();
+      void reloadActivity();
+    }, 100);
+  }, [reloadWork, reloadActivity]);
 
   React.useEffect(() => {
     const reload = () => {
-      void loadWorkItems();
+      refreshWorkItems();
+      void reloadCalendar();
     };
     const reloadWhenVisible = () => {
       if (document.visibilityState === "visible") reload();
     };
-    window.addEventListener(WORK_ITEMS_CHANGED_EVENT, reload);
+    window.addEventListener(WORK_ITEMS_CHANGED_EVENT, refreshWorkItems);
+    window.addEventListener(TODOS_CHANGED_EVENT, reloadActivity);
     window.addEventListener("focus", reload);
     document.addEventListener("visibilitychange", reloadWhenVisible);
     return () => {
-      window.removeEventListener(WORK_ITEMS_CHANGED_EVENT, reload);
+      if (refreshTimer.current !== null) {
+        clearTimeout(refreshTimer.current);
+        refreshTimer.current = null;
+      }
+      window.removeEventListener(WORK_ITEMS_CHANGED_EVENT, refreshWorkItems);
+      window.removeEventListener(TODOS_CHANGED_EVENT, reloadActivity);
       window.removeEventListener("focus", reload);
       document.removeEventListener("visibilitychange", reloadWhenVisible);
     };
-  }, [loadWorkItems]);
+  }, [refreshWorkItems, reloadCalendar, reloadActivity]);
+
+  React.useEffect(() => {
+    const es = new EventSource("/api/calendar-events/stream");
+    let connected = false;
+    const reload = () => {
+      void reloadCalendar();
+      void reloadActivity();
+    };
+    es.onmessage = reload;
+    es.onopen = () => {
+      if (connected) reload();
+      connected = true;
+    };
+    return () => es.close();
+  }, [reloadCalendar, reloadActivity]);
 
   // 이관일 라벨
   function transferDateLabel(transferDate: string) {
@@ -213,20 +199,32 @@ export function DashboardClient() {
   return (
     <div className="px-8 py-6 space-y-6">
       {/* 헤더 */}
-      <header>
-        <h1 className="text-xl font-semibold">홈</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {todayKst} · {weekDates[0].slice(5).replace("-", "/")} – {weekDates[6].slice(5).replace("-", "/")} 주
-        </p>
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">홈</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {todayKst} · {weekDates[0].slice(5).replace("-", "/")} – {weekDates[6].slice(5).replace("-", "/")} 주
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {(work.loading || activity.loading || calendar.loading) && <span role="status" className="text-xs text-muted-foreground">불러오는 중…</span>}
+          <Button variant="outline" size="sm" onClick={() => { refreshWorkItems(); void reloadCalendar(); }} disabled={work.loading || activity.loading || calendar.loading}>
+            <RefreshCw className="mr-2 h-3.5 w-3.5" />
+            새로고침
+          </Button>
+        </div>
       </header>
 
+      {work.error && <QueryError message={`${work.error}${work.data ? " 현재 표시된 내용은 최신 상태가 아닐 수 있습니다." : ""}`} onRetry={refreshWorkItems} />}
+      {referencesError && <QueryError message={referencesError} onRetry={() => void reloadReferences()} />}
+
       {/* 작업 현황 통계 */}
-      <StatusStats counts={counts} />
+      <div aria-busy={work.loading}><StatusStats counts={counts} /></div>
 
       {/* 3열: 이번주 이관 예정 | 진행중인 작업 | 오늘 일정 */}
       <div className="grid gap-4 lg:grid-cols-3">
         {/* 이번주 이관 예정 */}
-        <section className="rounded-lg border bg-card">
+        <section className="rounded-lg border bg-card" aria-busy={work.loading}>
           <header className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <CalendarClock className="h-4 w-4 text-muted-foreground" />
@@ -239,7 +237,7 @@ export function DashboardClient() {
           </header>
           <div className="p-2">
             {dueThisWeek === null ? (
-              <SkeletonRows />
+              work.error ? <EmptyRow icon={<CalendarClock className="h-4 w-4" />}>작업을 조회하지 못했습니다.</EmptyRow> : <SkeletonRows />
             ) : dueThisWeek.length === 0 ? (
               <EmptyRow icon={<CalendarClock className="h-4 w-4" />}>
                 이번주 이관 예정인 작업이 없습니다.
@@ -251,6 +249,7 @@ export function DashboardClient() {
                   return (
                     <li key={item.id}>
                       <button
+                        type="button"
                         onClick={() => setDrawerId(item.id)}
                         className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-accent/40 text-left"
                       >
@@ -272,7 +271,7 @@ export function DashboardClient() {
         </section>
 
         {/* 진행중인 작업 */}
-        <section className="rounded-lg border bg-card">
+        <section className="rounded-lg border bg-card" aria-busy={work.loading}>
           <header className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 text-muted-foreground" />
@@ -282,7 +281,7 @@ export function DashboardClient() {
           </header>
           <div className="p-2">
             {inProgress === null ? (
-              <SkeletonRows />
+              work.error ? <EmptyRow icon={<Loader2 className="h-4 w-4" />}>작업을 조회하지 못했습니다.</EmptyRow> : <SkeletonRows />
             ) : inProgress.length === 0 ? (
               <EmptyRow icon={<Loader2 className="h-4 w-4" />}>
                 진행중인 작업이 없습니다.
@@ -292,6 +291,7 @@ export function DashboardClient() {
                 {inProgress.map((item) => (
                   <li key={item.id}>
                     <button
+                      type="button"
                       onClick={() => setDrawerId(item.id)}
                       className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-accent/40 text-left"
                     >
@@ -308,7 +308,7 @@ export function DashboardClient() {
         </section>
 
         {/* 오늘 일정 */}
-        <section className="rounded-lg border bg-card">
+        <section className="rounded-lg border bg-card" aria-busy={calendar.loading}>
           <header className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -322,8 +322,9 @@ export function DashboardClient() {
             </Link>
           </header>
           <div className="p-2">
+            {calendar.error && <QueryError message={calendar.error} onRetry={() => void reloadCalendar()} />}
             {calEvents === null ? (
-              <SkeletonRows />
+              calendar.error ? null : <SkeletonRows />
             ) : calEvents.length === 0 ? (
               <EmptyRow icon={<CalendarDays className="h-4 w-4" />}>
                 오늘 일정이 없습니다.
@@ -339,7 +340,7 @@ export function DashboardClient() {
                       className="flex flex-col gap-0.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent/40"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={cn("shrink-0 rounded px-1 text-[9px] font-semibold leading-[14px]", badge.className)}>
+                        <span className={cn("shrink-0 rounded-sm px-1 text-[9px] font-semibold leading-[14px]", badge.className)}>
                           {badge.label}
                         </span>
                         <span className="truncate font-medium">{ev.title}</span>
@@ -358,7 +359,7 @@ export function DashboardClient() {
       </div>
 
       {/* 최근 활동 */}
-      <section className="rounded-lg border bg-card">
+      <section className="rounded-lg border bg-card" aria-busy={activity.loading}>
         <header className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <ListChecks className="h-4 w-4 text-muted-foreground" />
@@ -366,8 +367,9 @@ export function DashboardClient() {
           </div>
         </header>
         <div className="p-2">
+          {activity.error && <QueryError message={activity.error} onRetry={() => void reloadActivity()} />}
           {logs === null ? (
-            <SkeletonRows />
+            activity.error ? null : <SkeletonRows />
           ) : logs.length === 0 ? (
             <EmptyRow icon={<ListChecks className="h-4 w-4" />}>
               기록된 활동이 없습니다.
@@ -414,9 +416,9 @@ export function DashboardClient() {
         }}
         onDeleted={() => {
           setDrawerId(null);
-          void loadWorkItems();
+          refreshWorkItems();
         }}
-        onMutated={() => void loadWorkItems()}
+        onMutated={refreshWorkItems}
       />
 
       <WorkItemFormDialog
@@ -428,7 +430,7 @@ export function DashboardClient() {
         onClose={() => setFormOpen(false)}
         onSaved={() => {
           setFormOpen(false);
-          void loadWorkItems();
+          refreshWorkItems();
           if (drawerId) setDrawerReloadKey((k) => k + 1);
         }}
       />
@@ -518,9 +520,10 @@ function shortEntityId(id: string) {
 
 function SkeletonRows() {
   return (
-    <div className="space-y-2 p-2">
+    <div className="space-y-2 p-2" role="status">
+      <span className="sr-only">불러오는 중…</span>
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="h-6 animate-pulse rounded bg-muted" />
+        <div key={i} className="h-6 animate-pulse rounded-sm bg-muted" aria-hidden="true" />
       ))}
     </div>
   );

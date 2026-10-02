@@ -1,5 +1,3 @@
-import type { Config } from "tailwindcss";
-
 /**
  * 디자인 토큰 단일 출처.
  *
@@ -9,21 +7,15 @@ import type { Config } from "tailwindcss";
  *  - spacing/typo는 tailwind 기본 척도(4px grid) 사용
  *  - radius는 --radius 변수 하나로 통일 후 lg/md/sm 파생
  */
-const config: Config = {
-  darkMode: ["class"],
+/** @type {import("tailwindcss").Config} */
+module.exports = {
+  darkMode: "class",
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
     "./lib/**/*.{ts,tsx}",
   ],
   theme: {
-    container: {
-      center: true,
-      padding: "1rem",
-      screens: {
-        "2xl": "1400px",
-      },
-    },
     extend: {
       colors: {
         border: "hsl(var(--border))",
@@ -72,6 +64,7 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xs: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
         sans: [
@@ -115,5 +108,3 @@ const config: Config = {
   },
   plugins: [require("tailwindcss-animate")],
 };
-
-export default config;

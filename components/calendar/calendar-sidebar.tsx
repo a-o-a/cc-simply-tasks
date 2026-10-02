@@ -68,7 +68,7 @@ export function CalendarSidebar({
         <div className="mb-2 flex items-center justify-between">
           <button
             onClick={prevMini}
-            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="이전 달"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
@@ -78,7 +78,7 @@ export function CalendarSidebar({
           </span>
           <button
             onClick={nextMini}
-            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="다음 달"
           >
             <ChevronRight className="h-3.5 w-3.5" />
@@ -112,7 +112,7 @@ export function CalendarSidebar({
                 key={dayKey}
                 onClick={() => onDateClick(dayKey)}
                 className={cn(
-                  "h-6 w-full rounded text-center text-[11px] transition-colors",
+                  "h-6 w-full rounded-sm text-center text-[11px] transition-colors",
                   !inMonth && "text-muted-foreground/40",
                   inMonth && !isSelected && colIdx === 0 && "text-rose-500",
                   inMonth && !isSelected && colIdx === 6 && "text-blue-500",

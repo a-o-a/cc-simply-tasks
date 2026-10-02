@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { cuidSchema, isoDateTimeSchema } from "./common";
-import { CALENDAR_EVENT_CATEGORIES } from "@/lib/enums";
+import { cuidSchema, isoDateTimeSchema, uniqueMemberIdsSchema } from "./common";
+import { CALENDAR_EVENT_CATEGORIES } from "../enums";
 
 export const calendarEventCreateSchema = z
   .object({
-    title: z.string().min(1).max(300),
-    memberIds: z.array(cuidSchema).default([]),
+    title: z.string().trim().min(1).max(300),
+    memberIds: uniqueMemberIdsSchema.default([]),
     category: z.enum(CALENDAR_EVENT_CATEGORIES).default("ETC"),
     startDateTime: isoDateTimeSchema,
     endDateTime: isoDateTimeSchema,
@@ -23,8 +23,8 @@ export const calendarEventCreateSchema = z
 
 export const calendarEventUpdateSchema = z
   .object({
-    title: z.string().min(1).max(300).optional(),
-    memberIds: z.array(cuidSchema).optional(),
+    title: z.string().trim().min(1).max(300).optional(),
+    memberIds: uniqueMemberIdsSchema.optional(),
     category: z.enum(CALENDAR_EVENT_CATEGORIES).optional(),
     startDateTime: isoDateTimeSchema.optional(),
     endDateTime: isoDateTimeSchema.optional(),
@@ -46,7 +46,7 @@ export const calendarEventRangeQuerySchema = z.object({
   from: isoDateTimeSchema,
   to: isoDateTimeSchema,
   memberId: cuidSchema.optional(),
-});
+}).refine((value) => value.from < value.to, { path: ["to"], message: "조회 종료 시간은 시작 시간보다 이후여야 합니다" });
 
 export type CalendarEventCreateInput = z.infer<typeof calendarEventCreateSchema>;
 export type CalendarEventUpdateInput = z.infer<typeof calendarEventUpdateSchema>;

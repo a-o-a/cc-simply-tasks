@@ -1,42 +1,15 @@
 import { NextResponse } from "next/server";
-import path from "path";
-import fs from "fs";
-import { getSqliteDbPath } from "@/lib/db";
+import { getBackupFile } from "@/lib/backup";
+import { createFileDownloadResponse } from "@/lib/file-download";
+import { withErrorHandler } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/**
- * GET /api/backup/files/:filename
- * 특정 백업 파일 다운로드
- */
-export const GET = async (
-  _req: Request,
-  { params }: { params: { filename: string } }
+export const GET = withErrorHandler(async (
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<{ filename: string }> },
 ) => {
-  const { filename } = params;
-
-  // 경로 탐색 공격 방지: 파일명만 허용
-  if (!/^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.db$/.test(filename)) {
-    return NextResponse.json({ error: "잘못된 파일명입니다" }, { status: 400 });
-  }
-
-  const dir = path.dirname(getSqliteDbPath());
-  const filePath = path.join(dir, filename);
-
-  if (!fs.existsSync(filePath)) {
-    return NextResponse.json({ error: "파일을 찾을 수 없습니다" }, { status: 404 });
-  }
-
-  const file = fs.readFileSync(filePath);
-
-  return new NextResponse(file, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Content-Length": String(file.byteLength),
-      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-    },
-  });
-};
+  const params = await paramsPromise;
+  return createFileDownloadResponse(await getBackupFile(params.filename), ({ body, headers }) => new NextResponse(body, { headers }));
+});
