@@ -63,6 +63,7 @@ JSON 요청은 `application/json` 또는 `application/*+json`, 최대 256 KiB입
 - TODO PATCH의 `checklist` 생략은 기존 목록 유지, `[]`는 전체 삭제, 배열은 전체 동기화입니다.
 - checklist의 기존 항목은 `id`를 보내고 새 항목은 생략합니다. 다른 TODO에 속한 ID는 거부합니다.
 - TODO 본문과 자식 변경은 한 번의 PATCH와 같은 트랜잭션으로 저장하고 상세 응답을 반환합니다. 기존 개별 checklist API도 유지합니다.
+- 새 담당자·일정 참여자의 활성 여부는 `lib/db/member-validation.ts`로 같은 트랜잭션 안에서 검사합니다. 없는/삭제된 팀원은 필드 오류가 포함된 400 응답입니다. 기존 삭제 팀원의 연결을 유지하는 저장은 허용하며, 연결을 해제한 뒤 다시 지정하는 것은 허용하지 않습니다.
 
 현재 `updatedAt`은 버전 비교용 잠금이 아닙니다. `If-Match` 자동 처리나 409 동시 편집 보호가 있다고 가정하지 않습니다.
 
@@ -79,11 +80,19 @@ DB 시간 컬럼은 UTC epoch 밀리초를 Drizzle `Date`로 다룹니다. 표�
 
 ## UI와 접근성
 
+수직 라벨과 입력칸은 `app/globals.css`의 `form-field` utility를 사용해 **5px** 간격으로 배치합니다. 인라인 `Label`에 `space-y-*`를 섞으면 실제 간격이 달라지므로 필드 wrapper에 `form-field`를 지정합니다. 검색 필터도 같은 기준입니다. 다열 폼은 가로 12px·세로 16px(`gap-x-3 gap-y-4`), 버튼 사이는 8px을 사용합니다. 체크박스 옆 라벨과 목록 행은 각각의 가로/밀집 배치를 유지합니다.
+
 사용자 수정 성공 후 `emitWorkItemsChanged()` 또는 `emitTodosChanged()`를 호출합니다. 구독·focus·visibilitychange에서 재조회가 필요한 데이터를 새로 읽습니다. 일정은 SSE도 사용합니다.
 
 요청은 가능한 한 AbortSignal을 전달하고 오래된 응답이 최신 필터 상태를 덮지 않도록 합니다. 취소는 오류 토스트로 표시하지 않습니다. 로딩·빈 결과·실패를 구분하며 실패 시 재시도 동작을 제공합니다.
 
 아이콘 버튼에는 이름을 지정하고 폼 안의 보조 버튼은 `type="button"`을 사용합니다. 저장·삭제의 중복 실행을 막고 처리 중 상태를 알립니다.
+
+모바일 셸은 `h-dvh`와 상단 메뉴를 사용합니다. 화면 전체의 최소 폭을 강제하지 않고, 테이블·월력 등 큰 보기의 내부 영역에서만 가로 스크롤합니다. 긴 편집 폼은 일반 `div`에 스크롤을 두고, 내부 `fieldset`은 비활성화만 담당합니다. Chromium의 fieldset 스크롤 문제를 피하기 위한 구조입니다.
+
+달력의 `eventDayKeys(event, range)`는 표시 범위와 교집합인 날짜만 계산합니다. 월력은 42일 범위, 간트 휴일은 KST 기준 표시 기간을 전달합니다. 전체 일정 기간으로 매번 확장하지 않습니다. `node scripts/benchmark-calendar.cjs current`로 동일 조건의 날짜 계산만 측정할 수 있습니다.
+
+저장 요청이 끝난 뒤 목록을 재조회할 때는 최신 필터의 콜백을 사용합니다. 작업·할 일은 `latestLoadItems` ref로 저장 중 변경된 검색 조건을 보존합니다. 모바일·날짜·폼 스크롤·이 경합의 브라우저 회귀 실행 방법은 [출시 검수 기록](RELEASE_REVIEW.md)을 참고하세요.
 
 ## 검증과 스키마 변경
 
@@ -98,5 +107,18 @@ npm run test:integration
 `npm test`는 TypeScript CLI로 테스트를 임시 폴더에 컴파일해 Node assert로 실행합니다. 컴파일에는 NodeNext 해석을 사용하며 Node 22의 fetch·Web Streams를 사용합니다. 테스트와 순수 helper import는 상대경로를 사용합니다. 각 테스트 파일은 실행 함수 `run*`을 export해야 합니다. 추가 테스트 프레임워크는 필요하지 않습니다.
 
 통합 검사는 임시 DB로 실제 프로덕션 빌드·HTTP 요청을 실행합니다. 커서 조회, 최신 DB 건수, 부분 날짜 수정, 관계 감사 로그, TODO 원자적 저장과 rollback, 요청 보호, 백업 무결성을 검사합니다.
+
+### 대량 샘플 데이터
+
+`scripts/seed-demo.cjs`는 2026-10-21 기준의 검수 샘플을 정상 HTTP API로 생성합니다. 작업 2,000건(활성 1,320·이관 완료 680), 팀원 12명·분류 6개·시스템 8개, 별도로 TODO 60건과 일정 36건을 구성합니다. 업무 날짜는 과거/현재/예정으로 분산하지만 생성·수정 시각은 실제 API 실행 시각입니다.
+
+Node 22에서 아래 형식으로 실행합니다. **같은 DB를 사용하는 localhost 서버가 먼저 실행 중이어야 합니다.** `--db`에는 실재하는 임시 검수 DB를 지정하며 스크립트는 `/private/tmp/cc-build-size-*/db/qa.db` 경로만 허용합니다. 운영·개발 DB용 명령이 아닙니다.
+
+```bash
+node scripts/seed-demo.cjs --url http://127.0.0.1:3036 \
+  --db /private/tmp/cc-build-size-XXXXXX/db/qa.db --confirm-demo-data
+```
+
+`DEMO-20261021-` 요청번호와 TODO/일정 메모의 샘플 표식으로 재실행 중복을 피합니다. 기존 레코드는 수정·삭제하지 않으며, API 전 페이지·고유 ID·관계·날짜·감사 로그·SQLite 무결성과 기존 행 보존을 검사합니다. 결과는 Git에서 제외된 `output/playwright/seed-data-summary.json`에 기록됩니다.
 
 스키마 변경은 `lib/db/schema.ts` → migration 생성·검토 → 임시 DB 적용·검증 → 운영 적용 계획 순서입니다. migration을 추가했다면 `db/dev.db.clean`도 같은 기준으로 다시 생성합니다. 이번 유지보수 변경은 스키마 migration이 필요하지 않습니다.

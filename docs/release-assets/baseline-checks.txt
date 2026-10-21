@@ -1,0 +1,7 @@
+Node v22.23.3
+Baseline e4a35de, clean tree before local branch codex/release-readiness
+PASS npm run typecheck
+PASS npm run lint
+PASS npm run test:lint: 22 invalid / 7 valid / 3 TS diagnostics
+PASS npm test: backend, backup, file-download, frontend, security
+PASS isolated production build Next16.3.8

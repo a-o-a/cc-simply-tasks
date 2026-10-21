@@ -54,20 +54,30 @@ export function kstMonthGrid(year: number, month0: number): number[] {
  * 한 캘린더 이벤트가 KST 기준 어떤 day key들에 걸쳐 있는지.
  * - allDay: [startKstDate, endKstDate) — 종료일은 제외
  * - non-allDay: 시작/끝의 KST 날짜를 모두 포함 (단순화)
+ * - range가 있으면 [fromMs, toMs)에 걸친 표시 날짜만 생성한다
  */
 export function eventDayKeys(event: {
   startDateTime: string;
   endDateTime: string;
   allDay: boolean;
-}): string[] {
+}, range?: { fromMs: number; toMs: number }): string[] {
+  if (range && (!Number.isFinite(range.fromMs) || !Number.isFinite(range.toMs) || range.fromMs >= range.toMs)) {
+    return [];
+  }
   const start = new Date(event.startDateTime).getTime();
   const end = new Date(event.endDateTime).getTime();
 
-  const startDay = kstDateStringToUtcMs(utcMsToKstDateString(start));
+  let startDay = kstDateStringToUtcMs(utcMsToKstDateString(start));
   // allDay end는 반열림이라 end-1ms의 날짜를 사용해 마지막 포함 day를 구한다
   // (예: end = 2026-04-12 KST 00:00 → end-1ms = 2026-04-11 KST 23:59:59 → 4/11)
   const endRefMs = event.allDay ? end - 1 : end;
-  const endDay = kstDateStringToUtcMs(utcMsToKstDateString(endRefMs));
+  let endDay = kstDateStringToUtcMs(utcMsToKstDateString(endRefMs));
+  if (range) {
+    const firstVisibleDay = kstDateStringToUtcMs(utcMsToKstDateString(range.fromMs));
+    const lastVisibleDay = kstDateStringToUtcMs(utcMsToKstDateString(range.toMs - 1));
+    startDay = Math.max(startDay, firstVisibleDay);
+    endDay = Math.min(endDay, lastVisibleDay);
+  }
 
   const out: string[] = [];
   for (let ms = startDay; ms <= endDay; ms += DAY_MS) {

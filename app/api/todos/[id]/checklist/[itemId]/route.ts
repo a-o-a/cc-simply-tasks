@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { now } from "@/lib/db/helpers";
 import { todoChecklist, todos } from "@/lib/db/schema";
 import { withErrorHandler, HttpError, readJsonBody } from "@/lib/http";
@@ -45,6 +46,7 @@ export const PATCH = withErrorHandler(
         ...(input.assigneeId !== undefined ? { assigneeId: input.assigneeId } : {}),
         updatedAt,
       };
+      await assertAssignableMembers(tx, [{ id: input.assigneeId, previousId: before.assigneeId, path: ["assigneeId"] }]);
       await tx
         .update(todoChecklist)
         .set(after)

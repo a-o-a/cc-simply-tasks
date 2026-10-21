@@ -1,0 +1,12 @@
+
+> cc-simply-tasks@0.1.0 test:integration
+> node scripts/integration.cjs
+
+PASS isolated production build
+PASS live statistics and page responses
+PASS partial-date validation, audit, origin and streamed payload protections
+PASS complete cursor pagination, null dates, legacy cursors and bounded pages
+PASS calendar partial-date validation and member audit
+PASS atomic TODO and checklist save with rollback
+PASS consistent streaming backup and concurrent snapshot requests
+PASS member references, deleted-member history and atomic relationship rollback

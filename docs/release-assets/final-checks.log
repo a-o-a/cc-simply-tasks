@@ -1,0 +1,23 @@
+
+> cc-simply-tasks@0.1.0 typecheck
+> tsc --noEmit
+
+
+> cc-simply-tasks@0.1.0 lint
+> eslint .
+
+
+> cc-simply-tasks@0.1.0 test
+> node scripts/test.cjs
+
+PASS backend.test.ts
+PASS backup.test.ts
+PASS calendar-range.test.ts
+PASS file-download.test.ts
+PASS frontend.test.ts
+PASS security.test.ts
+
+> cc-simply-tasks@0.1.0 test:lint
+> node scripts/test-lint.cjs
+
+Quality gates passed: 22 invalid lint cases, 7 valid cases, 3 TypeScript diagnostics.

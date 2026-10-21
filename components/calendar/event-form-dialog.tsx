@@ -287,7 +287,7 @@ export function EventFormDialog({
           </DialogHeader>
           <form onSubmit={handleSubmit} aria-busy={submitting}>
             <fieldset disabled={submitting} className="space-y-4">
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="ce-category">카테고리</Label>
               <Select
                 id="ce-category"
@@ -301,7 +301,7 @@ export function EventFormDialog({
                 ))}
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="ce-title">제목</Label>
               <Input
                 id="ce-title"
@@ -313,7 +313,7 @@ export function EventFormDialog({
                 placeholder=""
               />
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="form-field">
               <Label>담당자</Label>
               <MemberFilter
                 members={members}
@@ -338,8 +338,8 @@ export function EventFormDialog({
             </label>
 
             {state.allDay ? (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
+              <div className="grid gap-x-3 gap-y-4 sm:grid-cols-2">
+                <div className="form-field">
                   <Label htmlFor="ce-start-date">시작일</Label>
                   <DatePicker
                     id="ce-start-date"
@@ -348,7 +348,7 @@ export function EventFormDialog({
                     clearable={false}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="form-field">
                   <Label htmlFor="ce-end-date">종료일</Label>
                   <DatePicker
                     id="ce-end-date"
@@ -359,8 +359,8 @@ export function EventFormDialog({
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
+              <div className="grid gap-x-3 gap-y-4 sm:grid-cols-2">
+                <div className="form-field">
                   <Label htmlFor="ce-start-dt">시작 시각</Label>
                   <DateTimePicker
                     id="ce-start-dt"
@@ -369,7 +369,7 @@ export function EventFormDialog({
                     clearable={false}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="form-field">
                   <Label htmlFor="ce-end-dt">종료 시각</Label>
                   <DateTimePicker
                     id="ce-end-dt"
@@ -381,7 +381,7 @@ export function EventFormDialog({
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="ce-note">메모</Label>
               <Textarea
                 id="ce-note"

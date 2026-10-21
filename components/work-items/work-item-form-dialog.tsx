@@ -308,9 +308,10 @@ export function WorkItemFormDialog({
           onSubmit={handleSubmit}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <fieldset disabled={submitting} className="subtle-scrollbar min-w-0 flex-1 overflow-y-auto space-y-4 px-1 pb-1 pr-2">
+          <div className="subtle-scrollbar min-h-0 flex-1 overflow-y-auto px-1 pb-1 pr-2">
+          <fieldset disabled={submitting} className="min-w-0 space-y-4">
           {/* 분류 — 맨 위 단독 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="wi-category">분류</Label>
             <Select
               id="wi-category"
@@ -327,8 +328,8 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 요청 정보 3열 */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-2">
+          <div className="grid gap-x-3 gap-y-4 sm:grid-cols-3">
+            <div className="form-field">
               <Label htmlFor="wi-req-type">요청구분</Label>
               <Input
                 id="wi-req-type"
@@ -338,7 +339,7 @@ export function WorkItemFormDialog({
                 placeholder=""
               />
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-requestor">요청자</Label>
               <Input
                 id="wi-requestor"
@@ -348,7 +349,7 @@ export function WorkItemFormDialog({
                 placeholder=""
               />
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-req-number">요청번호</Label>
               <Input
                 id="wi-req-number"
@@ -361,7 +362,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 요청내용 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="wi-req-content">요청내용</Label>
             <Textarea
               id="wi-req-content"
@@ -374,7 +375,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 제목 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="wi-title">제목 *</Label>
             <Input
               id="wi-title"
@@ -386,8 +387,8 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 상태 / 우선순위 / 담당자 */}
-          <div className="grid grid-cols-3 items-end gap-3">
-            <div className="space-y-2">
+          <div className="grid items-end gap-x-3 gap-y-4 sm:grid-cols-3">
+            <div className="form-field">
               <Label htmlFor="wi-status">상태</Label>
               <Select
                 id="wi-status"
@@ -401,7 +402,7 @@ export function WorkItemFormDialog({
                 ))}
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-priority">우선순위</Label>
               <Select
                 id="wi-priority"
@@ -415,8 +416,8 @@ export function WorkItemFormDialog({
                 ))}
               </Select>
             </div>
-            <div className="space-y-2 self-end">
-              <Label className="block" htmlFor="wi-assignee">담당자</Label>
+            <div className="form-field self-end">
+              <Label htmlFor="wi-assignee">담당자</Label>
               <MemberFilter
                 id="wi-assignee"
                 disabled={submitting}
@@ -432,7 +433,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 시스템 연동 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <div className="flex items-center justify-between">
               <Label>시스템 연동</Label>
               {systems.length > 0 && (
@@ -517,8 +518,8 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 일정 */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-2">
+          <div className="grid gap-x-3 gap-y-4 sm:grid-cols-3">
+            <div className="form-field">
               <Label htmlFor="wi-start">시작일</Label>
               <DatePicker
                 id="wi-start"
@@ -526,7 +527,7 @@ export function WorkItemFormDialog({
                 onChange={(v) => update("startDate", v)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-end">종료일</Label>
               <DatePicker
                 id="wi-end"
@@ -534,7 +535,7 @@ export function WorkItemFormDialog({
                 onChange={(v) => update("endDate", v)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-transfer">이관일</Label>
               <DatePicker
                 id="wi-transfer"
@@ -545,7 +546,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 추가 사항 */}
-          <div className="grid gap-1.5">
+          <div className="form-field">
             <Label htmlFor="wi-additional-notes">추가 사항</Label>
             <Textarea
               id="wi-additional-notes"
@@ -558,7 +559,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 설명 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="wi-desc">설명</Label>
             <Textarea
               id="wi-desc"
@@ -571,6 +572,7 @@ export function WorkItemFormDialog({
           </div>
 
           </fieldset>
+          </div>
 
           <DialogFooter className="shrink-0 border-t pt-4">
             <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>

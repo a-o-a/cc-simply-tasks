@@ -11,6 +11,7 @@ import {
   ne,
 } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { contains, newId, now } from "@/lib/db/helpers";
 import { hydrateWorkItems } from "@/lib/db/queries";
 import { workItems, workTickets, type WorkItemRow } from "@/lib/db/schema";
@@ -130,6 +131,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const timestamp = now();
 
   const created = await db.transaction(async (tx) => {
+    await assertAssignableMembers(tx, [{ id: input.assigneeId, path: ["assigneeId"] }]);
     const row = {
       id: newId(),
       title: input.title,

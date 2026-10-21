@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { newId, now, ticketSummaries } from "@/lib/db/helpers";
 import { loadWorkItemDetail } from "@/lib/db/queries";
 import { workItems, workTickets } from "@/lib/db/schema";
@@ -75,6 +76,7 @@ export const PATCH = withErrorHandler(
         updatedAt,
       };
       assertDateOrder(after.startDate, after.endDate, "endDate", true);
+      await assertAssignableMembers(tx, [{ id: input.assigneeId, previousId: before.assigneeId, path: ["assigneeId"] }]);
       await tx.update(workItems).set(after).where(eq(workItems.id, params.id));
 
       // 티켓 값이 바뀐 경우에만 전체 대체하고 관계 변경도 감사 로그에 남긴다.

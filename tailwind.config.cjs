@@ -2,7 +2,7 @@
  * 디자인 토큰 단일 출처.
  *
  * 원칙:
- *  - 뉴트럴 = zinc, 강조 = blue (CSS 변수로 라이트/다크 모두 정의)
+ *  - 조작 강조 = zinc, 업무 상태 색상은 별도 유지 (라이트/다크 CSS 변수)
  *  - 모든 색상은 hsl(var(--token)) 패턴으로 접근 (shadcn 컨벤션)
  *  - spacing/typo는 tailwind 기본 척도(4px grid) 사용
  *  - radius는 --radius 변수 하나로 통일 후 lg/md/sm 파생

@@ -61,6 +61,90 @@ async function freePort() {
   return port;
 }
 
+// Relationship inputs must fail as field validation, while historical assignments stay editable.
+async function runMemberValidationChecks(port) {
+  async function invalidMember(route, method, body, field) {
+    const response = await request(port, route, { method, body });
+    assert.equal(response.status, 400, `${method} ${route}: ${JSON.stringify(response.json)}`);
+    assert.equal(response.json.error.code, "VALIDATION_ERROR");
+    assert.ok(response.json.error.details.fieldErrors[field]?.length, `Missing field feedback for ${field}`);
+  }
+  const eventInput = {
+    title: "backend-qa event", category: "WORK", allDay: false,
+    startDateTime: "2026-10-02T00:00:00Z", endDateTime: "2026-10-03T00:00:00Z",
+  };
+  const missing = "backend-qa-missing-member";
+  await invalidMember("/api/work-items", "POST", { title: "backend-qa invalid work", assigneeId: missing }, "assigneeId");
+  await invalidMember("/api/todos", "POST", { title: "backend-qa invalid todo", assigneeId: missing }, "assigneeId");
+  await invalidMember("/api/todos", "POST", { title: "backend-qa invalid child", checklist: [{ content: "child", assigneeId: missing }] }, "checklist");
+  await invalidMember("/api/calendar-events", "POST", { ...eventInput, memberIds: [missing] }, "memberIds");
+
+  const historical = await request(port, "/api/team-members", { method: "POST", body: { name: "backend-qa historical member", role: "ETC" } });
+  const retired = await request(port, "/api/team-members", { method: "POST", body: { name: "backend-qa retired member", role: "ETC" } });
+  assert.equal(historical.status, 201);
+  assert.equal(retired.status, 201);
+  const historicalId = historical.json.id;
+  const retiredId = retired.json.id;
+  const work = await request(port, "/api/work-items", { method: "POST", body: { title: "backend-qa work", assigneeId: historicalId } });
+  const todo = await request(port, "/api/todos", { method: "POST", body: {
+    title: "backend-qa todo", assigneeId: historicalId,
+    checklist: [{ content: "backend-qa child", assigneeId: historicalId, done: true }],
+  } });
+  const event = await request(port, "/api/calendar-events", { method: "POST", body: { ...eventInput, memberIds: [historicalId] } });
+  assert.equal(work.status, 201);
+  assert.equal(todo.status, 201);
+  assert.equal(event.status, 201);
+  const workPath = `/api/work-items/${work.json.id}`;
+  const todoPath = `/api/todos/${todo.json.id}`;
+  const eventPath = `/api/calendar-events/${event.json.id}`;
+  const child = todo.json.checklist[0];
+  const childPath = `${todoPath}/checklist/${child.id}`;
+  for (const memberId of [historicalId, retiredId]) {
+    assert.equal((await request(port, `/api/team-members/${memberId}`, { method: "DELETE" })).status, 204);
+  }
+  const preserved = { title: "backend-qa preserved", assigneeId: historicalId };
+  assert.equal((await request(port, workPath, { method: "PATCH", body: preserved })).status, 200);
+  assert.equal((await request(port, todoPath, { method: "PATCH", body: { ...preserved, checklist: [child] } })).status, 200);
+  assert.equal((await request(port, childPath, { method: "PATCH", body: { content: "backend-qa preserved child", assigneeId: historicalId } })).status, 200);
+  assert.equal((await request(port, eventPath, { method: "PATCH", body: { title: preserved.title, memberIds: [historicalId] } })).status, 200);
+
+  for (const badId of [missing, retiredId]) {
+    await invalidMember("/api/work-items", "POST", { title: "backend-qa invalid work", assigneeId: badId }, "assigneeId");
+    await invalidMember("/api/todos", "POST", { title: "backend-qa invalid todo", assigneeId: badId }, "assigneeId");
+    await invalidMember("/api/todos", "POST", { title: "backend-qa invalid child", checklist: [{ content: "child", assigneeId: badId }] }, "checklist");
+    await invalidMember("/api/calendar-events", "POST", { ...eventInput, memberIds: [badId] }, "memberIds");
+    await invalidMember(workPath, "PATCH", { title: "must roll back", assigneeId: badId }, "assigneeId");
+    await invalidMember(todoPath, "PATCH", { title: "must roll back", assigneeId: badId }, "assigneeId");
+    await invalidMember(todoPath, "PATCH", { title: "must roll back", checklist: [{ id: child.id, content: "must roll back", assigneeId: badId }] }, "checklist");
+    await invalidMember(`${todoPath}/checklist`, "POST", { content: "invalid child", assigneeId: badId }, "assigneeId");
+    await invalidMember(childPath, "PATCH", { content: "must roll back", assigneeId: badId }, "assigneeId");
+    await invalidMember(eventPath, "PATCH", { title: "must roll back", memberIds: [historicalId, badId] }, "memberIds");
+  }
+  const workAfter = await request(port, workPath);
+  const todoAfter = await request(port, todoPath);
+  const eventAfter = await request(port, eventPath);
+  assert.equal(workAfter.json.title, preserved.title);
+  assert.equal(workAfter.json.assigneeId, historicalId);
+  assert.equal(todoAfter.json.title, preserved.title);
+  assert.equal(todoAfter.json.checklist.length, 1);
+  assert.equal(todoAfter.json.checklist[0].content, "backend-qa preserved child");
+  assert.equal(todoAfter.json.checklist[0].done, true);
+  assert.equal(todoAfter.json.checklist[0].assigneeId, historicalId);
+  assert.equal(eventAfter.json.title, preserved.title);
+  assert.deepEqual(eventAfter.json.members.map((member) => member.memberId), [historicalId]);
+  assert.deepEqual((await request(port, "/api/todos?title=backend-qa%20invalid")).json.items, [], "Rejected creates must not persist a parent");
+  await invalidMember(`${todoPath}/checklist`, "POST", { content: "new association", assigneeId: historicalId }, "assigneeId");
+  await invalidMember(todoPath, "PATCH", { checklist: [{ content: "new association", assigneeId: historicalId }] }, "checklist");
+  assert.equal((await request(port, workPath, { method: "PATCH", body: { assigneeId: null } })).status, 200);
+  assert.equal((await request(port, todoPath, { method: "PATCH", body: { assigneeId: null, checklist: [{ id: child.id, content: child.content, assigneeId: null }] } })).status, 200);
+  assert.equal((await request(port, eventPath, { method: "PATCH", body: { memberIds: [] } })).status, 200);
+  await invalidMember(workPath, "PATCH", { assigneeId: historicalId }, "assigneeId");
+  await invalidMember(todoPath, "PATCH", { assigneeId: historicalId }, "assigneeId");
+  await invalidMember(childPath, "PATCH", { assigneeId: historicalId }, "assigneeId");
+  await invalidMember(eventPath, "PATCH", { memberIds: [historicalId] }, "memberIds");
+  console.log("PASS member references, deleted-member history and atomic relationship rollback");
+}
+
 async function main() {
   for (const directory of ["app", "components", "lib", "drizzle"]) copy(path.join(root, directory), path.join(temporary, directory));
   for (const file of ["package.json", "tsconfig.json", "next.config.js", "postcss.config.js", "postcss.config.mjs", "tailwind.config.cjs", "instrumentation.ts", "eslint.config.mjs", "next-env.d.ts"]) {
@@ -102,7 +186,7 @@ async function main() {
   }
   assert.equal(ready, true, `Server did not start: ${logs}`);
 
-  for (const route of ["/", "/work-items", "/todos", "/calendar", "/transfer", "/settings"]) {
+  for (const route of ["/", "/work-items", "/todos", "/calendar", "/transfer", "/settings", "/icon.svg"]) {
     const response = await request(port, route);
     assert.equal(response.status, 200, route);
     assert.equal(response.headers["x-content-type-options"], "nosniff");
@@ -233,6 +317,8 @@ async function main() {
   assert.equal((await request(port, `/api/backup/files/${linkName}`)).status, 404);
   assert.ok(!(await request(port, "/api/backup/files")).json.files.some((file) => file.filename === linkName));
   console.log("PASS consistent streaming backup and concurrent snapshot requests");
+
+  await runMemberValidationChecks(port);
 }
 
 main().catch((error) => {

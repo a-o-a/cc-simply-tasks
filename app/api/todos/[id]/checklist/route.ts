@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { newId, now } from "@/lib/db/helpers";
 import { todoChecklist, todos } from "@/lib/db/schema";
 import { withErrorHandler, HttpError, readJsonBody } from "@/lib/http";
@@ -33,6 +34,8 @@ export const POST = withErrorHandler(
         .limit(1);
       if (!parent[0])
         throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
+
+      await assertAssignableMembers(tx, [{ id: input.assigneeId, path: ["assigneeId"] }]);
 
       const row = {
         id: newId(),

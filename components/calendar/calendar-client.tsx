@@ -202,14 +202,14 @@ export function CalendarClient() {
   const eventsByDay = React.useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const event of filteredEvents) {
-      for (const key of eventDayKeys(event)) {
+      for (const key of eventDayKeys(event, { fromMs: gridFromMs, toMs: gridToMs })) {
         const list = map.get(key) ?? [];
         list.push(event);
         map.set(key, list);
       }
     }
     return map;
-  }, [filteredEvents]);
+  }, [filteredEvents, gridFromMs, gridToMs]);
 
   const transfersByDay = React.useMemo(() => {
     const map = new Map<string, number>();
@@ -307,17 +307,17 @@ export function CalendarClient() {
     >
       <div className="flex h-full flex-col overflow-hidden">
         {/* ── 헤더 ── */}
-        <header className="flex shrink-0 items-center px-8 py-6">
+        <header className="flex shrink-0 flex-wrap items-center gap-3 px-4 py-4 md:px-8 md:py-6">
           {/* 왼쪽: 타이틀 */}
           <h1 className="text-xl font-semibold">캘린더</h1>
 
           {/* 가운데: 월 선택 + 오늘 + 팀원 필터 */}
-          <div className="flex flex-1 items-center justify-center gap-3">
+          <div className="order-last flex w-full flex-wrap items-center justify-center gap-2 md:order-none md:w-auto md:flex-1 md:gap-3">
             <div className="flex items-center rounded-md border bg-card">
               <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전 달">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="min-w-[10rem] px-3 text-center text-sm font-medium tabular-nums">
+              <span className="min-w-28 px-2 text-center text-sm font-medium tabular-nums md:min-w-40 md:px-3">
                 {headerLabel}
               </span>
               <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음 달">
@@ -338,7 +338,7 @@ export function CalendarClient() {
           </div>
 
           {/* 오른쪽: 로딩 + 이벤트 추가 */}
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3 md:ml-0">
             {loading && (
               <span className="text-xs text-muted-foreground" role="status">불러오는 중…</span>
             )}
@@ -373,7 +373,7 @@ export function CalendarClient() {
         )}
 
         {/* 캘린더 영역 */}
-        <div className="flex-1 overflow-hidden px-8 py-6" aria-busy={loading}>
+        <div className="min-h-0 flex-1 overflow-hidden px-4 py-4 md:px-8 md:py-6" aria-busy={loading}>
           <MonthView
             grid={grid}
             cursor={cursor}

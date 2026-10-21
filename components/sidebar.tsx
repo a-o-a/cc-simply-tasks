@@ -11,6 +11,7 @@ import {
   ChevronRight,
   LayoutDashboard,
   ListChecks,
+  Menu,
   Settings,
   UserCog,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   ACTOR_NAME_STORAGE_KEY,
   api,
@@ -71,6 +73,7 @@ export function Sidebar() {
   const [serviceName, setServiceName] = React.useState<string>(DEFAULT_SERVICE_NAME);
   const [mounted, setMounted] = React.useState(false);
   const [nameDialogOpen, setNameDialogOpen] = React.useState(false);
+  const [mobileOpen, setMobileOpen] = React.useState(false);
   const [nameDraft, setNameDraft] = React.useState("");
   const [openTodoCount, setOpenTodoCount] = React.useState(0);
   const [countError, setCountError] = React.useState<string | null>(null);
@@ -150,6 +153,7 @@ export function Sidebar() {
   }
 
   function openNameDialog() {
+    setMobileOpen(false);
     setNameDraft(window.localStorage.getItem(ACTOR_NAME_STORAGE_KEY) ?? "");
     setNameDialogOpen(true);
   }
@@ -164,23 +168,18 @@ export function Sidebar() {
     setNameDialogOpen(false);
   }
 
-  return (
-    <aside
-      className={cn(
-        "sticky top-0 flex h-screen shrink-0 flex-col border-r bg-card transition-[width] duration-200",
-        collapsed ? "w-16" : "w-60",
-      )}
-    >
+  function renderNavigation(isCollapsed: boolean, mobile = false) {
+    return <>
       {/* 헤더 */}
       <div className="flex h-14 items-center justify-between border-b px-3">
-        {!collapsed ? (
+        {!isCollapsed ? (
           <Link href="/" className="truncate text-sm font-semibold tracking-tight">
             {serviceName}
           </Link>
         ) : (
           <span className="sr-only">{serviceName}</span>
         )}
-        <Button
+        {mobile ? <SheetClose asChild><Button variant="ghost" size="icon" aria-label="메뉴 닫기"><ChevronLeft className="h-4 w-4" /></Button></SheetClose> : <Button
           variant="ghost"
           size="icon"
           onClick={toggleCollapsed}
@@ -191,11 +190,11 @@ export function Sidebar() {
           ) : (
             <ChevronLeft className="h-4 w-4" />
           )}
-        </Button>
+        </Button>}
       </div>
 
       {/* 네비게이션 */}
-      <nav className="flex-1 space-y-1 p-2">
+      <nav aria-label="주 메뉴" className="flex-1 space-y-1 overflow-y-auto p-2">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = item.exact
@@ -205,18 +204,20 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
+              onClick={() => setMobileOpen(false)}
               className={cn(
                 "relative flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
                 active
                   ? "bg-secondary text-secondary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                collapsed && "justify-center px-0",
+                isCollapsed && "justify-center px-0",
               )}
               aria-current={active ? "page" : undefined}
-              title={item.href === "/todos" && countError ? countError : collapsed ? item.label : undefined}
+              title={item.href === "/todos" && countError ? countError : isCollapsed ? item.label : undefined}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed ? (
+              {!isCollapsed ? (
                 <>
                   <span className="min-w-0 flex-1">{item.label}</span>
                   {item.href === "/todos" && (openTodoCount > 0 || countError) ? (
@@ -237,7 +238,7 @@ export function Sidebar() {
 
       {/* 하단: 액터 + 테마 */}
       <div className="border-t p-2">
-        {!collapsed ? (
+        {!isCollapsed ? (
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={openNameDialog}
@@ -267,13 +268,33 @@ export function Sidebar() {
         )}
       </div>
 
+    </>;
+  }
+
+  return (
+    <>
+      <aside className={cn("hidden h-dvh shrink-0 flex-col border-r bg-card transition-[width] duration-200 md:flex", collapsed ? "w-16" : "w-60")}>
+        {renderNavigation(collapsed)}
+      </aside>
+      <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-card px-4 md:hidden">
+        <Link href="/" className="min-w-0 truncate text-sm font-semibold">{serviceName}</Link>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild><Button variant="ghost" size="icon" aria-label="메뉴 열기"><Menu className="h-5 w-5" /></Button></SheetTrigger>
+          <SheetContent side="left" hideCloseButton className="w-60 max-w-[85vw] gap-0 bg-card p-0">
+            <SheetTitle className="sr-only">메뉴</SheetTitle>
+            <SheetDescription className="sr-only">화면 이동과 표시 이름, 테마 설정</SheetDescription>
+            {renderNavigation(false, true)}
+          </SheetContent>
+        </Sheet>
+      </div>
+
       <Dialog open={nameDialogOpen} onOpenChange={setNameDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>이름 변경</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleNameSubmit} className="space-y-4">
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="sidebar-name-input">표시 이름</Label>
               <Input
                 id="sidebar-name-input"
@@ -295,6 +316,6 @@ export function Sidebar() {
           </form>
         </DialogContent>
       </Dialog>
-    </aside>
+    </>
   );
 }

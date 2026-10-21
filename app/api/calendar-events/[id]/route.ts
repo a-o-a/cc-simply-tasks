@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { now } from "@/lib/db/helpers";
 import { loadCalendarEventDetail } from "@/lib/db/queries";
 import { calendarEventMembers, calendarEvents } from "@/lib/db/schema";
@@ -55,6 +56,10 @@ export const PATCH = withErrorHandler(
         : undefined;
       // memberIds가 제공된 경우 기존 팀원 교체
       if (input.memberIds !== undefined) {
+        const previousIds = new Set(beforeMemberIds);
+        await assertAssignableMembers(tx, input.memberIds.map((id, index) => ({
+          id, previousId: previousIds.has(id) ? id : undefined, path: ["memberIds", index],
+        })));
         await tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, params.id));
         if (input.memberIds.length > 0) {
           await tx.insert(calendarEventMembers).values(

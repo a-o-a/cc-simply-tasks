@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, gte, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { contains, newId, now } from "@/lib/db/helpers";
 import { hydrateTodos, loadTodoDetail } from "@/lib/db/queries";
 import { todoChecklist, todos, type TodoRow } from "@/lib/db/schema";
@@ -79,6 +80,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const timestamp = now();
 
   const createdId = await db.transaction(async (tx) => {
+    await assertAssignableMembers(tx, [
+      { id: input.assigneeId, path: ["assigneeId"] },
+      ...(input.checklist ?? []).map((item, index) => ({ id: item.assigneeId, path: ["checklist", index, "assigneeId"] })),
+    ]);
     const row = {
       id: newId(),
       title: input.title,

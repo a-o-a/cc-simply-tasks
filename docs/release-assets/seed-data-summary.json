@@ -1,0 +1,183 @@
+{
+  "generatedAt": "2026-10-21T08:12:13.929Z",
+  "node": "v22.23.3",
+  "baseUrl": "http://127.0.0.1:3036",
+  "dbPath": "/private/tmp/cc-build-size-8J4fGN/db/qa.db",
+  "seedPrefix": "DEMO-20261021",
+  "anchorKst": "2026-10-21",
+  "elapsedMs": 4588,
+  "added": {
+    "members": 12,
+    "categories": 6,
+    "systems": 8,
+    "workItems": 2000,
+    "todos": 60,
+    "events": 36
+  },
+  "recoveredPosts": 0,
+  "retries": 0,
+  "baseline": {
+    "TeamMember": 0,
+    "WorkCategory": 0,
+    "WorkSystem": 0,
+    "WorkItem": 0,
+    "WorkTicket": 0,
+    "Todo": 0,
+    "TodoChecklist": 0,
+    "CalendarEvent": 0,
+    "CalendarEventMember": 0,
+    "Setting": 0,
+    "AuditLog": 0
+  },
+  "totals": {
+    "TeamMember": 12,
+    "WorkCategory": 6,
+    "WorkSystem": 8,
+    "WorkItem": 2000,
+    "WorkTicket": 2000,
+    "Todo": 60,
+    "TodoChecklist": 330,
+    "CalendarEvent": 36,
+    "CalendarEventMember": 69,
+    "Setting": 0,
+    "AuditLog": 4452
+  },
+  "seeded": {
+    "workItems": 2000,
+    "status": {
+      "WAITING": 240,
+      "IN_PROGRESS": 320,
+      "INTERNAL_TEST": 200,
+      "BUSINESS_TEST": 140,
+      "QA_TEST": 140,
+      "TRANSFER_READY": 160,
+      "TRANSFERRED": 680,
+      "HOLDING": 120
+    },
+    "priority": {
+      "HIGH": 400,
+      "NORMAL": 1200,
+      "LOW": 400
+    },
+    "unassigned": 160,
+    "withoutTickets": 300,
+    "tickets": 2000,
+    "longDescriptions": 100,
+    "workDateRange": {
+      "from": "2026-04-17T15:00:00.000Z",
+      "to": "2026-11-16T15:00:00.000Z"
+    },
+    "todos": 60,
+    "checklist": 330,
+    "todoStatus": {
+      "DONE": 12,
+      "OPEN": 48
+    },
+    "calendarEvents": 36,
+    "calendarCategory": {
+      "HOLIDAY": 3,
+      "WORK": 24,
+      "ETC": 6,
+      "ABSENCE": 3
+    },
+    "createAudits": 2000
+  },
+  "verification": {
+    "apiTotal": 2000,
+    "allPages": 10,
+    "uniqueIds": 2000,
+    "active": 1320,
+    "transferred": 680,
+    "existingRowsPreserved": true,
+    "integrity": "ok",
+    "foreignKeyViolations": 0,
+    "samples": [
+      {
+        "id": "i2dtsts9emydpj1oi845nyea",
+        "requestNumber": "DEMO-20261021-0001",
+        "status": "WAITING",
+        "title": "고객 상담 이력 검색 조건 개선",
+        "descriptionLength": 1099,
+        "tickets": 0
+      },
+      {
+        "id": "wko4chg58hyejtawih0rgxqw",
+        "requestNumber": "DEMO-20261021-0013",
+        "status": "IN_PROGRESS",
+        "title": "근무 일정 등록 검색 조건 개선",
+        "descriptionLength": 254,
+        "tickets": 1
+      },
+      {
+        "id": "coz9gpqu3b3zu08yspgy1c3w",
+        "requestNumber": "DEMO-20261021-0029",
+        "status": "INTERNAL_TEST",
+        "title": "교육 이수 현황 검색 조건 개선",
+        "descriptionLength": 254,
+        "tickets": 1
+      },
+      {
+        "id": "vt8rvnxn47btzu0vfdbcgx1h",
+        "requestNumber": "DEMO-20261021-0039",
+        "status": "BUSINESS_TEST",
+        "title": "목표 대비 실적 검색 조건 개선",
+        "descriptionLength": 261,
+        "tickets": 2
+      },
+      {
+        "id": "kywbdvajsbejjvw3vpgz28wk",
+        "requestNumber": "DEMO-20261021-0046",
+        "status": "QA_TEST",
+        "title": "업무 대시보드 검색 조건 개선",
+        "descriptionLength": 260,
+        "tickets": 1
+      },
+      {
+        "id": "dcrlr8uztg3r2vflzyd79875",
+        "requestNumber": "DEMO-20261021-0053",
+        "status": "TRANSFER_READY",
+        "title": "휴가 잔여일 조회 예외 처리 보완",
+        "descriptionLength": 256,
+        "tickets": 1
+      },
+      {
+        "id": "usqvcl90v3av38feq763up0r",
+        "requestNumber": "DEMO-20261021-0061",
+        "status": "TRANSFERRED",
+        "title": "근무 일정 등록 예외 처리 보완",
+        "descriptionLength": 1097,
+        "tickets": 0
+      },
+      {
+        "id": "ik7loaycryq1t68kfe1zhoq6",
+        "requestNumber": "DEMO-20261021-0095",
+        "status": "HOLDING",
+        "title": "보고서 예약 발송 예외 처리 보완",
+        "descriptionLength": 263,
+        "tickets": 1
+      }
+    ]
+  },
+  "apiRequests": {
+    "count": 2162,
+    "medianMs": 1.69,
+    "p95Ms": 3.86
+  },
+  "dbBytes": 10731520,
+  "note": "실제 API로 생성한 샘플입니다. createdAt/updatedAt은 실제 생성 시각이며 업무 날짜만 과거·현재·예정으로 분산했습니다. 실행 중 기존 데이터는 변경하거나 삭제하지 않습니다.",
+  "idempotency": {
+    "verifiedAt": "2026-10-21T08:12:43.230Z",
+    "elapsedMs": 726,
+    "added": {
+      "members": 0,
+      "categories": 0,
+      "systems": 0,
+      "workItems": 0,
+      "todos": 0,
+      "events": 0
+    },
+    "existingRowsPreserved": true,
+    "apiTotal": 2000,
+    "integrity": "ok"
+  }
+}

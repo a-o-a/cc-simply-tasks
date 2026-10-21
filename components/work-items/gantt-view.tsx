@@ -4,7 +4,7 @@ import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api, isAbortError } from "@/lib/client/api";
 import { QueryError } from "@/components/ui/query-state";
-import { eventDayKeys } from "@/lib/client/calendar";
+import { eventDayKeys, kstDateStringToUtcMs } from "@/lib/client/calendar";
 import type { CalendarEvent, WorkItemListItem } from "@/lib/client/types";
 import { STATUS_LABELS } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
@@ -64,8 +64,11 @@ export function GanttView({
     if (scheduled.length === 0) return;
     const controller = new AbortController();
     setHolidayError(null);
-    const from = new Date(window.startMs).toISOString();
-    const to = new Date(window.startMs + window.totalDays * DAY_MS).toISOString();
+    // 간트 축은 KST 날짜를 UTC 자정으로 인코딩하므로 실제 조회 범위로 변환합니다.
+    const fromMs = kstDateStringToUtcMs(new Date(window.startMs).toISOString().slice(0, 10));
+    const toMs = fromMs + window.totalDays * DAY_MS;
+    const from = new Date(fromMs).toISOString();
+    const to = new Date(toMs).toISOString();
     api
       .get<{ items: CalendarEvent[] }>("/api/calendar-events", {
         signal: controller.signal,
@@ -76,7 +79,7 @@ export function GanttView({
         const dates = new Set<string>();
         for (const ev of res.items) {
           if (ev.category !== "HOLIDAY") continue;
-          for (const key of eventDayKeys(ev)) dates.add(key);
+          for (const key of eventDayKeys(ev, { fromMs, toMs })) dates.add(key);
         }
         setHolidayDates(dates);
       })

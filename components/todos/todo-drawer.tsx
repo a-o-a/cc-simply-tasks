@@ -407,15 +407,16 @@ export function TodoDrawer({
         </SheetHeader>
         {loading && <LoadingState message="할 일을 불러오는 중…" />}
         {loadError && <QueryError message={loadError} onRetry={() => setReloadKey((key) => key + 1)} />}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <fieldset
           disabled={loading || saving || Boolean(loadError)}
           className={cn(
-            "min-w-0 flex-1 space-y-4 overflow-y-auto p-4",
+            "min-w-0 space-y-4",
             loading && "pointer-events-none opacity-60",
           )}
         >
           <form
-            className="space-y-1.5"
+            className="form-field"
             onSubmit={(e) => {
               e.preventDefault();
               void handleTitleSubmit(title);
@@ -443,8 +444,8 @@ export function TodoDrawer({
             />
           </form>
 
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
-            <div className="min-w-0 space-y-1.5">
+          <div className="grid gap-x-3 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
+            <div className="form-field">
               <Label htmlFor="todo-status">상태</Label>
               <Select
                 id="todo-status"
@@ -458,7 +459,7 @@ export function TodoDrawer({
                 ))}
               </Select>
             </div>
-            <div className="min-w-0 space-y-1.5">
+            <div className="form-field">
               <Label htmlFor="todo-assignee">담당자</Label>
               <div>
                 <MemberFilter
@@ -473,7 +474,7 @@ export function TodoDrawer({
                 />
               </div>
             </div>
-            <div className="min-w-0 space-y-1.5">
+            <div className="form-field">
               <Label htmlFor="todo-due-date">마감일</Label>
               <DatePicker
                 id="todo-due-date"
@@ -484,7 +485,7 @@ export function TodoDrawer({
             </div>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="form-field">
             <Label htmlFor="todo-note">메모</Label>
             <Textarea
               id="todo-note"
@@ -496,7 +497,7 @@ export function TodoDrawer({
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="form-field">
             <div className="flex items-center justify-between">
               <Label>체크리스트</Label>
               <Button
@@ -597,8 +598,9 @@ export function TodoDrawer({
             )}
           </div>
         </fieldset>
+        </div>
 
-        <div className="flex items-center justify-between border-t bg-card p-3">
+        <div className="flex shrink-0 items-center justify-between border-t bg-card p-4">
           {mode === "edit" && detail ? (
             <>
               <Button

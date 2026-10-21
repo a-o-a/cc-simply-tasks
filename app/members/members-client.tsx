@@ -254,7 +254,7 @@ function MemberFormDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="member-name">이름</Label>
             <Input
               id="member-name"
@@ -267,7 +267,7 @@ function MemberFormDialog({
               placeholder=""
             />
           </div>
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="member-role">역할</Label>
             <Select
               disabled={submitting}

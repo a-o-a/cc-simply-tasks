@@ -295,8 +295,8 @@ export function TransferClient() {
   const headerLabel = `${cursor.year}년 ${cursor.month0 + 1}월`;
 
   return (
-    <div className="px-8 py-6">
-      <header className="flex items-center justify-between">
+    <div className="px-4 py-4 md:px-8 md:py-6">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-xl font-semibold">이관 현황</h1>
           {!loading && !error && (
@@ -307,7 +307,7 @@ export function TransferClient() {
         </div>
 
         {/* 가운데: 월 선택 */}
-        <div className="flex flex-1 items-center justify-center gap-3">
+        <div className="flex w-full items-center justify-center gap-2 md:w-auto md:flex-1 md:gap-3">
           <div className="flex items-center rounded-md border bg-card">
             <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전 달" disabled={loading || pendingDate !== null}>
               <ChevronLeft className="h-4 w-4" />
@@ -325,7 +325,7 @@ export function TransferClient() {
           </Button>
         </div>
 
-        <div className="flex flex-1 justify-end"></div>
+        <div className="hidden flex-1 justify-end md:flex"></div>
       </header>
 
       {referenceError && <div className="mt-4"><QueryError message={referenceError} onRetry={() => void reloadReferences()} /></div>}

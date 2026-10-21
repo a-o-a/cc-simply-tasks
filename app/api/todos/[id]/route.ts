@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { now, newId } from "@/lib/db/helpers";
 import { loadTodoDetail } from "@/lib/db/queries";
 import { todoChecklist, todos } from "@/lib/db/schema";
@@ -52,6 +53,7 @@ export const PATCH = withErrorHandler(
         ...(input.assigneeId !== undefined ? { assigneeId: input.assigneeId } : {}),
         updatedAt,
       };
+      await assertAssignableMembers(tx, [{ id: input.assigneeId, previousId: before.assigneeId, path: ["assigneeId"] }]);
       await tx.update(todos).set(after).where(eq(todos.id, params.id));
 
       // Supplying checklist replaces the active child list in the same transaction.
@@ -64,6 +66,12 @@ export const PATCH = withErrorHandler(
         if ([...submittedIds].some((id) => !byId.has(id))) {
           throw new HttpError("BAD_REQUEST", "체크리스트 항목이 이 할 일에 속하지 않거나 삭제되었습니다");
         }
+
+        await assertAssignableMembers(tx, input.checklist.map((item, index) => ({
+          id: item.assigneeId,
+          previousId: item.id ? byId.get(item.id)?.assigneeId : undefined,
+          path: ["checklist", index, "assigneeId"],
+        })));
 
         for (const item of existing) {
           if (submittedIds.has(item.id)) continue;

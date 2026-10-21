@@ -1,0 +1,60 @@
+{
+  "passed": true,
+  "node": "22.23.3",
+  "build": "isolated production build passed",
+  "themes": [
+    {
+      "theme": "light",
+      "normal": {
+        "foreground": [
+          255,
+          255,
+          255
+        ],
+        "background": [
+          39,
+          39,
+          42
+        ],
+        "contrast": 14.89,
+        "opacity": "1",
+        "focusVisible": false,
+        "boxShadow": "none"
+      },
+      "mobile": {
+        "client": 390,
+        "scroll": 390
+      }
+    },
+    {
+      "theme": "dark",
+      "normal": {
+        "foreground": [
+          9,
+          9,
+          11
+        ],
+        "background": [
+          212,
+          212,
+          216
+        ],
+        "contrast": 13.46,
+        "opacity": "1",
+        "focusVisible": false,
+        "boxShadow": "none"
+      },
+      "mobile": {
+        "client": 390,
+        "scroll": 390
+      }
+    }
+  ],
+  "verifiedStates": [
+    "default",
+    "hover",
+    "keyboard focus",
+    "selected filter",
+    "disabled and enabled form action"
+  ]
+}

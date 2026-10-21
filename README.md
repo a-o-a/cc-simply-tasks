@@ -46,7 +46,11 @@ npm run dev
 - `drizzle/`, `db/dev.db.clean`: 마이그레이션과 빈 개발 DB 템플릿.
 - `tests/`, `scripts/`: 회귀 검사와 임시 DB를 사용하는 프로덕션 통합 검사.
 
-Next.js 16.3.8, React 19.3.0, TypeScript 6.0.3, Tailwind 4.3.3/Radix UI, Drizzle ORM, `@libsql/client`를 사용합니다. 기본 개발·빌드는 Turbopack입니다. 현재 DB 연결은 로컬 SQLite `file:` URL만 지원합니다. Postgres 전환에는 드라이버·스키마·쿼리 변경이 필요합니다.
+Next.js 16.4.2, React 19.3.1, TypeScript 6.0.3, Tailwind 4.3.3/Radix UI, Drizzle ORM, `@libsql/client`를 사용합니다. 기본 개발·빌드는 Turbopack입니다. 현재 DB 연결은 로컬 SQLite `file:` URL만 지원합니다. Postgres 전환에는 드라이버·스키마·쿼리 변경이 필요합니다.
+
+모바일에서는 상단 메뉴로 화면을 이동합니다. 작업 테이블·칸반·간트·월력은 각각의 영역 안에서 가로로 스크롤합니다. 날짜는 달력 또는 `yyyy-mm-dd` 직접 입력을 사용하며, 키보드로 날짜 지우기에도 접근할 수 있습니다.
+
+버튼·선택 필터·포커스는 차콜/회색 계열로 통일합니다. 다크 모드에서는 대비를 위해 밝은 회색을 사용하고, 업무 상태를 구분하는 색상은 별도로 유지합니다.
 
 ## 개발·검증 명령
 
@@ -61,8 +65,11 @@ Next.js 16.3.8, React 19.3.0, TypeScript 6.0.3, Tailwind 4.3.3/Radix UI, Drizzle
 | `npm run test:integration` | 임시 체크아웃·DB에서 빌드와 실제 HTTP API 검사 |
 | `npm run db:generate`, `npm run db:migrate` | 마이그레이션 생성·적용 |
 | `npm audit` | 설치된 의존성 취약점 확인 |
+| `node scripts/benchmark-calendar.cjs current` | 장기 일정의 월력 날짜 계산 측정 |
 
 통합 검사는 기존 `.next`와 개발·운영 DB에 접근하지 않고, 완료 후 임시 서버와 파일을 정리합니다.
+
+2,000건의 작업과 팀원·코드·할 일·일정을 넣어 실제 사용 규모를 확인하는 검수 샘플 생성 방법은 [개발 가이드](docs/DEVELOPMENT.md#대량-샘플-데이터)에 있습니다. 임시 검수 DB만 대상으로 하며 재실행해도 같은 샘플을 중복 생성하지 않습니다.
 
 ## 운영과 백업
 
@@ -83,6 +90,8 @@ APP_ALLOWED_ORIGINS=""
 
 모든 쓰기는 Zod 검증, DB 트랜잭션, 감사 로그를 함께 적용합니다. 주요 엔티티는 soft delete합니다. 시간은 UTC timestamp로 저장하고 KST로 표시합니다. 상세 규칙은 [개발 가이드](docs/DEVELOPMENT.md)에 있습니다.
 
+새 담당자·일정 참여자는 활성 팀원만 지정할 수 있습니다. 과거 기록의 삭제된 팀원 연결은 유지하거나 해제할 수 있습니다. 오래된 폼에서 삭제된 팀원을 새로 지정하면 400 오류와 목록 새로고침 안내를 반환합니다.
+
 현재 동시 편집은 마지막 저장을 반영합니다. `If-Match` 기반 충돌 보호는 구현되어 있지 않습니다. 표시 이름과 IP는 인증된 사용자 증명이 아닙니다.
 
 브라우저의 다른 출처에서 보내는 변경 요청을 차단하고 JSON 본문은 256 KiB로 제한합니다. 출처의 scheme·host·port를 비교하며 Origin이 없으면 Referer를 검사합니다. TLS 종료 프록시나 Host를 바꾸는 프록시는 `APP_ALLOWED_ORIGINS`에 정확한 공개 origin을 지정합니다. 이 보호는 로그인·권한 관리의 대체 수단이 아닙니다.
@@ -93,5 +102,6 @@ APP_ALLOWED_ORIGINS=""
 - [운영·백업·복구](docs/OPERATIONS.md)
 - [Drizzle 마이그레이션](docs/DRIZZLE_MIGRATION.md)
 - [보안·성능·UI 개선 기록](docs/MAINTENANCE.md)
+- [2026-10-21 출시 전 검수·측정·화면](docs/RELEASE_REVIEW.md)
 - [의존성·런타임 버전](docs/DEPENDENCIES.md)
 - [후속 계획](PLAN.md)

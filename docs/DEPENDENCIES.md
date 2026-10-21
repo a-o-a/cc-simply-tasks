@@ -1,14 +1,15 @@
 # 의존성·런타임 기준
 
-2026-10-02 기준 npm registry의 정식 릴리스를 확인했습니다. beta·rc·canary는 사용하지 않습니다. 직접 의존성은 버전을 고정하고 전이 의존성은 `package-lock.json`으로 재현합니다.
+2026-10-21 기준 npm registry와 공식 릴리스·보안 공지를 다시 확인했습니다. beta·rc·canary는 사용하지 않습니다. 직접 의존성은 버전을 고정하고 전이 의존성은 `package-lock.json`으로 재현합니다. 출시 전 검수에서는 보안 수정과 현재 실행 경로에 필요한 업데이트를 우선하며, 모든 패키지를 일괄 최신화하지 않습니다.
 
 ## 주요 버전
 
 | 항목 | 적용 버전 |
 |---|---|
 | Node.js | 22.23.3 LTS (`.nvmrc`, 22 계열만 허용) |
-| Next.js / @next/eslint-plugin-next | 16.3.8 |
-| React / React DOM / React 타입 | 19.3.0 |
+| Next.js / @next/eslint-plugin-next | 16.4.2 |
+| React / React DOM | 19.3.1 |
+| React / React DOM 타입 | 19.3.0 |
 | Tailwind CSS / PostCSS 플러그인 | 4.3.3 |
 | tailwind-merge | 3.7.0 |
 | TypeScript | 6.0.3 |
@@ -18,7 +19,21 @@
 | Zod | 4.6.5 |
 | CUID2 / cron | 3.3.0 / 4.6.0 |
 
-Radix UI, Lucide, next-themes, CVA, clsx도 정식 최신 버전으로 갱신했습니다. dnd-kit·tailwindcss-animate·Drizzle ORM·PostCSS는 이미 최신 정식 버전이었습니다. 전체 목록은 [package.json](../package.json)을 기준으로 합니다. Node 타입은 런타임과 같은 22 계열입니다.
+PostCSS는 8.5.31, 전이 의존성 source-map-js는 1.2.2를 사용합니다. Radix UI, Lucide, next-themes, CVA, clsx, dnd-kit 등은 2026-10-02 정비 때 검증한 버전을 유지합니다. 전체 목록은 [package.json](../package.json)을 기준으로 합니다. Node 타입은 런타임과 같은 22 계열 최신인 22.20.5입니다.
+
+## 2026-10-21 출시 전 업데이트
+
+| 변경 | 적용 이유 |
+|---|---|
+| Next / Next ESLint 16.3.8 → 16.4.2 | 현재 사용하는 Turbopack의 스냅샷 일관성·GC·동적 import 청크 충돌 수정 반영, 프레임워크와 플러그인 버전 일치 |
+| React / React DOM 19.3.0 → 19.3.1 | React Server Components 전송 프로토콜 수정 반영 |
+| PostCSS 8.5.28 → 8.5.31, source-map-js 1.2.1 → 1.2.2 | source-map-js의 잘못된 indexed source map으로 인한 이벤트 루프 차단 취약점 패치 적용 |
+
+근거: [Next 16.4.2 릴리스](https://github.com/vercel/next.js/releases/tag/v16.4.2), [React 19.3.1 릴리스](https://github.com/react/react/releases/tag/v19.3.1), [PostCSS 8.5.31 릴리스](https://github.com/postcss/postcss/releases/tag/8.5.31), [source-map-js 보안 공지](https://github.com/advisories/GHSA-68fv-2mgg-jv7q).
+
+Next 16.4.2의 Node 요구 사항은 `>=20.9.0`, React peer는 `^19.0.0`을 포함하므로 Node 22.23.3·React 19.3.1과 호환됩니다. React 타입 19.3.0도 기존 UI 라이브러리의 peer 범위를 충족합니다. TypeScript는 7.0.2가 최신 정식 버전이지만 최신 typescript-eslint 8.72.0도 TypeScript `<6.1.0`을 요구하므로 6.0.3을 유지합니다. Drizzle 0.45.4는 postgres-js 전용 수정이므로 SQLite를 사용하는 이 프로젝트에서는 0.45.3을 유지합니다.
+
+Node 22.23.3에서 `npm install --strict-peer-deps`와 빈 임시 디렉터리의 `npm ci --strict-peer-deps`가 모두 통과했습니다. `--force`·`--legacy-peer-deps`는 사용하지 않았습니다.
 
 ## 호환성 결정
 
@@ -41,7 +56,7 @@ Tailwind 4의 브라우저 기준은 Safari 16.4+, Chrome/Edge 111+, Firefox 128
 | eslint-plugin-react 7.37.5 | @eslint-react/eslint-plugin 5.23.3 |
 | eslint-plugin-import 2.32.0 | eslint-plugin-import-x 4.17.1 |
 | eslint-plugin-jsx-a11y 6.10.2 | eslint-plugin-jsx-a11y-x 0.2.0 |
-| eslint-config-next 16.3.8 | @next/eslint-plugin-next 16.3.8 직접 구성 |
+| eslint-config-next 16.3.8 | @next/eslint-plugin-next 16.4.2 직접 구성 |
 
 React Hooks 7.1.1, typescript-eslint 8.71.0, globals 17.13.0도 직접 의존성으로 고정했습니다. Node 22.23.3은 ESLint 10과 새 React 플러그인의 실행 기준을 충족합니다. a11y-x는 0.x 정식 배포본이므로 다음 업데이트에서도 고정 버전·변경 내역·검증을 확인합니다.
 
@@ -68,7 +83,14 @@ React Hooks 7.1.1, typescript-eslint 8.71.0, globals 17.13.0도 직접 의존성
 
 ## 보안과 업데이트 절차
 
-업데이트 후 `npm audit`는 production 의존성 0개, 전체에서는 Drizzle CLI의 esbuild 계열 moderate 영향 패키지 4개를 보고합니다. CLI Studio 서버는 사용하지 않습니다. 이는 인증·네트워크 접근 제어의 안전성을 보증하는 결과가 아닙니다.
+2026-10-21 Node 22.23.3·npm 10.9.9에서 기존·수정 lockfile에 같은 `--package-lock-only` 옵션을 적용해 비교한 결과입니다. 개수는 독립적인 취약점 수가 아니라 npm이 전이 의존성의 영향을 포함해 보고한 영향 패키지 수입니다.
+
+| 검사 | 수정 전 | 수정 후 |
+|---|---|---|
+| `npm audit --omit=dev` | high 1개 | 0개 |
+| `npm audit` | high 5개, moderate 4개 | high 4개, moderate 4개 |
+
+남은 high 4개는 Next ESLint 플러그인 → fast-glob → micromatch → braces 경로입니다. [braces 보안 공지](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)는 현재 최신 3.0.3까지 영향받으며 패치 버전이 없다고 명시합니다. moderate 4개는 Drizzle CLI의 esbuild 계열입니다. CLI Studio 서버는 사용하지 않습니다. npm이 제안하는 자동 조치는 Next ESLint 14·Drizzle Kit 0.18로의 주요 버전 후퇴이므로 적용하지 않았습니다. 개발 도구의 취약점이 해소되었다고 간주하지 않으며 상위 패치를 추적해야 합니다. audit 결과는 인증·네트워크 접근 제어의 안전성을 보증하지 않습니다.
 
 1. `.nvmrc`의 Node 22 버전을 적용하고 `npm ci`로 설치합니다.
 2. beta·rc 태그를 제외하고 엔진·peer·변경 사항을 확인합니다.

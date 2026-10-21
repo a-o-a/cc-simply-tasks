@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, asc, eq, exists, gt, isNull, lt } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { newId, now } from "@/lib/db/helpers";
 import { hydrateCalendarEvents } from "@/lib/db/queries";
 import { calendarEventMembers, calendarEvents } from "@/lib/db/schema";
@@ -68,6 +69,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const timestamp = now();
 
   const created = await db.transaction(async (tx) => {
+    await assertAssignableMembers(tx, input.memberIds.map((id, index) => ({ id, path: ["memberIds", index] })));
     const row = {
       id: newId(),
       title: input.title,

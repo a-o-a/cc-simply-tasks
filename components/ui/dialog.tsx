@@ -52,7 +52,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]",
+        "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-4 overflow-y-auto rounded-lg border bg-background p-4 shadow-lg sm:p-6 data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]",
         className,
       )}
       {...props}
@@ -61,7 +61,7 @@ const DialogContent = React.forwardRef<
       {!hideCloseButton ? (
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">닫기</span>
         </DialogPrimitive.Close>
       ) : null}
     </DialogPrimitive.Content>
@@ -86,7 +86,7 @@ const DialogFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
+      "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
       className,
     )}
     {...props}
@@ -101,7 +101,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
+      "break-words pr-6 text-lg font-semibold leading-none tracking-tight",
       className,
     )}
     {...props}

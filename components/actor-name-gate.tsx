@@ -63,7 +63,7 @@ export function ActorNameGate() {
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="actor-name-input">표시 이름</Label>
             <Input
               id="actor-name-input"

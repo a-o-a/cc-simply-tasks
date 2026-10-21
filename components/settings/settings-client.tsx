@@ -79,7 +79,7 @@ function SettingsSkeleton({ rows = 3 }: { rows?: number }) {
 
 export function SettingsClient() {
   return (
-    <div className="px-8 py-6">
+    <div className="px-4 py-4 md:px-8 md:py-6">
       <header className="mb-6">
         <h1 className="text-xl font-semibold">설정</h1>
       </header>
@@ -157,7 +157,7 @@ function ServiceTab() {
       {error && <div className="mb-4"><QueryError message={error} onRetry={() => void reload()} /></div>}
       {loading && <p className="mb-3 text-xs text-muted-foreground" role="status">서비스명을 불러오는 중…</p>}
       <form onSubmit={handleSubmit} className="space-y-4" aria-busy={saving}>
-        <div className="space-y-2">
+        <div className="form-field">
           <Label htmlFor="service-name">표시 이름</Label>
           <Input
             id="service-name"
@@ -560,12 +560,12 @@ function CodeDialog({
           <DialogDescription>{definition.description}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4" aria-busy={submitting}>
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor={`${definition.prefix}-code`}>코드</Label>
             <Input id={`${definition.prefix}-code`} value={code} onChange={(e) => setCode(e.target.value)} autoFocus={!editing} maxLength={100} disabled={!!editing || submitting} required={!editing} pattern="[a-zA-Z0-9_-]+" />
             <p className="text-xs text-muted-foreground">영문, 숫자, 하이픈, 언더스코어만 허용. 한 번 등록하면 변경 불가.</p>
           </div>
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor={`${definition.prefix}-name`}>이름</Label>
             <Input id={`${definition.prefix}-name`} autoFocus={!!editing} value={name} onChange={(e) => setName(e.target.value)} maxLength={100} disabled={submitting} required />
           </div>

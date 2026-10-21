@@ -26,7 +26,12 @@ db/*.db-*
 
 # logs
 *.log
+!docs/release-assets/*.log
 npm-debug.log*
+
+# local browser verification artifacts
+.playwright-cli/
+output/playwright/
 
 # editor
 .vscode

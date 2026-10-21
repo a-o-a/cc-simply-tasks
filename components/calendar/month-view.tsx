@@ -180,7 +180,7 @@ export function MonthView({
 
   return (
     <div className="h-full overflow-auto">
-      <div className="overflow-hidden rounded-lg border bg-card">
+      <div className="min-w-[640px] overflow-hidden rounded-lg border bg-card">
         {/* Weekday header */}
         <div className="grid grid-cols-7 border-b text-xs font-medium text-muted-foreground">
           {Array.from({ length: 7 }).map((_, i) => (

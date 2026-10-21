@@ -289,14 +289,14 @@ export function WorkItemsClient() {
   );
 
   return (
-    <div className="px-8 py-6">
-      <header className="flex items-center">
+    <div className="px-4 py-4 md:px-8 md:py-6">
+      <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold">작업</h1>
-        <div className="flex flex-1 items-center justify-center gap-3">
+        <div className="order-last flex w-full flex-wrap items-center justify-center gap-3 md:order-none md:w-auto md:flex-1">
           <ScopeToggle value={scope} onChange={changeScope} />
           <ViewToggle value={view} onChange={changeView} scope={scope} />
         </div>
-        <Button onClick={openCreate}>
+        <Button className="ml-auto md:ml-0" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
           작업 추가
         </Button>
@@ -602,9 +602,9 @@ function FilterBar({
   return (
     <div className="mt-4 rounded-lg border bg-card p-3 space-y-3">
       {/* 1행: 분류 / 상태 / 담당자 / 우선순위 / 이관일 */}
-      <div className="flex divide-x divide-border">
+      <div className="grid grid-cols-2 gap-3 md:flex md:divide-x md:divide-border md:gap-0 [&>div]:min-w-0 max-md:[&>div]:px-0">
         {/* 분류 */}
-        <div className="flex-1 space-y-1.5 pr-3">
+        <div className="form-field flex-1 pr-3">
           <Label className="text-xs">분류</Label>
           <div className="flex flex-wrap gap-1">
             {categories.length === 0 ? (
@@ -620,7 +620,7 @@ function FilterBar({
         </div>
 
         {/* 상태 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">상태</Label>
           {scope === "active" ? (
             <div className="flex flex-wrap gap-1">
@@ -640,7 +640,7 @@ function FilterBar({
         </div>
 
         {/* 담당자 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">담당자</Label>
           <div className="flex flex-wrap gap-1">
             <MemberFilter
@@ -659,7 +659,7 @@ function FilterBar({
         </div>
 
         {/* 우선순위 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">우선순위</Label>
           <div className="flex flex-wrap gap-1">
             {PRIORITIES.map((p) => (
@@ -671,7 +671,7 @@ function FilterBar({
         </div>
 
         {/* 이관일 */}
-        <div className="flex-1 space-y-1.5 pl-3">
+        <div className="form-field flex-1 pl-3">
           <Label className="text-xs">이관일</Label>
           <DatePicker value={filters.transferDate} onChange={(v) => set("transferDate", v)} placeholder="날짜 선택" className="h-7 text-xs" />
         </div>
@@ -681,9 +681,9 @@ function FilterBar({
       <div className="border-t border-border" />
 
       {/* 2행: 제목 / 시스템 / 요청구분 / 요청자 / 요청번호 */}
-      <div className="flex divide-x divide-border">
+      <div className="grid grid-cols-2 gap-3 md:flex md:divide-x md:divide-border md:gap-0 [&>div]:min-w-0 max-md:[&>div]:px-0">
         {/* 제목 */}
-        <div className="flex-1 space-y-1.5 pr-3">
+        <div className="form-field flex-1 pr-3">
           <Label className="text-xs">제목</Label>
           <Input
             placeholder=""
@@ -693,7 +693,7 @@ function FilterBar({
         </div>
 
         {/* 시스템 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">시스템</Label>
           <div>
             <SystemFilter
@@ -706,7 +706,7 @@ function FilterBar({
         </div>
 
         {/* 요청구분 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">요청구분</Label>
           <Input
             placeholder=""
@@ -716,7 +716,7 @@ function FilterBar({
         </div>
 
         {/* 요청자 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">요청자</Label>
           <Input
             placeholder=""
@@ -726,7 +726,7 @@ function FilterBar({
         </div>
 
         {/* 요청번호 */}
-        <div className="flex-1 space-y-1.5 pl-3">
+        <div className="form-field flex-1 pl-3">
           <Label className="text-xs">요청번호</Label>
           <Input
             placeholder=""

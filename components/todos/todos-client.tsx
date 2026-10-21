@@ -112,6 +112,10 @@ export function TodosClient() {
     void loadItems();
     return cancelRequest;
   }, [loadItems, cancelRequest]);
+  const latestLoadItems = React.useRef(loadItems);
+  React.useEffect(() => {
+    latestLoadItems.current = loadItems;
+  }, [loadItems]);
 
   function startMutation(id: string) {
     if (pendingIdsRef.current.has(id)) return false;
@@ -206,7 +210,7 @@ export function TodosClient() {
     try {
       await api.patch(`/api/todos/${todo.id}`, { status: next });
       emitTodosChanged();
-      void loadItems();
+      void latestLoadItems.current();
     } catch (err) {
       setItems((prev) =>
         prev.map((t) => (t.id === todo.id ? { ...t, status: todo.status } : t)),
@@ -222,7 +226,7 @@ export function TodosClient() {
   }
 
   return (
-    <div className="px-8 py-6">
+    <div className="px-4 py-4 md:px-8 md:py-6">
       <header className="flex items-center">
         <h1 className="text-xl font-semibold">할 일</h1>
         <div className="flex-1" />
@@ -234,8 +238,8 @@ export function TodosClient() {
 
       {memberError && <div className="mt-4"><QueryError message={memberError} onRetry={() => setMemberReloadKey((key) => key + 1)} /></div>}
       {filterVisible && (
-        <div className="mt-4 flex items-start gap-4 rounded-lg border bg-card p-3">
-          <div className="flex-1 space-y-1.5">
+        <div className="mt-4 grid gap-4 rounded-lg border bg-card p-3 sm:grid-cols-3 [&>div]:min-w-0">
+          <div className="form-field">
             <Label className="text-xs">상태</Label>
             <div className="flex flex-wrap gap-1">
               {TODO_STATUSES.map((s) => {
@@ -266,7 +270,7 @@ export function TodosClient() {
               })}
             </div>
           </div>
-          <div className="flex-1 space-y-1.5">
+          <div className="form-field">
             <Label className="text-xs">담당자</Label>
             <div>
               <MemberFilter
@@ -285,7 +289,7 @@ export function TodosClient() {
               />
             </div>
           </div>
-          <div className="flex-1 space-y-1.5">
+          <div className="form-field">
             <Label className="text-xs">제목</Label>
             <Input
               aria-label="할 일 제목 검색"
@@ -344,7 +348,7 @@ export function TodosClient() {
                   todo.checklist?.filter((c) => c.done).length ?? 0;
                 return (
                   <li key={todo.id}>
-                    <div className="flex items-center gap-2 px-3 py-2.5">
+                    <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
                       <input
                         type="checkbox"
                         checked={todo.status === "DONE"}
@@ -374,7 +378,7 @@ export function TodosClient() {
                         type="button"
                         onClick={() => openEdit(todo.id)}
                         disabled={pendingIds.has(todo.id)}
-                        className="flex-1 truncate text-left text-sm font-medium hover:underline"
+                        className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline"
                       >
                         {todo.title}
                       </button>
@@ -393,12 +397,14 @@ export function TodosClient() {
                           {done}/{total}
                         </span>
                       )}
-                      <span className="w-24 shrink-0 truncate text-xs text-muted-foreground">
+                      <div className="flex w-full items-center gap-2 pl-14 sm:contents">
+                      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground sm:w-24 sm:flex-none">
                         {todo.assignee?.name ?? "—"}
                       </span>
-                      <span className="w-24 shrink-0 text-xs text-muted-foreground tabular-nums">
+                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums sm:w-24">
                         {todo.dueDate ? formatDate(todo.dueDate) : ""}
                       </span>
+                      </div>
                     </div>
                     {isExpanded && total > 0 && (
                       <ul className="border-t bg-muted/30 px-3 py-2">
@@ -417,7 +423,7 @@ export function TodosClient() {
                             />
                             <span
                               className={cn(
-                                "flex-1 text-sm",
+                                "min-w-0 flex-1 break-words text-sm",
                                 item.done && "text-muted-foreground line-through",
                               )}
                             >
@@ -458,7 +464,7 @@ export function TodosClient() {
         members={members}
         open={drawerMode === "create" || drawerId !== null}
         onClose={closeDrawer}
-        onMutated={() => void loadItems()}
+        onMutated={() => void latestLoadItems.current()}
       />
     </div>
   );

@@ -197,9 +197,9 @@ export function DashboardClient() {
   }
 
   return (
-    <div className="px-8 py-6 space-y-6">
+    <div className="space-y-6 px-4 py-4 md:px-8 md:py-6">
       {/* 헤더 */}
-      <header className="flex items-center justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">홈</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -222,7 +222,7 @@ export function DashboardClient() {
       <div aria-busy={work.loading}><StatusStats counts={counts} /></div>
 
       {/* 3열: 이번주 이관 예정 | 진행중인 작업 | 오늘 일정 */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* 이번주 이관 예정 */}
         <section className="rounded-lg border bg-card" aria-busy={work.loading}>
           <header className="flex items-center justify-between border-b px-4 py-3">

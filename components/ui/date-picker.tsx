@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 function parseYmd(v: string): { y: number; m: number; d: number } | null {
-  const match = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const match = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
   return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
 }
@@ -72,13 +72,13 @@ function CalendarGrid({
     <>
       {/* 헤더 */}
       <div className="mb-2 flex items-center justify-between">
-        <button type="button" onClick={onPrev} className="rounded-sm p-1 hover:bg-accent">
+        <button type="button" aria-label="이전 달" onClick={onPrev} className="rounded-sm p-1 hover:bg-accent">
           <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-medium">
           {viewYear}년 {String(viewMonth).padStart(2, "0")}월
         </span>
-        <button type="button" onClick={onNext} className="rounded-sm p-1 hover:bg-accent">
+        <button type="button" aria-label="다음 달" onClick={onNext} className="rounded-sm p-1 hover:bg-accent">
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -112,6 +112,9 @@ function CalendarGrid({
                 <button
                   key={ci}
                   type="button"
+                  aria-label={`${viewYear}년 ${viewMonth}월 ${day}일`}
+                  aria-pressed={isSelected}
+                  aria-current={isToday ? "date" : undefined}
                   onClick={() => onSelect(day)}
                   className={cn(
                     "rounded-sm py-1 text-xs transition-colors hover:bg-accent",
@@ -140,6 +143,39 @@ const popoverContentClass = cn(
   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
   "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
 );
+
+/** Native buttons inherit fieldset disabled state and keep clear reachable by keyboard. */
+function PickerTrigger({ id, label, hasValue, disabled, clearable, onClear, className }: {
+  id?: string;
+  label: string;
+  hasValue: boolean;
+  disabled: boolean;
+  clearable: boolean;
+  onClear: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn(
+      "flex h-9 w-full items-center rounded-md border border-input bg-background text-sm transition-colors focus-within:ring-1 focus-within:ring-ring",
+      disabled && "opacity-50",
+      className,
+    )}>
+      <Popover.Trigger asChild>
+        <button type="button" id={id} disabled={disabled}
+          className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-md px-3 text-left outline-hidden disabled:cursor-not-allowed">
+          <span className={cn("min-w-0 flex-1 truncate tabular-nums", !hasValue && "text-muted-foreground")}>{label}</span>
+          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      </Popover.Trigger>
+      {clearable && hasValue && (
+        <button type="button" disabled={disabled} onClick={onClear} aria-label="날짜 지우기"
+          className="mr-1 shrink-0 rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-ring disabled:cursor-not-allowed">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 // ════════════════════════════ DatePicker ════════════════════════════
 
@@ -232,46 +268,19 @@ export function DatePicker({
   }
 
   return (
-    <Popover.Root open={open} onOpenChange={disabled ? undefined : setOpen}>
-      <Popover.Trigger asChild>
-        <div
-          id={id}
-          role="button"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          tabIndex={disabled ? -1 : 0}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
-          className={cn(
-            "flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors",
-            "focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring",
-            disabled && "cursor-not-allowed opacity-50",
-            className,
-          )}
-        >
-          <span
-            className={cn(
-              "min-w-0 flex-1 truncate tabular-nums",
-              !value && "text-muted-foreground",
-            )}
-          >
-            {displayLabel || placeholder}
-          </span>
-          {clearable && value && !disabled && (
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={(e) => { e.stopPropagation(); onChange(""); }}
-              className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </div>
-      </Popover.Trigger>
+    <Popover.Root open={open && !disabled} onOpenChange={setOpen}>
+      <PickerTrigger
+        id={id}
+        label={displayLabel || placeholder}
+        hasValue={Boolean(value)}
+        disabled={disabled}
+        clearable={clearable}
+        onClear={() => onChange("")}
+        className={className}
+      />
 
       <Popover.Portal>
-        <Popover.Content align="start" sideOffset={4} className={popoverContentClass}>
+        <Popover.Content aria-label="날짜 선택" align="start" sideOffset={4} className={popoverContentClass}>
           <CalendarGrid
             viewYear={viewYear}
             viewMonth={viewMonth}
@@ -289,6 +298,8 @@ export function DatePicker({
                 type="text"
                 inputMode="numeric"
                 placeholder="yyyy-mm-dd"
+                aria-label="날짜 직접 입력"
+                aria-invalid={Boolean(inputError)}
                 value={draftInput}
                 onChange={(e) => {
                   const next = e.target.value;
@@ -327,7 +338,7 @@ export function DatePicker({
                 적용
               </button>
             </div>
-            <p className={cn("mt-1.5 text-[11px]", inputError ? "text-destructive" : "text-muted-foreground")}>
+            <p role={inputError ? "alert" : undefined} className={cn("mt-1.5 text-[11px]", inputError ? "text-destructive" : "text-muted-foreground")}>
               {inputError ?? "달력에서 고르거나 날짜를 직접 입력할 수 있습니다"}
             </p>
           </div>
@@ -448,46 +459,19 @@ export function DateTimePicker({
     : datePart;
 
   return (
-    <Popover.Root open={open} onOpenChange={disabled ? undefined : setOpen}>
-      <Popover.Trigger asChild>
-        <div
-          id={id}
-          role="button"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          tabIndex={disabled ? -1 : 0}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
-          className={cn(
-            "flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors",
-            "focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring",
-            disabled && "cursor-not-allowed opacity-50",
-            className,
-          )}
-        >
-          <span
-            className={cn(
-              "min-w-0 flex-1 truncate tabular-nums",
-              !value && "text-muted-foreground",
-            )}
-          >
-            {displayLabel || placeholder}
-          </span>
-          {clearable && value && !disabled && (
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={(e) => { e.stopPropagation(); onChange(""); }}
-              className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </div>
-      </Popover.Trigger>
+    <Popover.Root open={open && !disabled} onOpenChange={setOpen}>
+      <PickerTrigger
+        id={id}
+        label={displayLabel || placeholder}
+        hasValue={Boolean(value)}
+        disabled={disabled}
+        clearable={clearable}
+        onClear={() => onChange("")}
+        className={className}
+      />
 
       <Popover.Portal>
-        <Popover.Content align="start" sideOffset={4} className={popoverContentClass}>
+        <Popover.Content aria-label="날짜와 시간 선택" align="start" sideOffset={4} className={popoverContentClass}>
           <CalendarGrid
             viewYear={viewYear}
             viewMonth={viewMonth}
@@ -504,6 +488,8 @@ export function DateTimePicker({
                 type="text"
                 inputMode="numeric"
                 placeholder="yyyy-mm-dd"
+                aria-label="날짜 직접 입력"
+                aria-invalid={Boolean(dateError)}
                 value={draftDate}
                 onChange={(e) => {
                   const next = e.target.value;
@@ -546,6 +532,7 @@ export function DateTimePicker({
               <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <input
                 type="time"
+                aria-label="시간"
                 value={draftTime}
                 onChange={(e) => handleTimeChange(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
@@ -555,7 +542,7 @@ export function DateTimePicker({
                 )}
               />
             </div>
-            <p className={cn("mt-1.5 text-[11px]", dateError ? "text-destructive" : "text-muted-foreground")}>
+            <p role={dateError ? "alert" : undefined} className={cn("mt-1.5 text-[11px]", dateError ? "text-destructive" : "text-muted-foreground")}>
               {dateError ?? "달력에서 고르거나 날짜를 직접 입력한 뒤 시간을 선택할 수 있습니다"}
             </p>
           </div>
