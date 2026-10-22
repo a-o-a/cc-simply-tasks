@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -261,6 +262,9 @@ export function Sidebar() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>이름 변경</DialogTitle>
+            <DialogDescription className="sr-only">
+              작업 기록에 사용할 표시 이름을 변경합니다.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleNameSubmit} className="space-y-4">
             <div className="space-y-2">

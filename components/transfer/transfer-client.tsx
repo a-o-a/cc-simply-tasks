@@ -159,7 +159,7 @@ function groupItems(items: WorkItemListItem[]): DateGroup[] {
 // ─── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 
 export function TransferClient() {
-  const today = React.useMemo(todayKst, []);
+  const [today] = React.useState(todayKst);
   const [cursor, setCursor] = React.useState(() => cursorFromDateStr(today));
 
   const [items, setItems] = React.useState<WorkItemListItem[]>([]);
@@ -463,12 +463,12 @@ function DateTable({
           {dateGroup.label}
         </h2>
         {dateGroup.isToday && (
-          <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          <span className="rounded-sm bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
             오늘
           </span>
         )}
         {dateGroup.isPast && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
             지난날
           </span>
         )}
@@ -478,7 +478,7 @@ function DateTable({
             {dateGroup.systems.map((sysCode) => (
               <span
                 key={sysCode}
-                className="inline-flex items-center rounded bg-foreground/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground/70"
+                className="inline-flex items-center rounded-sm bg-foreground/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground/70"
               >
                 {systemNameByCode[sysCode] ?? sysCode}
               </span>
@@ -507,7 +507,7 @@ function DateTable({
       </div>
 
       {/* 테이블 */}
-      <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+      <div className="overflow-x-auto rounded-lg border bg-card shadow-xs">
         <table className="w-full text-sm text-left">
           <thead className="border-b text-xs uppercase text-muted-foreground bg-muted/40">
             <tr>
@@ -557,7 +557,7 @@ function DateTable({
                     >
                       <div className="flex flex-wrap items-center gap-1.5">
                         {item.category && categoryNameByCode[item.category] && (
-                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                             {categoryNameByCode[item.category]}
                           </span>
                         )}
@@ -582,7 +582,7 @@ function DateTable({
                           {item.tickets.map((t) => (
                             <div
                               key={`${t.systemName}-${t.ticketNumber}`}
-                              className="flex w-fit flex-col rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground leading-tight"
+                              className="flex w-fit flex-col rounded-sm bg-muted px-2 py-1 text-[11px] text-muted-foreground leading-tight"
                             >
                               <span className="font-medium text-foreground/80">
                                 {systemNameByCode[t.systemName] ?? t.systemName}

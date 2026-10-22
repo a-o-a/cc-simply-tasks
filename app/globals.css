@@ -1,13 +1,54 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tailwind 4의 CSS 기반 설정. 실제 색상은 아래 라이트/다크 토큰을 참조합니다. */
+@theme inline {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-status-waiting: hsl(var(--status-waiting));
+  --color-status-in-progress: hsl(var(--status-in-progress));
+  --color-status-internal-test: hsl(var(--status-internal-test));
+  --color-status-business-test: hsl(var(--status-business-test));
+  --color-status-qa-test: hsl(var(--status-qa-test));
+  --color-status-transfer-ready: hsl(var(--status-transfer-ready));
+  --color-status-transferred: hsl(var(--status-transferred));
+  --color-status-holding: hsl(var(--status-holding));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple SD Gothic Neo",
+    "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
 
 /**
  * 디자인 토큰 — CSS 변수.
  *
  * 뉴트럴: zinc 계열 (HSL 값은 Tailwind zinc 팔레트 기준)
  * 강조:   blue-600
- * radius: 6px
+ * radius: 8px (lg), 6px (md), 4px (sm)
  *
  * 라이트/다크 모두 동일한 토큰 이름 → 컴포넌트는 모드 신경 안 써도 됨.
  */
@@ -130,6 +171,18 @@
   body {
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* v3에서 사용하던 버튼 커서와 입력 placeholder 대비를 유지합니다. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+    opacity: 1;
   }
 }
 

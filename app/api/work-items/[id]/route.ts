@@ -9,7 +9,7 @@ import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { workItemUpdateSchema } from "@/lib/validation/workItem";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 /**
  * GET /api/work-items/:id
@@ -17,8 +17,9 @@ type Params = { params: { id: string } };
  */
 export const GET = withErrorHandler(
   async (_req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
-    const row = await loadWorkItemDetail(params.id);
+    const row = await loadWorkItemDetail(routeParams.id);
     if (!row) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
     return NextResponse.json(row);
   },
@@ -31,6 +32,7 @@ export const GET = withErrorHandler(
  */
 export const PATCH = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = workItemUpdateSchema.parse(await req.json());
@@ -40,7 +42,7 @@ export const PATCH = withErrorHandler(
       const beforeRows = await tx
         .select()
         .from(workItems)
-        .where(and(eq(workItems.id, params.id), isNull(workItems.deletedAt)))
+        .where(and(eq(workItems.id, routeParams.id), isNull(workItems.deletedAt)))
         .limit(1);
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
@@ -68,19 +70,19 @@ export const PATCH = withErrorHandler(
           : {}),
         updatedAt,
       };
-      await tx.update(workItems).set(after).where(eq(workItems.id, params.id));
+      await tx.update(workItems).set(after).where(eq(workItems.id, routeParams.id));
 
       // tickets 배열이 전달된 경우: 기존 soft delete 후 전체 재생성
       if (input.tickets !== undefined) {
         await tx
           .update(workTickets)
           .set({ deletedAt: updatedAt, updatedAt })
-          .where(and(eq(workTickets.workItemId, params.id), isNull(workTickets.deletedAt)));
+          .where(and(eq(workTickets.workItemId, routeParams.id), isNull(workTickets.deletedAt)));
         if (input.tickets.length > 0) {
           await tx.insert(workTickets).values(
             input.tickets.map((ticket) => ({
               id: newId(),
-              workItemId: params.id,
+              workItemId: routeParams.id,
               systemName: ticket.systemName,
               ticketNumber: ticket.ticketNumber,
               createdAt: updatedAt,
@@ -112,6 +114,7 @@ export const PATCH = withErrorHandler(
  */
 export const DELETE = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const deletedAt = now();
@@ -120,13 +123,13 @@ export const DELETE = withErrorHandler(
       const beforeRows = await tx
         .select()
         .from(workItems)
-        .where(and(eq(workItems.id, params.id), isNull(workItems.deletedAt)))
+        .where(and(eq(workItems.id, routeParams.id), isNull(workItems.deletedAt)))
         .limit(1);
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
 
       const after = { ...before, updatedAt: deletedAt, deletedAt };
-      await tx.update(workItems).set(after).where(eq(workItems.id, params.id));
+      await tx.update(workItems).set(after).where(eq(workItems.id, routeParams.id));
       await withAudit(tx, {
         entityType: "WorkItem",
         entityId: after.id,

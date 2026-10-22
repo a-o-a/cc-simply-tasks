@@ -11,11 +11,12 @@ import {
   todoChecklistReorderSchema,
 } from "@/lib/validation/todo";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 /** POST — 체크리스트 항목 추가 */
 export const POST = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = todoChecklistCreateSchema.parse(await req.json());
@@ -25,14 +26,14 @@ export const POST = withErrorHandler(
       const parent = await tx
         .select({ id: todos.id })
         .from(todos)
-        .where(and(eq(todos.id, params.id), isNull(todos.deletedAt)))
+        .where(and(eq(todos.id, routeParams.id), isNull(todos.deletedAt)))
         .limit(1);
       if (!parent[0])
         throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
 
       const row = {
         id: newId(),
-        todoId: params.id,
+        todoId: routeParams.id,
         content: input.content,
         done: input.done ?? false,
         order: input.order ?? 0,
@@ -46,7 +47,7 @@ export const POST = withErrorHandler(
       await tx
         .update(todos)
         .set({ updatedAt: timestamp })
-        .where(eq(todos.id, params.id));
+        .where(eq(todos.id, routeParams.id));
       await withAudit(tx, {
         entityType: "TodoChecklist",
         entityId: row.id,
@@ -64,6 +65,7 @@ export const POST = withErrorHandler(
 /** PATCH — reorder (ids 배열 순서대로 order 0..N-1 재설정) */
 export const PATCH = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const { ids } = todoChecklistReorderSchema.parse(await req.json());
@@ -75,7 +77,7 @@ export const PATCH = withErrorHandler(
         .from(todoChecklist)
         .where(
           and(
-            eq(todoChecklist.todoId, params.id),
+            eq(todoChecklist.todoId, routeParams.id),
             isNull(todoChecklist.deletedAt),
             inArray(todoChecklist.id, ids),
           ),
@@ -103,7 +105,7 @@ export const PATCH = withErrorHandler(
       await tx
         .update(todos)
         .set({ updatedAt: timestamp })
-        .where(eq(todos.id, params.id));
+        .where(eq(todos.id, routeParams.id));
     });
 
     return new NextResponse(null, { status: 204 });

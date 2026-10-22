@@ -325,7 +325,7 @@ export function EventFormDialog({
                 type="checkbox"
                 checked={state.allDay}
                 onChange={(e) => update("allDay", e.target.checked)}
-                className="h-4 w-4 rounded border-input"
+                className="h-4 w-4 rounded-sm border-input"
               />
               종일 일정
             </label>

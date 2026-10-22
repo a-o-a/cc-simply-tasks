@@ -18,6 +18,7 @@ import { Select } from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -120,7 +121,7 @@ export function TodoDrawer({
 
   const checklistInputRefs = React.useRef(new Map<string, HTMLInputElement | null>());
   const [pendingFocusChecklistId, setPendingFocusChecklistId] = React.useState<string | null>(null);
-  const originalSnapshotRef = React.useRef<DraftSnapshot | null>(null);
+  const [originalSnapshot, setOriginalSnapshot] = React.useState<DraftSnapshot | null>(null);
 
   const buildSnapshot = React.useCallback((): DraftSnapshot => ({
     title,
@@ -148,10 +149,9 @@ export function TodoDrawer({
         checklist.length > 0,
       );
     }
-    const original = originalSnapshotRef.current;
-    if (!original) return false;
-    return JSON.stringify(buildSnapshot()) !== JSON.stringify(original);
-  }, [mode, title, note, status, assigneeId, dueDate, checklist, buildSnapshot]);
+    if (!originalSnapshot) return false;
+    return JSON.stringify(buildSnapshot()) !== JSON.stringify(originalSnapshot);
+  }, [mode, title, note, status, assigneeId, dueDate, checklist, buildSnapshot, originalSnapshot]);
 
   // open / mode / todoId 변화 시 상태 초기화
   React.useEffect(() => {
@@ -166,14 +166,14 @@ export function TodoDrawer({
       setAssigneeId(null);
       setDueDate("");
       setChecklist([]);
-      originalSnapshotRef.current = {
+      setOriginalSnapshot({
         title: "",
         note: "",
         status: "OPEN",
         assigneeId: null,
         dueDate: "",
         checklist: [],
-      };
+      });
       return;
     }
     if (todoId) {
@@ -194,14 +194,14 @@ export function TodoDrawer({
           setAssigneeId(data.assigneeId);
           setDueDate(data.dueDate ? toDateInputValue(data.dueDate) : "");
           setChecklist(nextChecklist);
-          originalSnapshotRef.current = {
+          setOriginalSnapshot({
             title: data.title,
             note: data.note ?? "",
             status: data.status,
             assigneeId: data.assigneeId,
             dueDate: data.dueDate ? toDateInputValue(data.dueDate) : "",
             checklist: nextChecklist,
-          };
+          });
         })
         .catch((err) => {
           toast({
@@ -220,7 +220,7 @@ export function TodoDrawer({
   }
 
   async function syncChecklist(todoId: string, nextChecklist: DraftChecklistItem[]) {
-    const originalChecklist = originalSnapshotRef.current?.checklist ?? [];
+    const originalChecklist = originalSnapshot?.checklist ?? [];
     const originalById = new Map(originalChecklist.map((item) => [item.id, item]));
     const nextIds = new Set(nextChecklist.map((item) => item.id));
 
@@ -323,14 +323,14 @@ export function TodoDrawer({
         setAssigneeId(fresh.assigneeId);
         setDueDate(fresh.dueDate ? toDateInputValue(fresh.dueDate) : "");
         setChecklist(nextChecklist);
-        originalSnapshotRef.current = {
+        setOriginalSnapshot({
           title: fresh.title,
           note: fresh.note ?? "",
           status: fresh.status,
           assigneeId: fresh.assigneeId,
           dueDate: fresh.dueDate ? toDateInputValue(fresh.dueDate) : "",
           checklist: nextChecklist,
-        };
+        });
       } else if (mode === "create") {
         onClose();
       }
@@ -454,6 +454,9 @@ export function TodoDrawer({
           <SheetTitle>
             {mode === "create" ? "새 TODO" : detail?.title || "TODO"}
           </SheetTitle>
+          <SheetDescription className="sr-only">
+            할 일의 제목, 담당자, 마감일과 체크리스트를 편집합니다.
+          </SheetDescription>
         </SheetHeader>
         <div
           className={cn(
@@ -550,7 +553,7 @@ export function TodoDrawer({
               </Button>
             </div>
             {checklist.length === 0 ? (
-              <p className="rounded border border-dashed py-6 text-center text-xs text-muted-foreground">
+              <p className="rounded-sm border border-dashed py-6 text-center text-xs text-muted-foreground">
                 아직 항목이 없습니다
               </p>
             ) : (
@@ -558,7 +561,7 @@ export function TodoDrawer({
                 {checklist.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-center gap-2 rounded border bg-background p-2"
+                    className="flex items-center gap-2 rounded-sm border bg-background p-2"
                   >
                     <input
                       type="checkbox"
@@ -566,7 +569,7 @@ export function TodoDrawer({
                       onChange={(e) =>
                         updateChecklistItem(item.id, { done: e.target.checked })
                       }
-                      className="h-4 w-4 cursor-pointer rounded border-input"
+                      className="h-4 w-4 cursor-pointer rounded-sm border-input"
                     />
                     <Input
                       ref={(node) => {
@@ -619,7 +622,7 @@ export function TodoDrawer({
                     <button
                       type="button"
                       onClick={() => removeChecklistItem(item.id)}
-                      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
+                      className="shrink-0 rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
                       aria-label="항목 삭제"
                     >
                       <Trash2 className="h-4 w-4" />

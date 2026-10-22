@@ -8,9 +8,10 @@ import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { workSystemUpdateSchema } from "@/lib/validation/workSystem";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Params) => {
+  const routeParams = await params;
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const input = workSystemUpdateSchema.parse(await req.json());
@@ -20,13 +21,13 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
     const beforeRows = await tx
       .select()
       .from(workSystems)
-      .where(and(eq(workSystems.id, params.id), isNull(workSystems.deletedAt)))
+      .where(and(eq(workSystems.id, routeParams.id), isNull(workSystems.deletedAt)))
       .limit(1);
     const before = beforeRows[0];
     if (!before) throw new HttpError("NOT_FOUND", "작업 시스템을 찾을 수 없습니다");
 
     const after = { ...before, ...input, updatedAt };
-    await tx.update(workSystems).set(after).where(eq(workSystems.id, params.id));
+    await tx.update(workSystems).set(after).where(eq(workSystems.id, routeParams.id));
     await withAudit(tx, {
       entityType: "WorkSystem",
       entityId: after.id,
@@ -42,6 +43,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
 });
 
 export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Params) => {
+  const routeParams = await params;
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const deletedAt = now();
@@ -50,13 +52,13 @@ export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Para
     const beforeRows = await tx
       .select()
       .from(workSystems)
-      .where(and(eq(workSystems.id, params.id), isNull(workSystems.deletedAt)))
+      .where(and(eq(workSystems.id, routeParams.id), isNull(workSystems.deletedAt)))
       .limit(1);
     const before = beforeRows[0];
     if (!before) throw new HttpError("NOT_FOUND", "작업 시스템을 찾을 수 없습니다");
 
     const after = { ...before, updatedAt: deletedAt, deletedAt };
-    await tx.update(workSystems).set(after).where(eq(workSystems.id, params.id));
+    await tx.update(workSystems).set(after).where(eq(workSystems.id, routeParams.id));
     await withAudit(tx, {
       entityType: "WorkSystem",
       entityId: after.id,

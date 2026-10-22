@@ -1,6 +1,19 @@
 # 작업 관리 시스템 - 타당성 분석 & 실행 계획
 
-> 리뷰 대상: Next.js 13.5 + Drizzle ORM + SQLite 기반 내부용 작업 관리 시스템에 대한 에이전트 리뷰 응답 (상태/감사로그/Gantt/캘린더 포함).
+> 이 문서는 2026년 4월의 기능 구현 계획·완료 이력을 보존합니다. 아래 과거 검증 기록은 2026년 10월 업그레이드의 검증 결과가 아닙니다. 현재 실행 방법은 [README](./README.md), 최종 업그레이드 결과는 [업그레이드 기록](./docs/UPGRADE_NODE22.md)을 따릅니다.
+
+## 현재 실행 기준 (2026-10-15)
+
+- Node 22.x를 개발·빌드·migration·운영에서 공통 사용하며 `.nvmrc`는 22입니다. 최소 버전은 `package.json`의 `engines`를 따릅니다.
+- Next 16.4.1, React 19.3.1, Tailwind 4.3.3, Zod 4.6.7을 사용합니다. TypeScript 6.0.3과 ESLint 9.39.5는 typescript-eslint/Next 플러그인과의 호환 범위를 고려한 선택입니다.
+- Tailwind 디자인 토큰은 `app/globals.css`의 `@theme inline`, PostCSS는 `@tailwindcss/postcss`, 애니메이션은 `tw-animate-css`로 관리합니다. `tailwind.config.ts`는 사용하지 않습니다.
+- Next의 동적 `params`는 Promise이며 API에서 `await`합니다. ESLint는 flat config와 CLI를 사용하고 `next lint`는 사용하지 않습니다.
+- 설치는 `npm ci`, 배포에서는 커밋된 migration의 `db:migrate`만 수행합니다. `db:generate`는 개발 스키마 변경 단계에서만 실행합니다. 기존 DB에 초기 템플릿을 덮어쓰지 않습니다.
+- 백업 다운로드와 저장 백업은 `VACUUM INTO` 스냅샷을 사용합니다. cron 등록·겹침 방지는 프로세스 내 범위입니다.
+- `npm run check`는 lint → typecheck → build → API smoke를 실행합니다. UI는 `npx playwright install chromium` 후 `npm run test:ui`로 별도 실행합니다. 현재 실행 결과는 최종 업그레이드 기록에서 확인합니다.
+- 과거 계획과 달리 현재 코드에는 `lib/optimisticLock.ts` 및 `If-Match` 검증이 없습니다. 동시 편집 보호는 후속 검토 사항입니다.
+
+공식 참고: [Next 16](https://nextjs.org/docs/app/guides/upgrading/version-16), [Tailwind 4](https://tailwindcss.com/docs/upgrade-guide), [Zod 4](https://zod.dev/v4/changelog), [Drizzle migration](https://orm.drizzle.team/docs/migrations).
 
 ---
 
@@ -13,7 +26,7 @@
 
 | 구분 | 항목 | 타당성 | 판단 |
 |---|---|---|---|
-| 🔴 | Node 16 → Node 18 LTS | **높음** | Node 16은 EOL. 강제 제약이 아니라면 18/20 즉시 상향. |
+| 🔴 | 실행 환경 상향 | **높음** | 과거 Node 16 제약은 해제. 현재 Node 22 공통 환경으로 갱신. |
 | 🔴 | Status enum 완결성 (TRANSFERRED/CANCELED) | **높음** | 종결 상태 없으면 "완료 필터"가 불가. 즉시 반영. |
 | 🔴 | 감사 로그 $transaction 강제 | **매우 높음** | 데이터 정합성 핵심. `withAudit()` 헬퍼로 반드시 강제. |
 | 🔴 | actor_ip/actor_name 추출 표준화 | **높음** | `x-forwarded-for` 파싱 + localStorage 강제 입력. |
@@ -30,7 +43,7 @@
 | 🟢 | CSV export / 대시보드 / 검색 | **중간** | 유용하지만 1차 범위 밖으로 미뤄도 OK. |
 
 ### 1.3 이견 / 범위 조정 권고
-- **Node 버전**: 사내 표준이 Node 16으로 고정돼 있다면 `engines` 명시만으로 충분. 아니라면 18 LTS.
+- **Node 버전**: 과거 사내 Node 16 고정 결정은 현재 적용하지 않음. Node 22와 `package.json`의 최소 버전을 사용.
 - **멀티롤 `TeamMember.roles`**: 1차는 단일 role로 가고, 조인 테이블(`member_roles`)은 2차. 리뷰 응답도 같은 결론.
 - **FTS5 검색**: 1차 제외. LIKE로 충분.
 - **Rate limit**: 내부망이면 생략.
@@ -48,8 +61,8 @@
 ## 2. 실행 계획
 
 ### Phase 0 — 프로젝트 부트스트랩 ✅ 완료
-- [x] Next.js 13.5.11 (app router) + TypeScript 5.2 strict + Drizzle ORM + SQLite
-- [x] `engines: { node: ">=16.14 <17" }` + `.nvmrc` (사내 Node 16 제약)
+- [x] 초기 구현 당시 Next.js 13.5.11 + TypeScript 5.2 strict + Drizzle ORM + SQLite (현재 버전은 상단 실행 기준 참고)
+- [x] 초기 구현 당시 Node 16용 engines와 `.nvmrc` 지정 (현재는 Node 22로 대체)
 - [x] `lib/db/schema.ts`, `DATABASE_URL` 환경변수 기반
 - [x] `db/dev.db` 로컬 DB 파일, `.env` 기반 설정
 - [x] `lib/db.ts` Drizzle + libsql 싱글톤
@@ -95,12 +108,12 @@
 - [x] `lib/diff.ts` — `computeDiff` + `diffToJsonStrings` (Date ISO 정규화 포함)
 - [x] `lib/http.ts` — `{ error: { code, message, details? } }` + `HttpError` + `withErrorHandler` (ZodError/SQLite unique/not-found 계열 매핑)
 - [x] `lib/pagination.ts` — cursor 기반, 기본 50 / 최대 200, `parsePagination` + `toPage`
-- [x] `lib/optimisticLock.ts` — `assertIfMatch(req, updatedAt)` 불일치 시 409 + serverUpdatedAt 반환
+- [ ] 과거 `lib/optimisticLock.ts` / `assertIfMatch` 계획은 현재 코드에 없음. 동시 편집 보호 재검토 필요
 - [x] `lib/validation/` — zod: `common`, `teamMember`, `workItem`, `workTicket`, `calendarEvent`
-- [x] `tsc --noEmit` + `next build` 통과
+- [x] `tsc --noEmit` + `next build` 당시 통과 (이번 업그레이드 결과 아님)
 
 ### Phase 3 — API 라우트 (app/api) ✅ 완료
-모든 write는 `$transaction` + `withAudit` + `getActorContext` 필수.
+모든 도메인 write는 `db.transaction` + `withAudit` + `getActorContext` 필수.
 개발 규칙: [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) 준수.
 레퍼런스 구현: `app/api/work-items/*`.
 
@@ -122,7 +135,7 @@
 - [x] **`settings`**
   - [x] GET / PATCH (service_name)
 - [x] **`backup`**
-  - [x] GET — SQLite DB 파일 다운로드
+  - [x] GET — SQLite 스냅샷 다운로드
 - [x] **`audit-logs`** (읽기 전용)
   - [x] GET: `?entityType&entityId&action&actorName&cursor&pageSize`
 
@@ -130,8 +143,8 @@
 디자인 결정: shadcn/ui + Tailwind, zinc 뉴트럴 + blue-600 강조, **다크모드 1차 포함**, WorkItem 목록은 **칸반/테이블 토글**.
 
 - [x] **Step 1 — 디자인 시스템 부트스트랩**
-  - [x] Tailwind 3.4 + PostCSS + shadcn 의존성 설치 (Node 16 호환 버전 핀)
-  - [x] `tailwind.config.ts` 디자인 토큰 (zinc + blue, status semantic)
+  - [x] 초기 Tailwind 3.4 + PostCSS + shadcn 설치 (현재 Tailwind 4로 대체)
+  - [x] 초기 `tailwind.config.ts` 디자인 토큰 (현재 `app/globals.css`의 `@theme inline`으로 이전)
   - [x] `app/globals.css` CSS 변수 (라이트/다크 모두)
   - [x] `lib/utils.ts` cn 헬퍼
   - [x] `components/theme-provider.tsx` (next-themes), `components/theme-toggle.tsx`
@@ -145,7 +158,7 @@
   - [x] `components/sidebar.tsx` — 240/64 collapsible, 라우트 활성 매칭, 액터 이름 표시/변경, 다크 토글
   - [x] `components/app-shell.tsx` — RootLayout(서버 컴포넌트)에서 children을 받아 사이드바/게이트/토스터로 감쌈
   - [x] 스텁 페이지: `/work-items`, `/calendar`, `/members`
-  - [x] `tsc --noEmit` / `next build` 통과
+  - [x] `tsc --noEmit` / `next build` 당시 통과 (이번 업그레이드 결과 아님)
 - [x] **Step 3 — 멤버 관리 페이지** (가장 단순, 패턴 검증)
   - [x] `lib/enum-labels.ts` — enum 값 → 한글 라벨 매핑 (소스 오브 트루스는 `lib/enums.ts`)
   - [x] `components/ui/select.tsx` — 네이티브 `<select>` 기반 (Radix Select 도입은 필요할 때 교체)
@@ -153,7 +166,7 @@
   - [x] 생성 + 수정 다이얼로그 (`MemberFormDialog`) — `If-Match: updatedAt` 자동 처리, 토스트 피드백
   - [x] 삭제 확인 다이얼로그 (`DeleteMemberDialog`) — soft delete + If-Match
   - [x] 낙관적 락 충돌(409) 처리 패턴: 토스트 + 자동 재로드
-  - [x] `tsc --noEmit` / `next build` 통과 (members 페이지 5.7kB)
+  - [x] `tsc --noEmit` / `next build` 당시 통과 (이전 빌드 측정값)
 - [x] **Step 4 — 작업 목록 (테이블 + 칸반 토글) + 필터 + 드로어 + 활동 탭**
   - [x] 프리미티브: `textarea`, `badge`, `sheet`(우측 드로어), `tabs`
   - [x] `lib/client/types.ts` — 도메인 타입 (서버 ORM 타입 직접 import 금지)
@@ -166,7 +179,7 @@
     - 활동: `/api/audit-logs?entityType=WorkItem&entityId=...` 타임라인
   - [x] `TableView` / `KanbanView` — 행/카드 클릭 → 드로어
   - [x] `WorkItemsClient` — 필터바 (status/assignee/category/priority/ticket), 보기 토글(localStorage), 빈상태/스켈레톤/에러
-  - [x] `tsc --noEmit` / `next build` 통과 (work-items 페이지 13.7 kB)
+  - [x] `tsc --noEmit` / `next build` 당시 통과 (이전 빌드 측정값)
 - [x] **Step 5 — Gantt 뷰** (담당자 그룹 + Unassigned)
   - [x] `components/work-items/gantt-view.tsx` — KST 자정 day 그리드, 1일 = 32px
   - [x] 작업 페이지의 3번째 보기로 통합 (테이블 / 칸반 / 간트 토글)
@@ -199,10 +212,10 @@
 
 - [x] **설정 페이지** (`/settings`) — 서비스명 / 멤버 / 코드관리(분류+시스템코드) / 백업 4탭
 - [x] **서비스명 동적화** — `Setting` 모델 DB 저장, 사이드바 실시간 반영
-- [x] **DB 백업** — `GET /api/backup` SQLite 파일 직접 다운로드
+- [x] **DB 백업** — `GET /api/backup` SQLite 스냅샷 다운로드
 - [x] **자동 백업** — `instrumentation.ts` + `node-cron` 기반 스케줄 백업
-  - `BACKUP_CRON` 환경변수로 cron 표현식 설정 (기본: `0 0 2 * * *`, 매일 02:00)
-  - `VACUUM INTO` 방식으로 안전한 스냅샷 생성 → `db/backup_YYYY-MM-DD.db`
+  - `BACKUP_CRON` 환경변수로 cron 표현식 설정 (기본: `0 0 2 * * *`, 서버 현지 시간 매일 02:00)
+  - `VACUUM INTO` 방식으로 안전한 스냅샷 생성 → DB 디렉터리의 `backup_YYYY-MM-DD_HH-mm-ss.db`
   - 7일 초과분 자동 삭제, 설정 > 백업 탭에서 파일 목록 조회 및 개별 다운로드
   - `POST /api/backup/trigger` 즉시 백업 실행 API
 - [x] **WorkSystem CRUD** — 티켓 시스템 코드 마스터
@@ -258,7 +271,7 @@
 ---
 
 ## 5. 확정된 결정사항
-1. **Node 버전**: **Node 16 고정** (사내 제약). `engines` 명시 + 의존성 버전을 16 호환으로 핀 고정.
+1. **Node 버전**: **Node 22.x 공통 환경**. 최소 버전은 `engines`를 따르고 lockfile로 설치 버전을 재현.
 2. **category**: **동적 관리**. `WorkCategory` 모델 + `/api/work-categories` CRUD. 설정 > 코드관리 탭에서 등록.
 3. **TeamMember 멀티롤**: **1차는 단일 role**. 멀티롤은 추후 조인 테이블로 확장.
 4. **CSV export**: **후속 작업** (Phase 6 또는 선택).
@@ -268,5 +281,8 @@
 - 대시보드(상태별 카운트, 오늘 이관 예정)는 이전 논의대로 **1차 포함** 유지 — 필요 없으면 알려주세요.
 - CSV export, 감사 로그 archive 정책은 Phase 5(폴리싱)로 이동.
 
-## 7. 남은 TBD
-- 없음 (1차 범위 확정 완료)
+## 7. 후속 검토
+
+- 현재 API의 동시 편집 보호 정책(`If-Match` 또는 다른 충돌 감지)
+- 다중 서버 운영이 필요할 때 SSE 공유 및 cron 실행 주체 분리
+- Postgres 이관과 감사 로그 보존 정책

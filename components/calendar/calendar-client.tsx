@@ -40,7 +40,7 @@ function cursorFromDateStr(dateStr: string): { year: number; month0: number } {
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────────
 
 export function CalendarClient() {
-  const today = React.useMemo(todayKst, []);
+  const [today] = React.useState(todayKst);
 
   const [cursor, setCursor] = React.useState(() => cursorFromDateStr(today));
   const [selectedDate, setSelectedDate] = React.useState(today);
@@ -322,10 +322,10 @@ export function CalendarClient() {
       {/* ── 드래그 오버레이 ── */}
       <DragOverlay dropAnimation={null}>
         {activeEvent ? (
-          <div className="pointer-events-none min-w-[8rem] rounded border bg-card px-2 py-1 text-xs font-medium opacity-90 shadow-lg">
+          <div className="pointer-events-none min-w-[8rem] rounded-sm border bg-card px-2 py-1 text-xs font-medium opacity-90 shadow-lg">
             <span
               className={cn(
-                "mr-1 rounded px-1 text-[9px] font-semibold",
+                "mr-1 rounded-sm px-1 text-[9px] font-semibold",
                 getCategoryBadge(activeEvent.category).className,
               )}
             >

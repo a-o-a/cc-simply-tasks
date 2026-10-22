@@ -12,9 +12,9 @@ export const revalidate = 0;
  */
 export const GET = async (
   _req: Request,
-  { params }: { params: { filename: string } }
+  { params }: { params: Promise<{ filename: string }> }
 ) => {
-  const { filename } = params;
+  const { filename } = await params;
 
   // 경로 탐색 공격 방지: 파일명만 허용
   if (!/^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.db$/.test(filename)) {
@@ -30,7 +30,7 @@ export const GET = async (
 
   const file = fs.readFileSync(filePath);
 
-  return new NextResponse(file, {
+  return new NextResponse(new Uint8Array(file), {
     status: 200,
     headers: {
       "Content-Type": "application/octet-stream",

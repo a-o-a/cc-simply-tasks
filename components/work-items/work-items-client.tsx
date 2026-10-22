@@ -620,7 +620,7 @@ function FilterBar({
 
   const chipCls = (active: boolean) =>
     cn(
-      "inline-flex items-center rounded px-2 py-1 text-xs transition-colors",
+      "inline-flex items-center rounded-sm px-2 py-1 text-xs transition-colors",
       active
         ? "bg-primary text-primary-foreground"
         : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -659,7 +659,7 @@ function FilterBar({
             </div>
           ) : (
             <div className="flex flex-wrap gap-1">
-              <button type="button" disabled className="inline-flex items-center rounded px-2 py-1 text-xs bg-primary text-primary-foreground">
+              <button type="button" disabled className="inline-flex items-center rounded-sm px-2 py-1 text-xs bg-primary text-primary-foreground">
                 {STATUS_LABELS.TRANSFERRED}
               </button>
             </div>
@@ -814,7 +814,7 @@ function SystemFilter({
           <button
             onClick={onClear}
             className={cn(
-              "flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition-colors hover:bg-accent",
+              "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-xs transition-colors hover:bg-accent",
               count === 0 ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground",
             )}
           >
@@ -830,7 +830,7 @@ function SystemFilter({
                 key={s.code}
                 onClick={() => onToggle(s.code)}
                 className={cn(
-                  "flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition-colors hover:bg-accent",
+                  "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-xs transition-colors hover:bg-accent",
                   selected ? "bg-primary/10 text-primary font-medium" : "text-foreground",
                 )}
               >

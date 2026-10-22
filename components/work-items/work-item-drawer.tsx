@@ -139,7 +139,7 @@ export function WorkItemDrawer({
               onEdit={() => onEdit(detail)}
               onRequestDelete={() => setConfirmDelete(true)}
             />
-          ) : null}
+          ) : <DrawerSkeleton />}
         </SheetContent>
       </Sheet>
 
@@ -191,6 +191,9 @@ function DrawerBody({
           <p className="text-xs text-muted-foreground">{categoryName}</p>
         )}
         <SheetTitle className="text-xl">{detail.title}</SheetTitle>
+        <SheetDescription className="sr-only">
+          작업 상세 정보와 변경 이력을 확인하고 수정합니다.
+        </SheetDescription>
       </SheetHeader>
 
       <div className="flex justify-end gap-2">
@@ -449,7 +452,7 @@ function ActivityPanel({ workItemId }: { workItemId: string }) {
             {log.actorName ?? "익명"}
           </div>
           {log.afterJson ? (
-            <pre className="mt-2 max-h-40 overflow-auto rounded bg-muted/40 p-2 text-[11px] leading-snug">
+            <pre className="mt-2 max-h-40 overflow-auto rounded-sm bg-muted/40 p-2 text-[11px] leading-snug">
               {prettyJson(log.afterJson)}
             </pre>
           ) : null}
@@ -477,13 +480,17 @@ function prettyJson(s: string): string {
 function DrawerSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-      <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
-      <div className="h-9 w-40 animate-pulse rounded bg-muted" />
+      <SheetHeader className="sr-only">
+        <SheetTitle>작업 불러오는 중</SheetTitle>
+        <SheetDescription>작업 상세 정보를 가져오고 있습니다.</SheetDescription>
+      </SheetHeader>
+      <div className="h-4 w-24 animate-pulse rounded-sm bg-muted" />
+      <div className="h-7 w-2/3 animate-pulse rounded-sm bg-muted" />
+      <div className="h-9 w-40 animate-pulse rounded-sm bg-muted" />
       <div className="space-y-2">
-        <div className="h-3 w-full animate-pulse rounded bg-muted" />
-        <div className="h-3 w-5/6 animate-pulse rounded bg-muted" />
-        <div className="h-3 w-4/6 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-full animate-pulse rounded-sm bg-muted" />
+        <div className="h-3 w-5/6 animate-pulse rounded-sm bg-muted" />
+        <div className="h-3 w-4/6 animate-pulse rounded-sm bg-muted" />
       </div>
     </div>
   );

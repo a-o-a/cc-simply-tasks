@@ -57,7 +57,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitive.Close
     ref={ref}
     className={cn(
-      "absolute right-1 top-1 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100",
+      "absolute right-1 top-1 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring group-hover:opacity-100",
       className,
     )}
     toast-close=""
@@ -93,7 +93,9 @@ const ToastDescription = React.forwardRef<
 ToastDescription.displayName = ToastPrimitive.Description.displayName;
 
 type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>;
-type ToastActionElement = React.ReactElement<typeof ToastPrimitive.Action>;
+type ToastActionElement = React.ReactElement<
+  React.ComponentPropsWithoutRef<typeof ToastPrimitive.Action>
+>;
 
 export {
   type ToastProps,

@@ -1,6 +1,6 @@
 # cc-simply-tasks
 
-내부용 작업(업무) 관리 시스템. Next.js 13.5 (app router) + Drizzle ORM + `@libsql/client` + SQLite(file) 기반이며, 이후 Postgres 이관을 염두에 둔 구조로 설계됨.
+내부용 작업(업무) 관리 시스템. Next.js 16 (App Router) + Drizzle ORM + `@libsql/client` + SQLite(file) 기반이며, 이후 Postgres 이관을 염두에 둔 구조로 설계됨.
 
 ## 목적
 
@@ -14,18 +14,21 @@
 
 | 항목 | 버전 / 선택 | 비고 |
 |---|---|---|
-| Node.js | **16 고정** | 사내 제약. `.nvmrc` / `engines` 명시 |
-| Next.js | 13.5.11 | 13.5 라인 최신. Node 16.14+ 지원 |
-| React | 18.2.0 | |
-| TypeScript | 5.2.x strict | |
-| Drizzle ORM | 0.44.x | 별도 ORM 엔진 다운로드 없이 npm 기반으로 동작 |
-| SQLite Driver | `@libsql/client` | `better-sqlite3`/`node-gyp` 없이 Node 16에서 설치 가능 |
-| DB (1차) | SQLite (file) | `DATABASE_URL=file:...` 경로 사용 |
-| DB (이후) | Postgres | `DATABASE_URL` 교체 가능하게 raw SQL 금지 |
-| 검증 | zod 3.23 | |
-| UI | Tailwind 3.4 + shadcn/ui (Radix) | zinc 뉴트럴 + blue-600 강조, 다크모드 |
-| 테마 | next-themes 0.2 | system / light / dark |
-| 아이콘 | lucide-react | |
+| Node.js | **22.13.0 이상**, 개발·운영 권장 22.x | `.nvmrc`는 22, 설치·빌드·마이그레이션에 같은 Node 사용 |
+| Next.js / React | 16.4.1 / 19.3.1 | App Router, 동적 API `params`는 Promise |
+| TypeScript | 6.0.3 strict | typescript-eslint 호환 범위에 맞춘 버전 |
+| ESLint | 9.39.5 | Next 플러그인 호환 버전, `eslint.config.mjs` flat config |
+| Drizzle ORM / Kit | 0.45.4 / 0.31.11 | 커밋된 SQL migration 적용 |
+| SQLite Driver | `@libsql/client` 0.18.0 | Node용 드라이버, 네이티브 패키지는 서버 번들 외부화 |
+| DB | SQLite (file) | `DATABASE_URL=file:...`; Postgres 전환은 별도 dialect·스키마 작업 필요 |
+| 검증 | Zod 4.6.7 | `flattenError`, `z.iso.datetime` 사용 |
+| UI | Tailwind CSS 4.3.3 + Radix | CSS-first 설정, `@tailwindcss/postcss`, `tw-animate-css` |
+| 테마 / 아이콘 | next-themes 0.4.6 / lucide-react 1.57.0 | system / light / dark |
+| 자동 백업 | node-cron 4.6.0 | 서버 프로세스 내 스케줄 |
+
+정확한 설치 버전은 [`package.json`](./package.json)과 [`package-lock.json`](./package-lock.json)을 기준으로 합니다. TypeScript 7 및 ESLint 10은 현재 사용 중인 린트 도구·플러그인 호환 범위 때문에 채택하지 않습니다.
+
+Tailwind 4 기준 지원 브라우저는 Safari 16.4+, Chrome 111+, Firefox 128+입니다. 디자인 토큰은 `app/globals.css`의 `@theme inline`에 있으며 `tailwind.config.ts`는 사용하지 않습니다. [Tailwind 업그레이드 가이드](https://tailwindcss.com/docs/upgrade-guide)
 
 ## 디렉터리 구조 (현재)
 
@@ -43,7 +46,7 @@
 │   └── api/
 │       ├── work-items/          # 레퍼런스 구현
 │       │   ├── route.ts         # GET(list+필터+범위), POST(+tickets)
-│       │   └── [id]/route.ts    # GET, PATCH(If-Match, tickets 전체대체), DELETE(soft)
+│       │   └── [id]/route.ts    # GET, PATCH(tickets 전체대체), DELETE(soft)
 │       ├── team-members/
 │       │   ├── route.ts         # GET(list), POST
 │       │   └── [id]/route.ts    # GET, PATCH, DELETE
@@ -63,7 +66,7 @@
 │       │   ├── count/route.ts   # GET — TODO 카운트
 │       │   ├── [id]/route.ts    # GET, PATCH, DELETE
 │       │   └── [id]/checklist/  # POST(add), PATCH(reorder), [itemId]/PATCH/DELETE
-│       ├── backup/route.ts      # GET — SQLite DB 파일 다운로드
+│       ├── backup/route.ts      # GET — SQLite 스냅샷 다운로드
 │       ├── db-stats/route.ts    # GET — 테이블별 레코드 수
 │       └── audit-logs/
 │           └── route.ts         # GET(read-only, ?entityType&entityId 등)
@@ -76,8 +79,7 @@
 │   ├── theme-provider.tsx / theme-toggle.tsx
 │   ├── ui/
 │   │   ├── button/input/label/select/textarea/badge/dialog/sheet/tabs/toast
-│   │   ├── date-picker.tsx      # DatePicker (yyyy-MM-dd) + DateTimePicker (yyyy-MM-ddTHH:mm)
-│   │   └── popover.tsx          # Radix Popover
+│   │   └── date-picker.tsx      # Radix Popover 기반 DatePicker / DateTimePicker
 │   ├── work-items/
 │   │   ├── work-items-client.tsx  # 진행/이관완료 scope + 뷰토글 + 필터 + 이관완료 페이지네이션
 │   │   ├── table-view.tsx
@@ -101,7 +103,7 @@
 │   └── (members-client.tsx → app/members/ 아래)
 ├── lib/
 │   ├── client/
-│   │   ├── api.ts               # fetch wrapper (If-Match, x-actor-name, SERVICE_NAME_STORAGE_KEY)
+│   │   ├── api.ts               # fetch wrapper (x-actor-name, SERVICE_NAME_STORAGE_KEY)
 │   │   ├── use-toast.ts
 │   │   ├── types.ts             # 클라이언트용 도메인 타입 (WorkCategory, WorkSystem, AppSettings 포함)
 │   │   ├── format.ts            # KST 날짜/시간 포맷 — formatDate(yyyy-mm-dd) / formatDateTime(yyyy-mm-dd hh:mm:ss)
@@ -116,7 +118,6 @@
 │   ├── enum-labels.ts           # enum → 한글 라벨 (표시 전용, CATEGORY_LABELS 제거됨)
 │   ├── time.ts / actor.ts / diff.ts / audit.ts / http.ts
 │   ├── pagination.ts            # cursor 기반 (기본 50, 최대 200)
-│   ├── optimisticLock.ts
 │   ├── utils.ts
 │   └── validation/
 │       ├── common.ts / teamMember.ts / workTicket.ts / calendarEvent.ts
@@ -124,10 +125,11 @@
 │       ├── workSystem.ts
 │       └── workCategory.ts
 ├── db/
-│   └── dev.db                   # 개발 SQLite DB 파일
+│   ├── dev.db.clean             # 최초 실행용 빈 DB 템플릿
+│   └── dev.db                   # 로컬 개발 DB (덮어쓰기 금지)
 ├── docs/
 │   └── DEVELOPMENT.md           # 개발 가이드 (API 패턴, 컨벤션)
-├── .nvmrc                       # node 16
+├── .nvmrc                       # Node 22
 ├── package.json
 ├── tsconfig.json
 ├── next.config.js
@@ -141,177 +143,127 @@
 
 ## 개발 시작
 
+Node 22.x에서 개발·빌드·마이그레이션을 모두 수행합니다. 기존 `.env`와 DB 파일이 있으면 그대로 사용합니다. 아래는 기본 DB 경로용 예제이며, 다른 경로를 쓴다면 migration 명령에도 같은 `DATABASE_URL` 환경변수를 명시하세요.
+
 ```bash
-# Node 16 사용 (nvm 설치 권장)
-nvm use                 # .nvmrc 따름
+nvm install 22
+nvm use
+npm ci
 
-# .env 파일 생성
-cat > .env <<'EOF'
-DATABASE_URL="file:./db/dev.db"
-EOF
+# .env가 없을 때만 기본값 생성
+node -e "const fs=require('node:fs'); if (fs.existsSync('.env') === false) fs.writeFileSync('.env', 'DATABASE_URL=file:./db/dev.db\n', {flag:'wx'});"
 
-# 새 DB가 필요하면 기본 스키마 파일을 복사해서 시작
-cp db/dev.db.clean db/dev.db
+# DB가 없을 때만 템플릿 복사. COPYFILE_EXCL로 기존 파일 덮어쓰기 방지
+node -e "const fs=require('node:fs'); if (fs.existsSync('db/dev.db') === false) fs.copyFileSync('db/dev.db.clean', 'db/dev.db', fs.constants.COPYFILE_EXCL);"
 
-npm install
+npm run db:migrate
 npm run dev
 ```
 
-### 설치 메모
+`npm ci`는 lockfile의 버전을 재현합니다. 의존성을 의도적으로 변경할 때만 `npm install <패키지>@<버전>`을 사용하고 `package.json`과 lockfile을 함께 커밋합니다. [npm ci 문서](https://docs.npmjs.com/cli/v11/commands/npm-ci/)
 
-- 현재 런타임은 `@libsql/client` 기반이라 별도 ORM 엔진 바이너리를 내려받지 않습니다.
-- `better-sqlite3`처럼 `node-gyp`, Python, Node headers 다운로드에 의존하지 않는 방향입니다.
-- 따라서 Windows / Linux / macOS에서 공통적으로 `npm install`만으로 설치 가능한 구성을 목표로 유지합니다.
+로컬 SQLite는 플랫폼별 네이티브 패키지를 포함합니다. 설치 서버의 OS·아키텍처와 맞는 패키지가 필요하므로 다른 플랫폼의 `node_modules`를 복사하지 마세요. libsql은 `next.config.js`의 `serverExternalPackages`로 외부화합니다.
 
-## 빌드 및 배포 가이드
+## 빌드 및 배포
 
-### 핵심 원칙
-
-- 운영에서는 **앱 배포 디렉터리와 SQLite DB 파일 경로를 분리**하는 것을 권장합니다.
-- 현재 개발 기본값은 `.env`의 `DATABASE_URL="file:./db/dev.db"`이며, 실제 파일은 프로젝트 루트의 `db/dev.db`입니다.
-- 이 값을 운영에서도 그대로 쓰면 배포 과정에서 프로젝트 디렉터리를 통째로 교체할 때 DB가 함께 유실될 수 있습니다.
-- 따라서 운영에서는 예를 들어 `DATABASE_URL="file:/var/lib/cc-simply-tasks/dev.db"`처럼 **배포 산출물 바깥의 영속 경로**를 사용하세요.
-
-### 권장 디렉터리 예시
+운영 DB는 앱 배포 디렉터리 밖의 영속 경로에 둡니다. DB와 같은 디렉터리에 WAL/SHM 및 저장 백업이 생성될 수 있으므로 파일 하나가 아닌 디렉터리 전체의 쓰기 권한과 영속성을 확보합니다.
 
 ```text
 /srv/cc-simply-tasks/
-├── current/                  # 현재 서비스 중인 앱
-├── releases/2026-04-14/      # 배포 버전별 코드
+├── current/                  # 앱 코드와 빌드
 └── shared/
-    ├── .env.production
-    └── dev.db                # 운영 DB (영속 파일)
+    └── dev.db                # 영속 운영 DB
 ```
 
-예시 `.env.production`:
+최초 배포와 업데이트 모두 **저장소에 커밋된 migration만 적용**합니다. `db:generate`는 개발자가 스키마를 변경할 때 실행하는 명령이며 배포 중에는 실행하지 않습니다.
 
 ```bash
-DATABASE_URL="file:/srv/cc-simply-tasks/shared/dev.db"
-NODE_ENV=production
-```
+nvm use
+npm ci
 
-### 첫 배포
+# 앱 프로세스와 migration 명령에 같은 값을 전달
+export DATABASE_URL="file:/srv/cc-simply-tasks/shared/dev.db"
 
-운영 DB 파일이 아직 없는 최초 배포라면, **빌드 전에 스키마를 먼저 생성**해야 합니다.
-
-```bash
-# 1) 서버에 코드 배치
-npm install
-
-# 2) 마이그레이션 파일 생성
-npm run db:generate
-
-# 3) DB 생성 + migration 적용
+# 최초 배포는 상위 영속 디렉터리를 먼저 생성하고 서비스 계정 쓰기 권한 부여
+# 기존 서비스 업데이트라면 백업 후 쓰기 요청/앱 프로세스를 중지
 npm run db:migrate
-
-# 4) 빌드
 npm run build
-
-# 5) 실행
 npm run start
 ```
 
-주의:
-- `db:generate`, `db:migrate`로 SQLite DB 파일을 처음 만드는 단계는 **Node 16에서 동작하지 않을 수 있습니다.**
-- 따라서 **DB 생성/마이그레이션 작업은 Node 18+ 환경에서 실행**하는 것을 권장합니다.
-- 앱 런타임 자체는 현재 `package.json`의 `engines` 기준대로 **Node 16**을 사용합니다.
+`drizzle.config.ts`는 프로세스의 `DATABASE_URL`을 읽습니다. Next가 읽는 `.env.production`이 migration CLI에도 자동으로 적용된다고 가정하지 말고, 배포 환경이나 위 예제처럼 명시적으로 전달하세요. 앱은 기본 3000 포트로 시작하며, 운영에서는 프로세스 관리자와 reverse proxy를 사용합니다.
 
-기본적으로 Next.js는 `3000` 포트를 사용하므로, 실제 운영에서는 보통 reverse proxy(Nginx 등) 뒤에서 실행합니다.
+기존 운영 DB를 `db/dev.db.clean`으로 덮어쓰거나 배포 디렉터리와 함께 삭제하지 마세요. 기존 DB를 변경하는 migration은 백업과 복원 절차를 확인한 뒤 적용합니다. [Drizzle migration 문서](https://orm.drizzle.team/docs/migrations)
 
-### 배포 업데이트
-
-```bash
-# 새 코드 반영
-npm install
-npm run build
-```
-
-그 다음 앱 프로세스를 재시작합니다. 이때 **DB 파일이 배포 디렉터리 밖의 영속 경로에 있으면 덮어씌워지지 않습니다.**
-
-### 절대 하지 말아야 할 것
-
-- 운영 DB를 프로젝트 폴더 안의 `db/dev.db`에 두고 배포 디렉터리를 통째로 교체
-- 백업 없이 운영 DB 파일을 수동 덮어쓰기
-
-DB 파일은 `/var/lib/...`, `/srv/.../shared/...` 같은 배포 산출물 바깥의 영속 경로에 두는 편이 안전합니다.
-
-## 스크립트
+## 스크립트와 검증
 
 | 스크립트 | 설명 |
 |---|---|
 | `npm run dev` | 개발 서버 |
 | `npm run build` | 프로덕션 빌드 |
-| `npm run start` | 프로덕션 서버 |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run db:generate` | Drizzle migration 파일 생성 |
-| `npm run db:migrate` | Drizzle migration 적용 |
+| `npm run start` | 빌드된 프로덕션 서버 |
+| `npm run lint` | flat config 기반 `eslint . --max-warnings=0` |
+| `npm run typecheck` | `next typegen` 후 `tsc --noEmit` |
+| `npm run test:smoke` | Node 테스트 러너로 API·DB·백업 검증 |
+| `npm run test:ui` | Playwright Chromium으로 UI 검증 (별도 실행) |
+| `npm run check` | lint → typecheck → build → smoke 순서 실행 |
+| `npm run db:generate` | 개발 스키마 변경에서 migration SQL 생성 |
+| `npm run db:migrate` | 커밋된 migration 적용 |
 
-## 스키마 변경 & 마이그레이션
+Next 16에서는 `next lint`를 사용하지 않습니다. React Compiler는 켜지 않으며, 기존 비동기 데이터 로딩·폼 초기화 패턴을 유지하기 위해 `react-hooks/set-state-in-effect`만 비활성화합니다. `rules-of-hooks`, `exhaustive-deps` 및 나머지 규칙은 유지합니다. [Next 16 업그레이드 가이드](https://nextjs.org/docs/app/guides/upgrading/version-16)
 
-### 컬럼/테이블 추가·변경 절차
+```bash
+npm run check
 
-1. `lib/db/schema.ts` 수정
-2. **개발 서버 중지** (SQLite는 파일 락 — 서버가 살아있으면 마이그레이션 실패)
-3. 마이그레이션 생성 & DB 적용:
+# UI 검증은 Chromium 설치 후 별도로 실행
+npx playwright install chromium
+npm run test:ui
+```
+
+API/UI 테스트는 빌드 결과를 사용해 임시 DB와 별도 서버를 생성합니다. `test:smoke` 또는 `test:ui`만 직접 실행할 때는 먼저 `npm run build`를 실행하세요. 테스트 스크립트는 기존 개발·운영 DB를 대상으로 사용하지 않습니다. 이 절은 실행 방법이며 검증 통과 기록은 아닙니다. [Playwright 브라우저 설치](https://playwright.dev/docs/browsers)
+
+## 스키마 변경과 마이그레이션
+
+1. 개발 환경에서 `lib/db/schema.ts`를 수정합니다.
+2. 대상 DB를 백업하고 해당 DB에 쓰는 서버를 중지합니다.
+3. 같은 Node 22 환경에서 migration을 생성하고 SQL을 검토한 뒤 적용합니다.
+
    ```bash
    npm run db:generate
    npm run db:migrate
    ```
-4. `npm run dev` 재시작
 
-스키마가 변경되어 migration을 추가했다면, 새 사용자가 바로 시작할 수 있도록 깨끗한 기본 DB 파일(`db/dev.db.clean`)도 같은 migration 기준으로 다시 생성해 커밋합니다.
+4. `drizzle/` SQL·메타데이터와 스키마를 함께 커밋합니다. `db/dev.db.clean`은 별도의 새 빈 DB에 migration을 적용해 갱신하며, 기존 개인 DB를 템플릿으로 복사하지 않습니다.
+5. `npm run check`와 필요한 UI 검증 후 서버를 재시작합니다.
 
-### 자주 겪는 오류
-
-| 오류 | 원인 | 해결 |
-|---|---|---|
-| `The column X does not exist in the current database` | 스키마에는 컬럼이 있는데 마이그레이션 미적용 | `npm run db:migrate` 실행 |
-| `database is locked` | 개발 서버가 DB 파일을 점유 중 | 서버 중지 후 재시도 |
-| 타입 불일치 | 스키마/쿼리 변경 후 타입체크 미실행 | `npm run typecheck` 실행 |
-| `no such table` during `npm run build` | `.env.production`이 빈 SQLite 파일을 가리킨 상태에서 정적 생성 중 API가 호출됨 | 빌드용 DB를 미리 준비하거나, 생산용 `DATABASE_URL`을 실제 스키마가 있는 파일로 지정 |
-
-### Drizzle 명령 역할 정리
-
-| 명령 | 역할 | DB 변경 |
-|---|---|---|
-| `npm run db:generate` | Drizzle 스키마 기준 migration SQL 생성 | 파일 생성 |
-| `npm run db:migrate` | 생성된 migration 적용, DB 파일이 없으면 생성까지 수행 | 있음 |
-
-> 참고: `db:migrate`로 DB 파일을 처음 생성하는 작업은 Node 16 환경에서 실패할 수 있어, 가능하면 Node 18+에서 실행하세요.
+`database is locked`는 다른 연결이나 프로세스의 쓰기 경합을 확인하고 재시도합니다. `no such table` 또는 `no such column`은 실제 `DATABASE_URL`과 적용된 migration 이력을 먼저 확인합니다. ORM 스키마 파일을 수정하는 것만으로 DB 파일의 스키마는 바뀌지 않습니다.
 
 ## 백업 및 복구
 
-### 백업
+설정 → **백업** 탭에서 즉시 다운로드하거나 서버에 저장된 백업을 관리합니다.
 
-설정 페이지 → **백업** 탭에서 SQLite DB 파일을 직접 다운로드.
+- `GET /api/backup`: `VACUUM INTO`로 임시 스냅샷을 만든 뒤 다운로드합니다. WAL에 남은 커밋을 포함하며 임시 파일은 요청 처리 후 정리합니다.
+- `POST /api/backup/trigger`: DB와 같은 디렉터리에 `backup_YYYY-MM-DD_HH-mm-ss.db`를 저장합니다.
+- `GET /api/backup/files`: 저장 백업 목록을 조회합니다. 파일명 경로로 개별 다운로드할 수 있습니다.
+- `instrumentation.ts`: Node 서버 시작 시 cron을 등록합니다. `BACKUP_CRON` 기본값은 `0 0 2 * * *`이며 **서버 현지 시간 매일 02:00**입니다. 같은 프로세스에서 중복 등록과 실행 겹침을 방지하고, 저장 백업 생성 후 7일 이전 파일을 정리합니다.
 
-또는 API 직접 호출:
+프로세스가 종료되면 자동 백업도 실행되지 않습니다. 여러 서버/워커의 중복 실행은 현재 프로세스 내 가드로 막을 수 없으므로 단일 백업 실행 주체를 유지하세요. [node-cron 스케줄 옵션](https://nodecron.com/scheduling-options.html)
+
 ```bash
-curl -O http://localhost:3000/api/backup
+curl --fail --output backup.db http://localhost:3000/api/backup
 ```
 
-### 복구
-
-1. 백업 파일(`dev.db`)을 `db/dev.db`에 덮어씁니다.
-2. 서버를 재시작합니다:
-   ```bash
-   npm run dev
-   ```
-
-> **주의**: 기존 데이터가 모두 덮어씌워지므로 복구 전 현재 DB를 별도 보관하세요.
->
-> 운영 환경에서는 `db/dev.db` 대신 `DATABASE_URL`이 가리키는 **영속 DB 파일 경로**에 복구해야 합니다.
+복구할 때는 서버와 DB 연결을 모두 종료하고 현재 DB 및 남아 있는 `-wal`/`-shm` 파일을 별도 보관합니다. 백업의 `PRAGMA integrity_check` 결과를 확인한 후 `DATABASE_URL`이 가리키는 파일로 복원하고, 이전 DB의 WAL/SHM 파일을 복원된 DB와 섞어 사용하지 않습니다. 서버를 재시작한 뒤 주요 목록과 최근 데이터를 확인하세요. DB 본파일만 실행 중에 복사하면 WAL의 최신 데이터가 누락될 수 있습니다. [SQLite 백업 문서](https://www.sqlite.org/backup.html)
 
 ## Phase 진행 상황
 
-> 전체 계획은 [`PLAN.md`](./PLAN.md) 참고.
+> 기존 기능 구현 이력입니다. 전체 계획은 [`PLAN.md`](./PLAN.md)를 참고하며 현재 업그레이드 검증 결과와 구분합니다.
 
 | Phase | 내용 | 상태 |
 |---|---|---|
 | **0** | 프로젝트 부트스트랩 (Next.js + SQLite + TS) | ✅ 완료 |
 | **1** | 도메인 스키마 확정 (현재는 Drizzle 스키마 기준) | ✅ 완료 |
-| **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, optimistic lock, DB bootstrap) | ✅ 완료 |
+| **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, DB bootstrap) | ✅ 완료 |
 | **3** | API 라우트 (team-members, work-items, calendar-events, audit-logs 등) | ✅ 완료 |
 | **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더 + 대시보드) | ✅ 완료 |
 | **4+** | 캘린더 개선 (주 보기, 드래그 이동, 팀원 필터, 카테고리 정리, 다중 담당자) | ✅ 완료 |
@@ -325,15 +277,15 @@ curl -O http://localhost:3000/api/backup
 
 ## 핸드오프 메모 (다음 에이전트용)
 
-### 현재 상태 (2026-04-14)
+### 현재 기준 (2026-10-15)
 
-Phase 0–5++ 완료. 현재 작업 브랜치에는 작업 요청 정보 필드와 시스템 연동 단순화가 반영되어 있음.
+Node 22 / Next 16 / React 19 / Tailwind 4 / Zod 4로 실행 기준을 갱신했습니다. 아래 Phase 완료 내역은 기존 기능 구현 이력이며 이번 업그레이드의 검증 통과를 뜻하지 않습니다. 업그레이드 상세와 최종 검증 기록은 [`docs/UPGRADE_NODE22.md`](./docs/UPGRADE_NODE22.md)를 참고하세요.
 
 ### 알아야 할 결정사항
 
 | 사항 | 내용 |
 |---|---|
-| Node 버전 | **16 고정** (사내 제약). 로컬에서 Node 23 사용해도 동작하나 프로덕션은 16. |
+| Node 버전 | 개발·빌드·migration·운영에 Node 22.x 사용. 최소 버전은 `package.json`의 engines 기준. |
 | enum 컬럼 | SQLite 미지원 → String 저장. `lib/enums.ts`가 유일한 소스 오브 트루스. |
 | Status 8종 | `WAITING / IN_PROGRESS / INTERNAL_TEST / BUSINESS_TEST / QA_TEST / TRANSFER_READY / TRANSFERRED / HOLDING` |
 | 작업 분류(category) | **동적**. `WorkCategory` 모델 → `/api/work-categories` CRUD. 설정 페이지 코드관리 탭에서 관리. |
@@ -341,7 +293,7 @@ Phase 0–5++ 완료. 현재 작업 브랜치에는 작업 요청 정보 필드�
 | 작업 목록 | `진행 작업 / 이관 완료` 2개 scope. 진행 작업은 테이블/칸반/간트, 이관 완료는 테이블 전용(칸반/간트 비활성). |
 | 시스템 연동 | WorkTicket은 시스템 선택만으로 저장 가능, 티켓번호는 선택 입력. |
 | 날짜/시간 | 저장: UTC ISO. 표시: KST. all-day 이벤트는 반열림 `[start, end)` 구간. |
-| 낙관적 락 | PATCH/DELETE 전에 If-Match 헤더 필수 (이전 GET의 `updatedAt`). 409 충돌 시 토스트 + 자동 재로드. |
+| 동시 편집 | 현재 API는 `If-Match` 검증을 하지 않음. 409는 유니크 제약 등 충돌 응답이며 동시 편집 보호는 후속 과제. |
 | SQLite 경로 | 현재 기본값은 `DATABASE_URL="file:./db/dev.db"`. |
 | 감사 로그 | 모든 write는 transaction + `withAudit(tx, ...)` 패턴 필수. |
 | 설정 탭 구조 | 서비스 / 멤버 / 코드관리(분류+시스템 코드) / 백업 4탭. |
@@ -414,7 +366,7 @@ Phase 0–5++ 완료. 현재 작업 브랜치에는 작업 요청 정보 필드�
 
 - **설정 페이지** (`/settings`) — 4탭: 서비스명 관리 · 멤버 · 코드관리(분류+시스템코드) · 백업
 - **서비스명 동적화** — `Setting` 모델 DB 저장, 사이드바 헤더 실시간 반영 (`settings-changed` CustomEvent)
-- **DB 백업** — `GET /api/backup` → SQLite 파일 직접 다운로드
+- **DB 백업** — `GET /api/backup` → SQLite 스냅샷 다운로드
 - **WorkSystem CRUD** — 티켓 등록 시 선택 가능한 시스템 코드 마스터 (`/api/work-systems`)
 - **WorkCategory CRUD** — 작업 분류 동적 관리 (`/api/work-categories`), CATEGORIES enum 완전 제거
 - **Status 8종 개편** — 대기/진행중/내부테스트/현업테스트/QA테스트/이관대기/이관완료/홀딩. CSS 변수 전면 교체.
@@ -450,17 +402,17 @@ Phase 0–5++ 완료. 현재 작업 브랜치에는 작업 요청 정보 필드�
 
 ---
 
-## 알려진 리스크 / 이슈
+## 운영 제약
 
-- **Next.js 13.5.x 잔존 보안 advisory (high 4건)**: Next 14/15/16에서 패치됐으나 Node 16 제약과 충돌. 내부망 한정으로 리스크 감내.
-- **minimatch (transitive)**: ReDoS 관련, 빌드 타임 dev 의존성. 런타임 미사용.
-- 로컬 Node 버전이 23인 경우 `EBADENGINE` 경고 발생 — 동작에는 영향 없음.
+- 내부망용이며 인증·권한 검증은 제공하지 않습니다. 외부 공개 전 별도 접근 제어가 필요합니다.
+- SQLite, 캘린더 SSE, cron은 현재 단일 서버 프로세스 운영을 기준으로 합니다.
+- 보안 점검은 설치된 lockfile과 실행 시점의 advisory로 판단합니다. `npm audit` 및 의존성별 공식 공지를 확인하며 과거 취약점 건수를 현재 상태로 재사용하지 않습니다.
 
 ## 설계 원칙 (요약)
 
-- **모든 write는 `$transaction` + `withAudit()`** 로 감사 로그와 묶음
+- **모든 도메인 write는 `db.transaction` + `withAudit()`** 로 감사 로그와 묶음
 - **Soft delete** (`deletedAt`) — 인증 없는 환경에서 복구 수단 확보
-- **낙관적 락** (`If-Match: updatedAt`) — 동시 편집 충돌 방어
+- **동시 편집 보호는 후속 과제** — 현재 API는 If-Match 헤더를 검증하지 않음
 - **시간 저장은 UTC, 표시는 `Asia/Seoul`** — 한 곳(`lib/time.ts`)에서 관리
 - **cursor 기반 페이지네이션** — 기본 50, 최대 200
-- **Postgres 이관 대비**: `id`는 cuid, JSON은 문자열로 저장, raw SQL 금지
+- **Postgres 이관 대비**: `id`는 cuid2, JSON은 문자열로 저장; SQLite 전용 구문은 DB·백업 계층에 한정

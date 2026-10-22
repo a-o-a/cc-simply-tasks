@@ -10,15 +10,16 @@ import { withAudit } from "@/lib/audit";
 import { emitCalendarChanged } from "@/lib/calendar-bus";
 import { calendarEventUpdateSchema } from "@/lib/validation/calendarEvent";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 /**
  * GET /api/calendar-events/:id
  */
 export const GET = withErrorHandler(
   async (_req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
-    const row = await loadCalendarEventDetail(params.id);
+    const row = await loadCalendarEventDetail(routeParams.id);
     if (!row) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
     return NextResponse.json(row);
   },
@@ -29,6 +30,7 @@ export const GET = withErrorHandler(
  */
 export const PATCH = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = calendarEventUpdateSchema.parse(await req.json());
@@ -38,17 +40,17 @@ export const PATCH = withErrorHandler(
       const beforeRows = await tx
         .select()
         .from(calendarEvents)
-        .where(and(eq(calendarEvents.id, params.id), isNull(calendarEvents.deletedAt)))
+        .where(and(eq(calendarEvents.id, routeParams.id), isNull(calendarEvents.deletedAt)))
         .limit(1);
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
 
       // memberIds가 제공된 경우 기존 팀원 교체
       if (input.memberIds !== undefined) {
-        await tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, params.id));
+        await tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, routeParams.id));
         if (input.memberIds.length > 0) {
           await tx.insert(calendarEventMembers).values(
-            input.memberIds.map((memberId) => ({ eventId: params.id, memberId })),
+            input.memberIds.map((memberId) => ({ eventId: routeParams.id, memberId })),
           );
         }
       }
@@ -65,7 +67,7 @@ export const PATCH = withErrorHandler(
         ...(input.note !== undefined ? { note: input.note } : {}),
         updatedAt,
       };
-      await tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, params.id));
+      await tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, routeParams.id));
       await withAudit(tx, {
         entityType: "CalendarEvent",
         entityId: after.id,
@@ -79,7 +81,7 @@ export const PATCH = withErrorHandler(
       });
     });
 
-    const updated = await loadCalendarEventDetail(params.id);
+    const updated = await loadCalendarEventDetail(routeParams.id);
     if (!updated) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
     emitCalendarChanged();
     return NextResponse.json(updated);
@@ -92,6 +94,7 @@ export const PATCH = withErrorHandler(
  */
 export const DELETE = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const deletedAt = now();
@@ -100,13 +103,13 @@ export const DELETE = withErrorHandler(
       const beforeRows = await tx
         .select()
         .from(calendarEvents)
-        .where(and(eq(calendarEvents.id, params.id), isNull(calendarEvents.deletedAt)))
+        .where(and(eq(calendarEvents.id, routeParams.id), isNull(calendarEvents.deletedAt)))
         .limit(1);
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
 
       const after = { ...before, updatedAt: deletedAt, deletedAt };
-      await tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, params.id));
+      await tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, routeParams.id));
       await withAudit(tx, {
         entityType: "CalendarEvent",
         entityId: after.id,

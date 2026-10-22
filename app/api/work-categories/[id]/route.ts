@@ -8,9 +8,10 @@ import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { workCategoryUpdateSchema } from "@/lib/validation/workCategory";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Params) => {
+  const routeParams = await params;
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const input = workCategoryUpdateSchema.parse(await req.json());
@@ -20,13 +21,13 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
     const beforeRows = await tx
       .select()
       .from(workCategories)
-      .where(and(eq(workCategories.id, params.id), isNull(workCategories.deletedAt)))
+      .where(and(eq(workCategories.id, routeParams.id), isNull(workCategories.deletedAt)))
       .limit(1);
     const before = beforeRows[0];
     if (!before) throw new HttpError("NOT_FOUND", "작업 분류를 찾을 수 없습니다");
 
     const after = { ...before, ...input, updatedAt };
-    await tx.update(workCategories).set(after).where(eq(workCategories.id, params.id));
+    await tx.update(workCategories).set(after).where(eq(workCategories.id, routeParams.id));
     await withAudit(tx, {
       entityType: "WorkCategory",
       entityId: after.id,
@@ -42,6 +43,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest, { params }: Param
 });
 
 export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Params) => {
+  const routeParams = await params;
   await ensureSqlitePragma();
   const actor = getActorContext(req);
   const deletedAt = now();
@@ -50,13 +52,13 @@ export const DELETE = withErrorHandler(async (req: NextRequest, { params }: Para
     const beforeRows = await tx
       .select()
       .from(workCategories)
-      .where(and(eq(workCategories.id, params.id), isNull(workCategories.deletedAt)))
+      .where(and(eq(workCategories.id, routeParams.id), isNull(workCategories.deletedAt)))
       .limit(1);
     const before = beforeRows[0];
     if (!before) throw new HttpError("NOT_FOUND", "작업 분류를 찾을 수 없습니다");
 
     const after = { ...before, updatedAt: deletedAt, deletedAt };
-    await tx.update(workCategories).set(after).where(eq(workCategories.id, params.id));
+    await tx.update(workCategories).set(after).where(eq(workCategories.id, routeParams.id));
     await withAudit(tx, {
       entityType: "WorkCategory",
       entityId: after.id,

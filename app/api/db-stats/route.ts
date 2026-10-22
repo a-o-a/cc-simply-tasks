@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import {
   auditLogs as auditLogsTable,
@@ -23,7 +24,7 @@ import { withErrorHandler } from "@/lib/http";
 export const GET = withErrorHandler(async () => {
   await ensureSqlitePragma();
 
-  const countTable = async (table: any) => {
+  const countTable = async (table: SQLiteTable) => {
     const rows = await db
       .select({ count: sql<number>`count(*)` })
       .from(table);

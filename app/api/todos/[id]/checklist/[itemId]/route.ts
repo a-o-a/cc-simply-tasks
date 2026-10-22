@@ -8,10 +8,11 @@ import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { todoChecklistUpdateSchema } from "@/lib/validation/todo";
 
-type Params = { params: { id: string; itemId: string } };
+type Params = { params: Promise<{ id: string; itemId: string }> };
 
 export const PATCH = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = todoChecklistUpdateSchema.parse(await req.json());
@@ -23,8 +24,8 @@ export const PATCH = withErrorHandler(
         .from(todoChecklist)
         .where(
           and(
-            eq(todoChecklist.id, params.itemId),
-            eq(todoChecklist.todoId, params.id),
+            eq(todoChecklist.id, routeParams.itemId),
+            eq(todoChecklist.todoId, routeParams.id),
             isNull(todoChecklist.deletedAt),
           ),
         )
@@ -44,12 +45,12 @@ export const PATCH = withErrorHandler(
       await tx
         .update(todoChecklist)
         .set(after)
-        .where(eq(todoChecklist.id, params.itemId));
+        .where(eq(todoChecklist.id, routeParams.itemId));
       // 부모 updatedAt도 갱신
       await tx
         .update(todos)
         .set({ updatedAt })
-        .where(eq(todos.id, params.id));
+        .where(eq(todos.id, routeParams.id));
       await withAudit(tx, {
         entityType: "TodoChecklist",
         entityId: after.id,
@@ -67,6 +68,7 @@ export const PATCH = withErrorHandler(
 
 export const DELETE = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const deletedAt = now();
@@ -77,8 +79,8 @@ export const DELETE = withErrorHandler(
         .from(todoChecklist)
         .where(
           and(
-            eq(todoChecklist.id, params.itemId),
-            eq(todoChecklist.todoId, params.id),
+            eq(todoChecklist.id, routeParams.itemId),
+            eq(todoChecklist.todoId, routeParams.id),
             isNull(todoChecklist.deletedAt),
           ),
         )
@@ -91,11 +93,11 @@ export const DELETE = withErrorHandler(
       await tx
         .update(todoChecklist)
         .set(after)
-        .where(eq(todoChecklist.id, params.itemId));
+        .where(eq(todoChecklist.id, routeParams.itemId));
       await tx
         .update(todos)
         .set({ updatedAt: deletedAt })
-        .where(eq(todos.id, params.id));
+        .where(eq(todos.id, routeParams.id));
       await withAudit(tx, {
         entityType: "TodoChecklist",
         entityId: after.id,

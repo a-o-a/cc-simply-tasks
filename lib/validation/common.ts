@@ -2,8 +2,7 @@ import { z } from "zod";
 
 export const cuidSchema = z.string().min(1);
 
-export const isoDateTimeSchema = z
-  .string()
+export const isoDateTimeSchema = z.iso
   .datetime({ offset: true })
   .transform((v) => new Date(v));
 

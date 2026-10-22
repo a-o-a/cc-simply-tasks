@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { getSqliteDbPath, getSqlite } from "@/lib/db";
+import { ensureSqlitePragma, getSqliteDbPath, getSqlite } from "@/lib/db";
 
 const BACKUP_RETAIN_DAYS = 7;
 const BACKUP_FILENAME_RE = /^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.db$/;
@@ -37,10 +37,10 @@ export function listBackupFiles(): { filename: string; size: number; date: strin
   if (!fs.existsSync(dir)) return [];
 
   return fs
-    .readdirSync(dir)
+    .readdirSync(/* turbopackIgnore: true */ dir)
     .filter((f) => BACKUP_FILENAME_RE.test(f))
     .map((filename) => {
-      const stat = fs.statSync(path.join(dir, filename));
+      const stat = fs.statSync(/* turbopackIgnore: true */ path.join(dir, filename));
       const date = filename.replace("backup_", "").replace(".db", "");
       return { filename, size: stat.size, date };
     })
@@ -66,16 +66,22 @@ function pruneOldBackups() {
   }
 }
 
+/** WAL의 커밋된 변경까지 포함하는 일관된 SQLite 스냅샷 생성 */
+export async function createSqliteSnapshot(destPath: string): Promise<void> {
+  await ensureSqlitePragma();
+  const sqlite = getSqlite();
+  await sqlite.execute({ sql: "VACUUM INTO ?", args: [destPath] });
+}
+
 /** SQLite VACUUM INTO로 스냅샷 백업 생성 */
 export async function runBackup(): Promise<string> {
   const dir = getBackupDir();
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   const timestamp = backupTimestamp();
-  const destPath = path.join(dir, backupFilename(timestamp));
+  const destPath = path.join(/* turbopackIgnore: true */ dir, backupFilename(timestamp));
 
-  const sqlite = getSqlite();
-  await sqlite.execute(`VACUUM INTO '${destPath}'`);
+  await createSqliteSnapshot(destPath);
   console.log(`[backup] 백업 완료: ${destPath}`);
 
   pruneOldBackups();

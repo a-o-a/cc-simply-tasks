@@ -35,7 +35,7 @@ export const workItemCreateSchema = z
       !v.startDate ||
       !v.endDate ||
       (v.startDate as Date).getTime() <= (v.endDate as Date).getTime(),
-    { message: "endDate는 startDate 이후여야 합니다", path: ["endDate"] },
+    { error: "endDate는 startDate 이후여야 합니다", path: ["endDate"] },
   );
 
 export const workItemUpdateSchema = z
@@ -64,7 +64,7 @@ export const workItemUpdateSchema = z
       !v.startDate ||
       !v.endDate ||
       (v.startDate as Date).getTime() <= (v.endDate as Date).getTime(),
-    { message: "endDate는 startDate 이후여야 합니다", path: ["endDate"] },
+    { error: "endDate는 startDate 이후여야 합니다", path: ["endDate"] },
   );
 
 /** 쉼표 구분 문자열 → 배열 변환 헬퍼 */
@@ -111,7 +111,7 @@ export const workItemListQuerySchema = z.object({
     .string()
     .optional()
     .transform((v) => v === "true")
-    .pipe(z.boolean().optional()),
+    .pipe(z.boolean()),
   });
 
 export const workItemBulkStatusUpdateSchema = z.object({

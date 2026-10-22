@@ -58,7 +58,7 @@ function kstTimeStr(iso: string) {
 }
 
 export function DashboardClient() {
-  const todayKst = React.useMemo(() => utcMsToKstDateString(Date.now()), []);
+  const [todayKst] = React.useState(() => utcMsToKstDateString(Date.now()));
   const weekDates = React.useMemo(() => kstWeekContaining(todayKst), [todayKst]);
 
   const [counts, setCounts] = React.useState<WorkItemCounts | null>(null);
@@ -339,7 +339,7 @@ export function DashboardClient() {
                       className="flex flex-col gap-0.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent/40"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={cn("shrink-0 rounded px-1 text-[9px] font-semibold leading-[14px]", badge.className)}>
+                        <span className={cn("shrink-0 rounded-sm px-1 text-[9px] font-semibold leading-[14px]", badge.className)}>
                           {badge.label}
                         </span>
                         <span className="truncate font-medium">{ev.title}</span>
@@ -520,7 +520,7 @@ function SkeletonRows() {
   return (
     <div className="space-y-2 p-2">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="h-6 animate-pulse rounded bg-muted" />
+        <div key={i} className="h-6 animate-pulse rounded-sm bg-muted" />
       ))}
     </div>
   );

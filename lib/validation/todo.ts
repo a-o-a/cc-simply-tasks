@@ -54,7 +54,7 @@ export const todoListQuerySchema = z.object({
     .string()
     .optional()
     .transform((v) => (v ? v.split(",").filter(Boolean) : []))
-    .pipe(z.array(z.string()).optional()),
+    .pipe(z.array(z.string())),
 });
 
 export const todoChecklistCreateSchema = checklistItemSchema;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ZodError } from "zod";
+import { ZodError, flattenError } from "zod";
 
 /**
  * 표준 에러 응답 포맷: { error: { code, message, details? } }
@@ -60,14 +60,17 @@ export function withErrorHandler<Args extends unknown[]>(
       return await handler(...args);
     } catch (err) {
       if (err instanceof ZodError) {
-        return errorResponse("VALIDATION_ERROR", "입력값 검증 실패", err.flatten());
+        return errorResponse("VALIDATION_ERROR", "입력값 검증 실패", flattenError(err));
       }
       if (err instanceof HttpError) {
         return errorResponse(err.code, err.message, err.details);
       }
-      // SQLite unique 제약 위반 등
-      if (err && typeof err === "object" && "code" in err) {
-        const dbCode = (err as { code: unknown }).code;
+      // DrizzleQueryError가 감싼 libsql 오류도 원인 체인을 따라 확인한다.
+      const seen = new Set<unknown>();
+      let cause: unknown = err;
+      while (cause && typeof cause === "object" && !seen.has(cause)) {
+        seen.add(cause);
+        const dbCode = "code" in cause ? cause.code : undefined;
         if (
           dbCode === "P2002" ||
           dbCode === "SQLITE_CONSTRAINT_UNIQUE" ||
@@ -78,11 +81,11 @@ export function withErrorHandler<Args extends unknown[]>(
         if (dbCode === "P2025") {
           return errorResponse("NOT_FOUND", "대상 리소스를 찾을 수 없습니다");
         }
+        if (cause instanceof Error && /UNIQUE constraint failed/i.test(cause.message)) {
+          return errorResponse("CONFLICT", "중복된 값이 존재합니다");
+        }
+        cause = "cause" in cause ? cause.cause : undefined;
       }
-      if (err instanceof Error && /UNIQUE constraint failed/i.test(err.message)) {
-        return errorResponse("CONFLICT", "중복된 값이 존재합니다");
-      }
-      // eslint-disable-next-line no-console
       console.error("[api] unhandled error:", err);
       return errorResponse("INTERNAL", "서버 내부 오류");
     }

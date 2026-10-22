@@ -16,7 +16,7 @@ export const calendarEventCreateSchema = z
     (v) =>
       (v.startDateTime as Date).getTime() < (v.endDateTime as Date).getTime(),
     {
-      message: "endDateTime은 startDateTime보다 이후여야 합니다",
+      error: "endDateTime은 startDateTime보다 이후여야 합니다",
       path: ["endDateTime"],
     },
   );
@@ -37,7 +37,7 @@ export const calendarEventUpdateSchema = z
       !v.endDateTime ||
       (v.startDateTime as Date).getTime() < (v.endDateTime as Date).getTime(),
     {
-      message: "endDateTime은 startDateTime보다 이후여야 합니다",
+      error: "endDateTime은 startDateTime보다 이후여야 합니다",
       path: ["endDateTime"],
     },
   );

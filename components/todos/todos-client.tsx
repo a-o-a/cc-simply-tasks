@@ -212,7 +212,7 @@ export function TodosClient() {
                       }))
                     }
                     className={cn(
-                      "inline-flex items-center rounded px-2 py-1 text-xs transition-colors",
+                      "inline-flex items-center rounded-sm px-2 py-1 text-xs transition-colors",
                       active
                         ? "bg-primary text-primary-foreground"
                         : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -300,14 +300,14 @@ export function TodosClient() {
                         type="checkbox"
                         checked={todo.status === "DONE"}
                         onChange={() => void toggleTodoStatus(todo)}
-                        className="h-4 w-4 shrink-0 cursor-pointer rounded border-input"
+                        className="h-4 w-4 shrink-0 cursor-pointer rounded-sm border-input"
                         aria-label="완료 토글"
                       />
                       {total > 0 ? (
                         <button
                           type="button"
                           onClick={() => toggleExpand(todo.id)}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-accent"
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-accent"
                           aria-label={isExpanded ? "접기" : "펼치기"}
                         >
                           {isExpanded ? (
@@ -328,7 +328,7 @@ export function TodosClient() {
                       </button>
                       <span
                         className={cn(
-                          "shrink-0 rounded px-1.5 py-0.5 text-[11px]",
+                          "shrink-0 rounded-sm px-1.5 py-0.5 text-[11px]",
                           todo.status === "DONE"
                             ? "bg-muted text-muted-foreground"
                             : "bg-primary/10 text-primary",
@@ -359,7 +359,7 @@ export function TodosClient() {
                               type="checkbox"
                               checked={item.done}
                               onChange={() => toggleChecklistItem(todo.id, item)}
-                              className="h-4 w-4 cursor-pointer rounded border-input"
+                              className="h-4 w-4 cursor-pointer rounded-sm border-input"
                             />
                             <span
                               className={cn(

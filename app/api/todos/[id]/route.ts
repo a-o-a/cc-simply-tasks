@@ -9,12 +9,13 @@ import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { todoUpdateSchema } from "@/lib/validation/todo";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 export const GET = withErrorHandler(
   async (_req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
-    const row = await loadTodoDetail(params.id);
+    const row = await loadTodoDetail(routeParams.id);
     if (!row) throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
     return NextResponse.json(row);
   },
@@ -22,6 +23,7 @@ export const GET = withErrorHandler(
 
 export const PATCH = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = todoUpdateSchema.parse(await req.json());
@@ -31,7 +33,7 @@ export const PATCH = withErrorHandler(
       const beforeRows = await tx
         .select()
         .from(todos)
-        .where(and(eq(todos.id, params.id), isNull(todos.deletedAt)))
+        .where(and(eq(todos.id, routeParams.id), isNull(todos.deletedAt)))
         .limit(1);
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
@@ -46,7 +48,7 @@ export const PATCH = withErrorHandler(
         ...(input.assigneeId !== undefined ? { assigneeId: input.assigneeId } : {}),
         updatedAt,
       };
-      await tx.update(todos).set(after).where(eq(todos.id, params.id));
+      await tx.update(todos).set(after).where(eq(todos.id, routeParams.id));
 
       await withAudit(tx, {
         entityType: "Todo",
@@ -65,6 +67,7 @@ export const PATCH = withErrorHandler(
 
 export const DELETE = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const deletedAt = now();
@@ -73,19 +76,19 @@ export const DELETE = withErrorHandler(
       const beforeRows = await tx
         .select()
         .from(todos)
-        .where(and(eq(todos.id, params.id), isNull(todos.deletedAt)))
+        .where(and(eq(todos.id, routeParams.id), isNull(todos.deletedAt)))
         .limit(1);
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
 
       const after = { ...before, updatedAt: deletedAt, deletedAt };
-      await tx.update(todos).set(after).where(eq(todos.id, params.id));
+      await tx.update(todos).set(after).where(eq(todos.id, routeParams.id));
       // 자식 체크리스트도 soft delete
       await tx
         .update(todoChecklist)
         .set({ deletedAt, updatedAt: deletedAt })
         .where(
-          and(eq(todoChecklist.todoId, params.id), isNull(todoChecklist.deletedAt)),
+          and(eq(todoChecklist.todoId, routeParams.id), isNull(todoChecklist.deletedAt)),
         );
       await withAudit(tx, {
         entityType: "Todo",

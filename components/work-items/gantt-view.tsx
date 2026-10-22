@@ -178,7 +178,7 @@ export function GanttView({
       {canLeft && (
         <button
           onClick={() => scrollBy(-320)}
-          className="absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center h-6 w-6 rounded-full bg-card border shadow-sm hover:bg-accent"
+          className="absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center h-6 w-6 rounded-full bg-card border shadow-xs hover:bg-accent"
           style={{ left: LABEL_WIDTH + 4 }}
         >
           <ChevronLeft className="h-4 w-4 text-muted-foreground" />
@@ -189,7 +189,7 @@ export function GanttView({
       {canRight && (
         <button
           onClick={() => scrollBy(320)}
-          className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-4 bg-gradient-to-l from-card via-card/70 to-transparent"
+          className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-4 bg-linear-to-l from-card via-card/70 to-transparent"
         >
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
         </button>
@@ -243,7 +243,7 @@ export function GanttView({
                     <div className="pb-1">{day}</div>
                     {/* 오늘 세로선 상단 */}
                     {isToday && (
-                      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-t" />
+                      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-t-sm" />
                     )}
                   </div>
                 );
@@ -328,7 +328,7 @@ export function GanttView({
                           key={item.id}
                           onClick={() => onOpen(item)}
                           title={`${item.title} · ${STATUS_LABELS[item.status]}`}
-                          className="group relative flex h-6 items-center overflow-hidden rounded text-left text-[11px] font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+                          className="group relative flex h-6 items-center overflow-hidden rounded-sm text-left text-[11px] font-medium text-white shadow-xs transition-opacity hover:opacity-90"
                           style={{
                             marginLeft: startCol * COL_WIDTH,
                             width: spanDays * COL_WIDTH - 2,

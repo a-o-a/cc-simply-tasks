@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -208,7 +209,7 @@ function BackupTab() {
         {statsLoading && !tables ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-8 animate-pulse rounded bg-muted" />
+              <div key={i} className="h-8 animate-pulse rounded-sm bg-muted" />
             ))}
           </div>
         ) : (
@@ -237,8 +238,8 @@ function BackupTab() {
       <div className="rounded-lg border bg-card p-6">
         <h2 className="mb-2 text-sm font-semibold">데이터베이스 백업</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          자동 백업은 매일 서버 시간 기준 02:00에 실행됩니다 (<code className="rounded bg-muted px-1 py-0.5 text-xs">BACKUP_CRON</code> 환경변수로 변경 가능).
-          최근 7일치를 <code className="rounded bg-muted px-1 py-0.5 text-xs">db/</code> 디렉터리에 보관합니다.
+          자동 백업은 매일 서버 시간 기준 02:00에 실행됩니다 (<code className="rounded-sm bg-muted px-1 py-0.5 text-xs">BACKUP_CRON</code> 환경변수로 변경 가능).
+          최근 7일치를 <code className="rounded-sm bg-muted px-1 py-0.5 text-xs">db/</code> 디렉터리에 보관합니다.
         </p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleTrigger} disabled={triggering}>
@@ -270,7 +271,7 @@ function BackupTab() {
         {filesLoading ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
+              <div key={i} className="h-10 animate-pulse rounded-sm bg-muted" />
             ))}
           </div>
         ) : backupFiles.length === 0 ? (
@@ -370,7 +371,7 @@ function CategoriesTab() {
         {loading ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
+              <div key={i} className="h-10 animate-pulse rounded-sm bg-muted" />
             ))}
           </div>
         ) : items.length === 0 ? (
@@ -478,6 +479,9 @@ function WorkCategoryDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? "분류 수정" : "분류 추가"}</DialogTitle>
+          <DialogDescription className="sr-only">
+            작업 분류의 코드와 표시 이름을 설정합니다.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -584,7 +588,7 @@ function WorkSystemsSection() {
         {loading ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
+              <div key={i} className="h-10 animate-pulse rounded-sm bg-muted" />
             ))}
           </div>
         ) : items.length === 0 ? (
@@ -692,6 +696,9 @@ function WorkSystemDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? "시스템 수정" : "시스템 추가"}</DialogTitle>
+          <DialogDescription className="sr-only">
+            작업 시스템의 코드와 표시 이름을 설정합니다.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

@@ -1,12 +1,21 @@
 # Development Guide
 
-이 문서는 현재 코드베이스의 서버/API 구현 규칙을 정리합니다. 기준 스택은 `Next.js + Drizzle ORM + @libsql/client + SQLite(file)`입니다.
+이 문서는 현재 코드베이스의 서버/API 구현 규칙을 정리합니다. 기준 스택은 `Node 22 + Next.js 16 + React 19 + Drizzle ORM + @libsql/client + SQLite(file)`입니다. 정확한 버전은 [`package.json`](../package.json)과 lockfile을 기준으로 합니다.
 
 - 레퍼런스 구현: [`app/api/work-items/`](../app/api/work-items/)
 - DB 진입점: [`lib/db.ts`](../lib/db.ts)
 - 스키마: [`lib/db/schema.ts`](../lib/db/schema.ts)
 - 조회/관계 하이드레이션 헬퍼: [`lib/db/queries.ts`](../lib/db/queries.ts)
 - 감사 로그: [`lib/audit.ts`](../lib/audit.ts)
+
+## 실행 환경과 도구
+
+- `.nvmrc`의 Node 22를 설치하고 `nvm use` 후 `npm ci`로 의존성을 설치합니다. 개발·빌드·migration·운영에 같은 Node 22 환경을 사용합니다.
+- TypeScript 6.0.3 및 ESLint 9.39.5는 현재 typescript-eslint와 Next 플러그인 호환 범위에 맞춘 선택입니다. 최신 메이저를 독립적으로 올리지 않습니다.
+- lint는 `eslint.config.mjs` flat config와 ESLint CLI를 사용합니다. `next lint`는 사용하지 않습니다.
+- React Compiler는 사용하지 않으며 `react-hooks/set-state-in-effect`만 비활성화합니다. `rules-of-hooks`, `exhaustive-deps`와 나머지 린트 규칙은 유지합니다.
+- Tailwind 4 토큰과 다크모드 정의는 `app/globals.css`의 `@theme inline`/CSS에 둡니다. PostCSS는 `@tailwindcss/postcss`, 애니메이션은 `tw-animate-css`를 사용하며 `tailwind.config.ts`는 만들지 않습니다.
+- 브라우저 최소 기준은 Safari 16.4+, Chrome 111+, Firefox 128+입니다. [Tailwind 4 업그레이드](https://tailwindcss.com/docs/upgrade-guide)
 
 ## 1. 핵심 원칙
 
@@ -35,8 +44,9 @@ app/api/<resource>/[id]/route.ts
 ### 3.1 연결
 
 - 공용 DB 객체는 [`lib/db.ts`](../lib/db.ts) 의 `db`를 사용한다.
-- DB 연결은 `DATABASE_URL=file:...` 값을 `file://` URL로 변환해 `@libsql/client`에 전달한다.
+- DB 연결은 `DATABASE_URL=file:...` 값을 `file://` URL로 변환해 `@libsql/client/node`에 전달한다. 표준 import를 사용하고 `@libsql/client`/`libsql`은 Next의 `serverExternalPackages`로 외부화한다. 연결 자체는 첫 DB 접근 때 생성한다.
 - API 코드에서는 DB 접근 전 `await ensureSqlitePragma()`를 호출한다. 최초 호출 시 SQLite PRAGMA(`busy_timeout`, `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`)를 한 번 적용한다.
+- libsql의 추가 풀 연결에도 잠금 대기 시간이 적용되도록 `createClient`에 `timeout: 5000`을 지정한다. `synchronous=NORMAL`은 최초 연결에 적용되며 새 풀 연결은 드라이버 기본값을 사용한다. 런타임 DB·백업을 배포 파일 추적에 포함하지 않는다.
 
 ### 3.2 스키마
 
@@ -131,6 +141,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
 ### 4.2 Item route
 
+Next 16의 동적 `params`는 Promise입니다. 핸들러에서 먼저 `await`한 뒤 사용합니다. `cookies()`/`headers()`를 새로 사용할 때도 비동기 API 규칙을 따릅니다. `new URL(req.url).searchParams`는 별도의 동기 URL API입니다. [Next 16 마이그레이션](https://nextjs.org/docs/app/guides/upgrading/version-16)
+
 ```ts
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
@@ -142,15 +154,16 @@ import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { teamMemberUpdateSchema } from "@/lib/validation/teamMember";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 export const GET = withErrorHandler(
   async (_req: NextRequest, { params }: Params) => {
+    const { id } = await params;
     await ensureSqlitePragma();
     const row = await db
       .select()
       .from(teamMembers)
-      .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
+      .where(and(eq(teamMembers.id, id), isNull(teamMembers.deletedAt)))
       .limit(1);
 
     if (!row[0]) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
@@ -160,6 +173,7 @@ export const GET = withErrorHandler(
 
 export const PATCH = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {
+    const { id } = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = teamMemberUpdateSchema.parse(await req.json());
@@ -169,7 +183,7 @@ export const PATCH = withErrorHandler(
       const beforeRows = await tx
         .select()
         .from(teamMembers)
-        .where(and(eq(teamMembers.id, params.id), isNull(teamMembers.deletedAt)))
+        .where(and(eq(teamMembers.id, id), isNull(teamMembers.deletedAt)))
         .limit(1);
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "팀원을 찾을 수 없습니다");
@@ -181,7 +195,7 @@ export const PATCH = withErrorHandler(
         updatedAt,
       };
 
-      await tx.update(teamMembers).set(after).where(eq(teamMembers.id, params.id));
+      await tx.update(teamMembers).set(after).where(eq(teamMembers.id, id));
       await withAudit(tx, {
         entityType: "TeamMember",
         entityId: after.id,
@@ -223,7 +237,9 @@ export const PATCH = withErrorHandler(
 
 - 직접 에러 JSON을 만들기보다 `throw new HttpError(...)`를 사용한다.
 - 라우트는 반드시 `withErrorHandler`로 감싼다.
-- SQLite unique 에러는 `withErrorHandler`가 `CONFLICT`로 매핑한다.
+- SQLite unique 에러는 `withErrorHandler`가 Drizzle 오류의 `cause` 체인까지 확인해 `CONFLICT`로 매핑한다.
+- Zod 4는 `flattenError(err)`로 `details.formErrors`/`details.fieldErrors` 응답 구조를 유지한다. 신규 스키마는 `z.iso.datetime`, `z.url`과 `error` 옵션을 사용한다. [Zod 4 변경점](https://zod.dev/v4/changelog)
+- 현재 API는 `If-Match`를 검사하지 않는다. 409 응답이 있다는 이유로 동시 편집 보호가 구현되어 있다고 가정하지 않는다.
 
 ### 5.2 성공 응답
 
@@ -273,7 +289,7 @@ export const PATCH = withErrorHandler(
 
 - DB 상태를 그대로 보여줘야 하는 카운트/통계 GET 라우트는 Next Route Handler 캐시가 끼지 않게 명시한다.
 - 예: [`GET /api/work-items/count`](../app/api/work-items/count/route.ts)는 `dynamic = "force-dynamic"`, `revalidate = 0`, `Cache-Control: no-store`를 함께 둔다.
-- 클라이언트 fetch wrapper도 `cache: "no-store"`를 사용하지만, 서버 Route Handler의 정적 캐시 가능성은 라우트 파일에서 별도로 차단한다.
+- Next 16의 GET Route Handler는 기본적으로 캐시하지 않는다. 통계·백업처럼 항상 최신 상태가 필요한 라우트는 이 의도를 `dynamic`/`revalidate`와 응답 헤더로 명시하고, 클라이언트 fetch wrapper도 `cache: "no-store"`를 사용한다.
 - 작업 생성/수정/삭제/상태 변경처럼 다른 화면의 통계에 영향을 주는 write 성공 후에는 [`emitWorkItemsChanged()`](../lib/client/api.ts)를 호출한다.
 - 대시보드처럼 같은 탭에서 오래 열려 있을 수 있는 화면은 `WORK_ITEMS_CHANGED_EVENT`, `focus`, `visibilitychange`에서 필요한 데이터를 다시 조회한다.
 - TODO 뱃지는 같은 패턴으로 `emitTodosChanged()` / `TODOS_CHANGED_EVENT`를 사용한다.
@@ -297,20 +313,34 @@ export const PATCH = withErrorHandler(
 - `scope=transferred`는 `transferDate desc` 정렬을 우선한다.
 - ticket/systemCode 필터는 `exists(...)` 서브쿼리로 구현한다.
 
-## 8. 마이그레이션 / DB 파일
+## 8. 마이그레이션 / DB 파일 / 백업
 
-- 개발 기본 DB: `db/dev.db`
-- 최초 실행용 깨끗한 DB 템플릿: `db/dev.db.clean`
-- 운영에서는 `DATABASE_URL`을 영속 경로로 바꿔 사용한다.
-- 스키마 수정 후:
+- 개발 기본 DB는 `db/dev.db`, 초기 빈 템플릿은 `db/dev.db.clean`이다. 템플릿은 대상 파일이 없을 때만 `fs.copyFileSync(..., fs.constants.COPYFILE_EXCL)`로 복사한다.
+- 운영 `DATABASE_URL`은 배포 산출물 밖의 영속 디렉터리를 가리킨다. WAL/SHM와 백업을 위해 디렉터리 쓰기 권한도 필요하다.
+- `drizzle.config.ts`는 쉘 환경변수 `DATABASE_URL`을 읽는다. `.env.production`의 자동 로딩을 가정하지 않는다.
+- 개발자가 스키마를 변경할 때만 다음 명령으로 SQL을 생성하고 검토 후 적용한다. 실행 중인 쓰기 작업은 먼저 중지한다.
 
 ```bash
+nvm use
 npm run db:generate
 npm run db:migrate
 ```
 
-- migration이 추가되면 `db/dev.db.clean`도 새 스키마 기준으로 다시 생성해 커밋한다.
-- 백업/복구는 `DATABASE_URL`이 가리키는 실제 파일 기준으로 처리한다.
+배포에서는 `npm ci` 후 **커밋된 migration을 `npm run db:migrate`로 적용**한다. 배포 중 `db:generate`를 실행하지 않는다. migration이 추가되면 별도 새 DB에서 `db/dev.db.clean`을 다시 만들고 SQL·메타데이터와 함께 커밋한다.
+
+백업 생성은 `lib/backup.ts`의 `createSqliteSnapshot`이 `VACUUM INTO`로 처리한다. `/api/backup` 다운로드는 임시 스냅샷을 만들고 항상 정리하며, 저장 백업과 cron은 `runBackup`을 공유한다. 실행 중인 DB 본파일만 복사하면 WAL의 최신 커밋이 누락될 수 있다. [SQLite VACUUM INTO](https://www.sqlite.org/lang_vacuum.html)
+
+`instrumentation.ts`는 `NEXT_RUNTIME === "nodejs"` 분기 내부에서 모듈을 동적으로 import한다. cron은 프로세스 내 중복 등록과 실행 겹침을 방지하며, `BACKUP_CRON` 기본값은 서버 현지 시간 02:00이다. 여러 프로세스 사이의 중복 실행을 조정하는 기능은 없다. [Next instrumentation](https://nextjs.org/docs/app/guides/instrumentation)
+
+## 자동 검증
+
+```bash
+npm run check                 # lint → typecheck → build → API smoke
+npx playwright install chromium
+npm run test:ui               # 별도 UI 검증
+```
+
+`typecheck`는 `next typegen && tsc --noEmit`이며, smoke/UI 스크립트는 Node 테스트 러너를 사용한다. UI는 Playwright Chromium 설치가 필요하다. 테스트는 빌드 결과와 임시 DB/별도 서버를 사용하므로 단독 실행 전 `npm run build`를 수행한다. 실행 방법만 기재하며 통과 여부는 각 실행 로그와 업그레이드 기록으로 확인한다.
 
 ## 9. 수동 검증 체크리스트
 
@@ -348,7 +378,8 @@ curl -s 'localhost:3000/api/audit-logs?pageSize=10'
 - [ ] write가 모두 `await db.transaction(async (tx) => ...)` 안에 있다
 - [ ] write 쿼리에 `await`가 빠진 곳이 없다
 - [ ] `withAudit(tx, ...)`가 write와 같은 트랜잭션에 있다
-- [ ] 입력은 zod로 검증한다
+- [ ] 동적 route의 `params`를 `await`한다
+- [ ] 입력은 Zod 4로 검증하고 오류 응답 구조를 유지한다
 - [ ] soft delete 필터가 필요한 곳에 `isNull(deletedAt)`가 있다
 - [ ] 에러 처리는 `withErrorHandler` / `HttpError`를 따른다
 - [ ] 관계 응답 shape가 기존 클라이언트 기대와 일치한다
