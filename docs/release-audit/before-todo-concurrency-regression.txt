@@ -1,0 +1,179 @@
+▶ TODO edits commit the parent, checklist and audit records atomically
+  ✔ one PATCH preserves existing IDs, creates/deletes children and returns the saved draft (34.491333ms)
+  ✔ foreign and duplicate checklist IDs are rejected before any draft is committed (12.892833ms)
+  ✔ a checklist write failure rolls back parent, removals and audits, then a retry succeeds once (17.148ms)
+  ✔ omitting checklist preserves children and individual checklist APIs keep working (14.459834ms)
+  ✖ a stale drawer cannot overwrite another client's checklist add (7.457125ms)
+  ✖ a stale drawer cannot overwrite another client's checklist complete (5.784292ms)
+  ✖ every parent/checklist write advances the parent version even when the clock has not advanced (7.230209ms)
+✖ TODO edits commit the parent, checklist and audit records atomically (345.132542ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 4
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 540.310333
+
+✖ failing tests:
+
+test at scripts/todo-regression.test.mjs:117:13
+✖ a stale drawer cannot overwrite another client's checklist add (7.457125ms)
+  AssertionError [ERR_ASSERTION]: PATCH /api/todos/qn38gspstmw1qkl3roi0wvtb: {"id":"qn38gspstmw1qkl3roi0wvtb","title":"stale draft title","note":null,"status":"OPEN","dueDate":null,"order":0,"assigneeId":null,"createdAt":"2026-10-22T09:20:25.409Z","updatedAt":"2026-10-22T09:20:25.414Z","deletedAt":null,"assignee":null,"checklist":[{"id":"hqrm5ukgkprwlc5okexna95n","todoId":"qn38gspstmw1qkl3roi0wvtb","content":"shared item","done":false,"order":0,"assigneeId":null,"createdAt":"2026-10-22T09:20:25.409Z","updatedAt":"2026-10-22T09:20:25.409Z","deletedAt":null,"assignee":null}]}
+  ▲ Next.js 16.4.1
+  - Local:         http://127.0.0.1:54335
+  - Network:       http://127.0.0.1:54335
+  ✓ Ready in 56ms
+  ✓ Running next.config.js took 5ms
+  [backup] 자동 백업 스케줄 등록됨 (0 0 0 29 2 *)
+  [api] unhandled error: Error: Failed query: insert into "TodoChecklist" ("id", "todoId", "content", "done", "order", "assigneeId", "createdAt", "updatedAt", "deletedAt") values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  params: btmhcjsotbypitci5xvckzy6,ti2v9z6mg9yjun258z082puv,reject-once,0,1,,1792660825382,1792660825382,
+      at e9.queryWithCache (.next/server/chunks/_1g1rrxeqoda3q._.js:14:21121)
+      at async e9.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25318)
+      at async (.next/server/chunks/_1-ylc_1-pg-we._.js:1:2305)
+      at async e3.transaction (.next/server/chunks/_1g1rrxeqoda3q._.js:14:24325)
+      at async (.next/server/chunks/_1-ylc_1-pg-we._.js:1:545)
+      at async (.next/server/chunks/_0o0t19mj-fm7a._.js:1:444)
+      at async z (.next/server/chunks/_1-ylc_1-pg-we._.js:1:6603) {
+    query: 'insert into "TodoChecklist" ("id", "todoId", "content", "done", "order", "assigneeId", "createdAt", "updatedAt", "deletedAt") values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    params: [
+      'btmhcjsotbypitci5xvckzy6',
+      'ti2v9z6mg9yjun258z082puv',
+      'reject-once',
+      0,
+      1,
+      null,
+      1792660825382,
+      1792660825382,
+      null
+    ],
+    [cause]: Error [LibsqlError]: SQLITE_CONSTRAINT: injected checklist failure
+        at <unknown> (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25428)
+        at e9.queryWithCache (.next/server/chunks/_1g1rrxeqoda3q._.js:14:21102)
+        at e9.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25329)
+        at QueryPromise.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:11543)
+        at QueryPromise.execute (.next/server/chunks/_1g1rrxeqoda3q._.js:14:11707)
+        at QueryPromise.then (.next/server/chunks/_1g1rrxeqoda3q._.js:14:670) {
+      code: 'SQLITE_CONSTRAINT',
+      extendedCode: 'SQLITE_CONSTRAINT_TRIGGER',
+      rawCode: 1811,
+      [cause]: SqliteError: injected checklist failure
+          at <unknown> (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25428)
+          at e9.queryWithCache (.next/server/chunks/_1g1rrxeqoda3q._.js:14:21102)
+          at e9.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25329)
+          at QueryPromise.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:11543)
+          at QueryPromise.execute (.next/server/chunks/_1g1rrxeqoda3q._.js:14:11707)
+          at QueryPromise.then (.next/server/chunks/_1g1rrxeqoda3q._.js:14:670) {
+        code: 'SQLITE_CONSTRAINT_TRIGGER',
+        rawCode: 1811
+      }
+    }
+  }
+
+
+  200 !== 409
+
+      at request (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:22:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:126:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:117:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 409,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/todo-regression.test.mjs:117:13
+✖ a stale drawer cannot overwrite another client's checklist complete (5.784292ms)
+  AssertionError [ERR_ASSERTION]: PATCH /api/todos/ifhvfpxdvq5ag8q9ldk4cvfe: {"id":"ifhvfpxdvq5ag8q9ldk4cvfe","title":"stale draft title","note":null,"status":"OPEN","dueDate":null,"order":0,"assigneeId":null,"createdAt":"2026-10-22T09:20:25.417Z","updatedAt":"2026-10-22T09:20:25.420Z","deletedAt":null,"assignee":null,"checklist":[{"id":"qvcjra2wq3m7ugwri0zfb03h","todoId":"ifhvfpxdvq5ag8q9ldk4cvfe","content":"shared item","done":false,"order":0,"assigneeId":null,"createdAt":"2026-10-22T09:20:25.417Z","updatedAt":"2026-10-22T09:20:25.420Z","deletedAt":null,"assignee":null}]}
+  ▲ Next.js 16.4.1
+  - Local:         http://127.0.0.1:54335
+  - Network:       http://127.0.0.1:54335
+  ✓ Ready in 56ms
+  ✓ Running next.config.js took 5ms
+  [backup] 자동 백업 스케줄 등록됨 (0 0 0 29 2 *)
+  [api] unhandled error: Error: Failed query: insert into "TodoChecklist" ("id", "todoId", "content", "done", "order", "assigneeId", "createdAt", "updatedAt", "deletedAt") values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  params: btmhcjsotbypitci5xvckzy6,ti2v9z6mg9yjun258z082puv,reject-once,0,1,,1792660825382,1792660825382,
+      at e9.queryWithCache (.next/server/chunks/_1g1rrxeqoda3q._.js:14:21121)
+      at async e9.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25318)
+      at async (.next/server/chunks/_1-ylc_1-pg-we._.js:1:2305)
+      at async e3.transaction (.next/server/chunks/_1g1rrxeqoda3q._.js:14:24325)
+      at async (.next/server/chunks/_1-ylc_1-pg-we._.js:1:545)
+      at async (.next/server/chunks/_0o0t19mj-fm7a._.js:1:444)
+      at async z (.next/server/chunks/_1-ylc_1-pg-we._.js:1:6603) {
+    query: 'insert into "TodoChecklist" ("id", "todoId", "content", "done", "order", "assigneeId", "createdAt", "updatedAt", "deletedAt") values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    params: [
+      'btmhcjsotbypitci5xvckzy6',
+      'ti2v9z6mg9yjun258z082puv',
+      'reject-once',
+      0,
+      1,
+      null,
+      1792660825382,
+      1792660825382,
+      null
+    ],
+    [cause]: Error [LibsqlError]: SQLITE_CONSTRAINT: injected checklist failure
+        at <unknown> (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25428)
+        at e9.queryWithCache (.next/server/chunks/_1g1rrxeqoda3q._.js:14:21102)
+        at e9.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25329)
+        at QueryPromise.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:11543)
+        at QueryPromise.execute (.next/server/chunks/_1g1rrxeqoda3q._.js:14:11707)
+        at QueryPromise.then (.next/server/chunks/_1g1rrxeqoda3q._.js:14:670) {
+      code: 'SQLITE_CONSTRAINT',
+      extendedCode: 'SQLITE_CONSTRAINT_TRIGGER',
+      rawCode: 1811,
+      [cause]: SqliteError: injected checklist failure
+          at <unknown> (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25428)
+          at e9.queryWithCache (.next/server/chunks/_1g1rrxeqoda3q._.js:14:21102)
+          at e9.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:25329)
+          at QueryPromise.run (.next/server/chunks/_1g1rrxeqoda3q._.js:14:11543)
+          at QueryPromise.execute (.next/server/chunks/_1g1rrxeqoda3q._.js:14:11707)
+          at QueryPromise.then (.next/server/chunks/_1g1rrxeqoda3q._.js:14:670) {
+        code: 'SQLITE_CONSTRAINT_TRIGGER',
+        rawCode: 1811
+      }
+    }
+  }
+
+
+  200 !== 409
+
+      at request (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:22:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:126:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:117:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 409,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/todo-regression.test.mjs:144:11
+✖ every parent/checklist write advances the parent version even when the clock has not advanced (7.230209ms)
+  AssertionError [ERR_ASSERTION]: 1792660825426 must be greater than 1792660885424
+      at assertAdvanced (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:152:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:157:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:144:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

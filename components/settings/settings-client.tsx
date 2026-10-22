@@ -22,7 +22,7 @@ import { MembersClient } from "@/app/members/members-client";
 
 export function SettingsClient() {
   return (
-    <div className="px-8 py-6">
+    <div className="px-4 py-4 md:px-8 md:py-6">
       <header className="mb-6">
         <h1 className="text-xl font-semibold">설정</h1>
       </header>

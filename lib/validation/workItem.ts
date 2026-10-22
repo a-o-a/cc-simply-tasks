@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { PRIORITIES, STATUSES } from "../enums";
-import { cuidSchema, optionalIsoDateTimeSchema } from "./common";
+import { cuidSchema, kstDateStringSchema, optionalIsoDateTimeSchema } from "./common";
+
+// PATCH 입력 자체뿐 아니라 기존 행과 병합한 최종 범위에도 적용합니다.
+export const workItemDateRangeSchema = z.object({
+  startDate: z.date().nullable().optional(),
+  endDate: z.date().nullable().optional(),
+}).refine((v) => !v.startDate || !v.endDate || v.startDate <= v.endDate, {
+  error: "endDate는 startDate 이후여야 합니다", path: ["endDate"],
+});
 
 export const WORK_ITEM_SCOPES = ["all", "active", "transferred"] as const;
 
@@ -93,8 +101,8 @@ export const workItemListQuerySchema = z.object({
     .pipe(z.array(z.string()).optional()),
   priority: csvEnum(PRIORITIES),
   ticket: z.string().min(1).optional(),
-  transferDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  transferDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  transferDate: kstDateStringSchema.optional(),
+  transferDateTo: kstDateStringSchema.optional(),
   // 텍스트 검색
   title: z.string().max(300).optional(),
   requestType: z.string().max(200).optional(),
@@ -112,6 +120,8 @@ export const workItemListQuerySchema = z.object({
     .optional()
     .transform((v) => v === "true")
     .pipe(z.boolean()),
+  }).refine((v) => !v.transferDate || !v.transferDateTo || v.transferDate <= v.transferDateTo, {
+    error: "종료일은 시작일 이후여야 합니다", path: ["transferDateTo"],
   });
 
 export const workItemBulkStatusUpdateSchema = z.object({

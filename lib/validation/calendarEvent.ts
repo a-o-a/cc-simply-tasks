@@ -2,6 +2,13 @@ import { z } from "zod";
 import { cuidSchema, isoDateTimeSchema } from "./common";
 import { CALENDAR_EVENT_CATEGORIES } from "@/lib/enums";
 
+export const calendarEventDateRangeSchema = z.object({
+  startDateTime: z.date(),
+  endDateTime: z.date(),
+}).refine((v) => v.startDateTime < v.endDateTime, {
+  error: "endDateTime은 startDateTime보다 이후여야 합니다", path: ["endDateTime"],
+});
+
 export const calendarEventCreateSchema = z
   .object({
     title: z.string().min(1).max(300),
@@ -46,6 +53,8 @@ export const calendarEventRangeQuerySchema = z.object({
   from: isoDateTimeSchema,
   to: isoDateTimeSchema,
   memberId: cuidSchema.optional(),
+}).refine((v) => v.from < v.to, {
+  error: "조회 종료 시각은 시작 시각보다 이후여야 합니다", path: ["to"],
 });
 
 export type CalendarEventCreateInput = z.infer<typeof calendarEventCreateSchema>;

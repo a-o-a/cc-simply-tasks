@@ -1,11 +1,12 @@
 import { z } from "zod";
+import { HttpError } from "@/lib/http";
 
 /**
  * Cursor 기반 페이지네이션.
  *
  * 사용 예:
  *   const { take, cursor } = parsePagination(searchParams);
- *   const rows = await db.select().from(workItems).orderBy(desc(workItems.createdAt));
+ *   const rows = await db.select().from(workItems).orderBy(desc(workItems.createdAt)).limit(take + 1);
  *   const { items, nextCursor } = toPage(rows, take);
  */
 
@@ -41,7 +42,7 @@ export function parsePagination(
 }
 
 /**
- * findMany의 결과(take+1 개)에서 items와 nextCursor를 분리.
+ * 정렬된 결과(take+1 개)에서 items와 nextCursor를 분리.
  */
 export function toPage<T extends { id: string }>(
   rows: T[],
@@ -59,12 +60,10 @@ export function slicePageAfterCursor<T extends { id: string }>(
   cursor: string | undefined,
   take: number,
 ): { items: T[]; nextCursor: string | null } {
-  const start =
-    cursor === undefined
-      ? 0
-      : Math.max(
-          0,
-          rows.findIndex((row) => row.id === cursor) + 1,
-        );
+  const cursorIndex = cursor === undefined ? -1 : rows.findIndex((row) => row.id === cursor);
+  if (cursor !== undefined && cursorIndex === -1) {
+    throw new HttpError("BAD_REQUEST", "목록이 변경되었습니다. 처음부터 다시 조회해주세요.");
+  }
+  const start = cursorIndex + 1;
   return toPage(rows.slice(start, start + take + 1), take);
 }

@@ -16,9 +16,12 @@ export const PATCH = withErrorHandler(
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = todoChecklistUpdateSchema.parse(await req.json());
-    const updatedAt = now();
 
     const updated = await db.transaction(async (tx) => {
+      const [parent] = await tx.select({ updatedAt: todos.updatedAt }).from(todos)
+        .where(and(eq(todos.id, routeParams.id), isNull(todos.deletedAt))).limit(1);
+      if (!parent) throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
+      const updatedAt = new Date(Math.max(now().getTime(), parent.updatedAt.getTime() + 1));
       const beforeRows = await tx
         .select()
         .from(todoChecklist)
@@ -71,9 +74,12 @@ export const DELETE = withErrorHandler(
     const routeParams = await params;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
-    const deletedAt = now();
 
     await db.transaction(async (tx) => {
+      const [parent] = await tx.select({ updatedAt: todos.updatedAt }).from(todos)
+        .where(and(eq(todos.id, routeParams.id), isNull(todos.deletedAt))).limit(1);
+      if (!parent) throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
+      const deletedAt = new Date(Math.max(now().getTime(), parent.updatedAt.getTime() + 1));
       const beforeRows = await tx
         .select()
         .from(todoChecklist)

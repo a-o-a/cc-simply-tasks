@@ -87,7 +87,7 @@ export function MemberFilter({
         <Popover.Content
           align="start"
           sideOffset={6}
-          className="z-50 rounded-md border bg-popover p-2 shadow-md animate-in fade-in-0 zoom-in-95"
+          className="z-50 max-h-[var(--radix-popover-content-available-height)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-md border bg-popover p-2 shadow-md animate-in fade-in-0 zoom-in-95"
         >
           <div className={cn("grid gap-1", mode === "multi" ? "grid-cols-5" : "grid-cols-4")}>
             {/* 전체 버튼 — multi 모드에서만 표시 */}
@@ -116,9 +116,12 @@ export function MemberFilter({
               return (
                 <button
                   key={m.id}
+                  type="button"
+                  aria-label={m.name}
+                  aria-pressed={selected}
                   onClick={() => handleToggle(m.id)}
                   className={cn(
-                    "flex flex-col items-center gap-1 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-accent",
+                    "flex min-w-0 flex-col items-center gap-1 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-accent",
                     selected ? "bg-primary/10 text-primary font-medium" : "text-foreground",
                   )}
                 >

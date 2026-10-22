@@ -71,8 +71,8 @@ Tailwind 4 기준 지원 브라우저는 Safari 16.4+, Chrome 111+, Firefox 128+
 │       └── audit-logs/
 │           └── route.ts         # GET(read-only, ?entityType&entityId 등)
 ├── components/
-│   ├── app-shell.tsx            # 사이드바 + 게이트 + 토스터 셸 (h-screen 레이아웃)
-│   ├── sidebar.tsx              # 좌측 네비게이션 (240/64 collapsible, 서비스명 동적 표시)
+│   ├── app-shell.tsx            # 반응형 셸 (h-dvh, 모바일 상단 메뉴 + 본문)
+│   ├── sidebar.tsx              # 데스크톱 좌측 240/64, 모바일 상단 네비게이션
 │   ├── member-filter.tsx        # 재사용 팀원 필터 드롭다운 (Radix Popover, 캘린더·작업 공용)
 │   ├── actor-name-gate.tsx      # 액터 이름 강제 모달 (ESC/바깥 차단)
 │   ├── toaster.tsx
@@ -81,7 +81,7 @@ Tailwind 4 기준 지원 브라우저는 Safari 16.4+, Chrome 111+, Firefox 128+
 │   │   ├── button/input/label/select/textarea/badge/dialog/sheet/tabs/toast
 │   │   └── date-picker.tsx      # Radix Popover 기반 DatePicker / DateTimePicker
 │   ├── work-items/
-│   │   ├── work-items-client.tsx  # 진행/이관완료 scope + 뷰토글 + 필터 + 이관완료 페이지네이션
+│   │   ├── work-items-client.tsx  # 진행/이관완료 scope + 뷰토글 + 필터 + 양쪽 scope 페이지네이션
 │   │   ├── table-view.tsx
 │   │   ├── kanban-view.tsx
 │   │   ├── gantt-view.tsx
@@ -117,7 +117,7 @@ Tailwind 4 기준 지원 브라우저는 Safari 16.4+, Chrome 111+, Firefox 128+
 │   ├── enums.ts                 # enum 소스 오브 트루스 (Status 8종, Priority, MemberRole 등)
 │   ├── enum-labels.ts           # enum → 한글 라벨 (표시 전용, CATEGORY_LABELS 제거됨)
 │   ├── time.ts / actor.ts / diff.ts / audit.ts / http.ts
-│   ├── pagination.ts            # cursor 기반 (기본 50, 최대 200)
+│   ├── pagination.ts            # cursor 기반 (기본 50, 최대 10,000)
 │   ├── utils.ts
 │   └── validation/
 │       ├── common.ts / teamMember.ts / workTicket.ts / calendarEvent.ts
@@ -205,8 +205,10 @@ npm run start
 | `npm run lint` | flat config 기반 `eslint . --max-warnings=0` |
 | `npm run typecheck` | `next typegen` 후 `tsc --noEmit` |
 | `npm run test:smoke` | Node 테스트 러너로 API·DB·백업 검증 |
-| `npm run test:ui` | Playwright Chromium으로 UI 검증 (별도 실행) |
-| `npm run check` | lint → typecheck → build → smoke 순서 실행 |
+| `npm run test:ui` | Playwright Chromium 정상 흐름·모바일·오류 복구·목록 경계 회귀 검증 |
+| `npm run test:regression` | 날짜·TODO 원자 저장/동시 편집·캘린더 범위 회귀 검증 |
+| `npm run benchmark` | 격리 메모리 DB와 합성 데이터로 조회·날짜 계산 전후 비교 |
+| `npm run check` | lint → typecheck → build → smoke → regression 순서 실행 |
 | `npm run db:generate` | 개발 스키마 변경에서 migration SQL 생성 |
 | `npm run db:migrate` | 커밋된 migration 적용 |
 
@@ -220,7 +222,7 @@ npx playwright install chromium
 npm run test:ui
 ```
 
-API/UI 테스트는 빌드 결과를 사용해 임시 DB와 별도 서버를 생성합니다. `test:smoke` 또는 `test:ui`만 직접 실행할 때는 먼저 `npm run build`를 실행하세요. 테스트 스크립트는 기존 개발·운영 DB를 대상으로 사용하지 않습니다. 이 절은 실행 방법이며 검증 통과 기록은 아닙니다. [Playwright 브라우저 설치](https://playwright.dev/docs/browsers)
+API/UI 테스트는 빌드 결과를 사용해 임시 DB와 별도 서버를 생성합니다. `test:smoke`, `test:regression`, `test:ui`만 직접 실행할 때는 먼저 `npm run build`를 실행하세요. 테스트 스크립트는 기존 개발·운영 DB를 대상으로 사용하지 않습니다. 이 절은 실행 방법이며 검증 통과 기록은 아닙니다. [Playwright 브라우저 설치](https://playwright.dev/docs/browsers)
 
 ## 스키마 변경과 마이그레이션
 
@@ -293,7 +295,7 @@ Node 22 / Next 16 / React 19 / Tailwind 4 / Zod 4로 실행 기준을 갱신했�
 | 작업 목록 | `진행 작업 / 이관 완료` 2개 scope. 진행 작업은 테이블/칸반/간트, 이관 완료는 테이블 전용(칸반/간트 비활성). |
 | 시스템 연동 | WorkTicket은 시스템 선택만으로 저장 가능, 티켓번호는 선택 입력. |
 | 날짜/시간 | 저장: UTC ISO. 표시: KST. all-day 이벤트는 반열림 `[start, end)` 구간. |
-| 동시 편집 | 현재 API는 `If-Match` 검증을 하지 않음. 409는 유니크 제약 등 충돌 응답이며 동시 편집 보호는 후속 과제. |
+| 동시 편집 | TODO 편집은 `expectedUpdatedAt`으로 버전을 검사해 불일치 시 409 반환. 다른 API 및 이 값을 생략한 클라이언트에는 동시 편집 보호가 없고 `If-Match`도 검사하지 않음. |
 | SQLite 경로 | 현재 기본값은 `DATABASE_URL="file:./db/dev.db"`. |
 | 감사 로그 | 모든 write는 transaction + `withAudit(tx, ...)` 패턴 필수. |
 | 설정 탭 구조 | 서비스 / 멤버 / 코드관리(분류+시스템 코드) / 백업 4탭. |
@@ -318,7 +320,7 @@ Node 22 / Next 16 / React 19 / Tailwind 4 / Zod 4로 실행 기준을 갱신했�
 | 티켓 유니크 제약 | `WorkTicket`은 `workItemId + systemName` 유니크. 작업당 같은 시스템은 1개만 연결 가능. |
 | 티켓 컬럼 변경 | `ticketUrl` 제거. 현재는 시스템 코드(`systemName`)와 작업번호(`ticketNumber`)만 저장. |
 | 작업 폼 담당자 선택 | `MemberFilter`는 `mode="single"` 지원. 작업 폼에서는 단일 선택 팝오버로 사용. |
-| 헤더 레이아웃 통일 | 모든 페이지 `text-xl font-semibold` + `py-6`. 작업/캘린더: 좌(타이틀)/가운데(컨트롤)/우(추가버튼) 3분할. |
+| 헤더 레이아웃 통일 | 데스크톱 작업/캘린더는 타이틀·컨트롤·추가버튼 배치. 모바일은 줄바꿈과 한 열 필터를 사용하며 넓은 표는 내부 스크롤. |
 | DB 현황 | `GET /api/db-stats` — 테이블별 전체 레코드 수. 설정→백업 탭 상단에 표시. |
 | 코드 관리 복원 | 소프트 딜리트된 코드를 같은 코드로 재등록 시 `create` 대신 복원(`deletedAt=null`). |
 | 칸반 스크롤 UX | 스크롤바 숨김(`scrollbarWidth:none`), 좌우 그라디언트 화살표(ResizeObserver로 가시 제어), 배경 클릭드래그 스크롤(카드 버튼은 제외). |
@@ -412,7 +414,20 @@ Node 22 / Next 16 / React 19 / Tailwind 4 / Zod 4로 실행 기준을 갱신했�
 
 - **모든 도메인 write는 `db.transaction` + `withAudit()`** 로 감사 로그와 묶음
 - **Soft delete** (`deletedAt`) — 인증 없는 환경에서 복구 수단 확보
-- **동시 편집 보호는 후속 과제** — 현재 API는 If-Match 헤더를 검증하지 않음
+- **TODO 편집 충돌 보호** — 드로어 저장 시 `expectedUpdatedAt`을 보내며, 다른 곳에서 변경된 경우 409로 거부하고 초안을 보존합니다. 체크리스트와 부모 필드는 같은 트랜잭션에서 저장합니다. 다른 API 및 버전을 생략한 호출은 동시 편집 보호 대상이 아닙니다.
 - **시간 저장은 UTC, 표시는 `Asia/Seoul`** — 한 곳(`lib/time.ts`)에서 관리
-- **cursor 기반 페이지네이션** — 기본 50, 최대 200
+- **cursor 기반 페이지네이션** — 기본 50, 최대 10,000. 작업/TODO/감사 로그의 첫 페이지는 DB에서 필요한 행만 조회하며, 누락된 커서는 400 오류로 알림
 - **Postgres 이관 대비**: `id`는 cuid2, JSON은 문자열로 저장; SQLite 전용 구문은 DB·백업 계층에 한정
+
+
+## 출시 전 회귀 검수
+
+검수 결과·측정 조건·전후 화면·남은 제약은 [2026-10-22 검수 기록](docs/RELEASE_AUDIT_20261022.md)에 있습니다.
+
+- 모바일에서는 상단 메뉴와 한 열 필터를 사용합니다. 테이블·간트·월간 캘린더처럼 넓은 정보는 해당 영역 안에서 가로로 스크롤합니다.
+- 진행 작업은 `더보기`, 이관 완료는 `이전`·`다음`으로 후속 항목에 접근합니다. 팀원 선택과 월별 집계는 마지막 페이지까지 조회합니다.
+- 작업 제목 버튼은 키보드 Enter/Space로 상세를 열고, Escape로 닫으면 원래 버튼으로 돌아옵니다.
+- 목록 조회 실패는 빈 결과와 구분하며 `다시 시도`를 제공합니다. 삭제된 페이지 커서로 조회할 경우 처음부터 다시 불러옵니다.
+- TODO 제목·메모·상태·담당자·날짜·체크리스트는 저장 버튼 또는 제목의 Enter로 함께 저장합니다. 기존 체크 ID는 유지하고 생략된 항목은 soft delete합니다. 충돌·실패 시 초안은 그대로 남으며, 충돌 안내에 따라 최신 내용을 다시 확인합니다.
+
+`test:ui`는 Chromium 설치가 필요합니다. `PLAYWRIGHT_BROWSERS_PATH`로 별도 캐시 위치를 지정할 수 있으며, 설치와 실행에 같은 값을 사용하세요. 모든 테스트는 임시 DB/로컬 서버를 만들고 정리하며 기존 DB에 쓰지 않습니다.

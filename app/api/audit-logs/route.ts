@@ -26,11 +26,13 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     filters.actorName ? eq(auditLogs.actorName, filters.actorName) : undefined,
   ].filter(Boolean);
 
-  const rows = await db
+  const query = db
     .select()
     .from(auditLogs)
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id));
+
+  const rows = await (cursor ? query : query.limit(take + 1));
 
   const { items, nextCursor } = slicePageAfterCursor(rows, cursor, take);
   return NextResponse.json({ items, nextCursor });

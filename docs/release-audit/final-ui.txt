@@ -1,0 +1,37 @@
+npm notice run cc-simply-tasks@0.1.0 test:ui
+npm notice run node --test scripts/ui.test.mjs scripts/release-ui.test.mjs scripts/pagination-regression.test.mjs
+▶ pagination and work-list regression checks
+  ✔ first page, tied sort keys, filters and subsequent pages match the full ordered result (71.218125ms)
+  ✔ a missing cursor gives an explicit recoverable error instead of repeating page one (27.432458ms)
+  ✔ the 51st active item is reachable in table, kanban and gantt views (3210.638459ms)
+  ✔ a deleted next-page cursor keeps visible work and offers a restart (181.945542ms)
+  ✔ debounced search ignores an older response and retries a failed load (1181.930875ms)
+  ✔ holding work stays accessible in the default kanban and status filter (1397.810125ms)
+  ✔ mobile filter labels and controls remain within the viewport (30.681375ms)
+✔ pagination and work-list regression checks (6524.532917ms)
+▶ release UI regressions on an isolated production database
+  ✔ mobile navigation and page controls fit a 390px viewport (918.701916ms)
+  ✔ work table detail can be opened and closed with the keyboard (961.552833ms)
+  ✔ a late initial TODO response cannot erase a new draft (163.874125ms)
+  ✔ TODO failure is distinct from empty data and retry recovers (229.533292ms)
+  ✔ calendar failure has a retry and recovers without changing month (181.2465ms)
+  ✔ the 51st member is available in management and assignment (826.375833ms)
+  ✔ late TODO search results cannot replace the current filter (699.280333ms)
+  ✔ failed TODO save preserves its draft and retries as a single write (1419.414083ms)
+  ✔ calendar counts all pages of transfer work (403.501458ms)
+  ✔ a stale work detail response cannot replace the newly selected work (1076.2315ms)
+  ✔ concurrent TODO edits keep the draft and protect another user's checklist (219.664791ms)
+✔ release UI regressions on an isolated production database (7482.5115ms)
+▶ browser workflows on a disposable production database
+  ✔ actor registration, settings, members, codes and light/dark themes (2098.37825ms)
+  ✔ work item views, date picker and TODO Enter/checklist saving (5918.240666ms)
+  ✔ calendar event creation, backup controls and browser errors (2271.701708ms)
+✔ browser workflows on a disposable production database (10704.008708ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11057.526875

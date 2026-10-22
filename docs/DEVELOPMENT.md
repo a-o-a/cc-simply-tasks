@@ -239,7 +239,7 @@ export const PATCH = withErrorHandler(
 - 라우트는 반드시 `withErrorHandler`로 감싼다.
 - SQLite unique 에러는 `withErrorHandler`가 Drizzle 오류의 `cause` 체인까지 확인해 `CONFLICT`로 매핑한다.
 - Zod 4는 `flattenError(err)`로 `details.formErrors`/`details.fieldErrors` 응답 구조를 유지한다. 신규 스키마는 `z.iso.datetime`, `z.url`과 `error` 옵션을 사용한다. [Zod 4 변경점](https://zod.dev/v4/changelog)
-- 현재 API는 `If-Match`를 검사하지 않는다. 409 응답이 있다는 이유로 동시 편집 보호가 구현되어 있다고 가정하지 않는다.
+- `If-Match` 헤더는 검사하지 않는다. TODO PATCH만 선택적 `expectedUpdatedAt`을 트랜잭션에서 비교하며 불일치는 409다. 공식 TODO 드로어는 항상 버전을 전달한다. 다른 API와 버전 생략 호출은 동시 편집 보호 대상이 아니다.
 
 ### 5.2 성공 응답
 
@@ -256,7 +256,9 @@ export const PATCH = withErrorHandler(
 ### 5.3 페이지네이션
 
 - `parsePagination(searchParams)` → `{ take, cursor }`
-- Drizzle에서는 cursor-skip을 DB에 직접 밀지 않고, 현재 코드베이스처럼 정렬된 결과를 `slicePageAfterCursor()`로 잘라낸다.
+- 작업/TODO/감사 로그의 커서 없는 첫 페이지는 SQL `LIMIT take + 1`로 조회한 뒤 `toPage()`로 응답한다.
+- 기존 ID 커서가 있는 후속 페이지는 정렬 결과를 `slicePageAfterCursor()`로 자른다. 이 경로는 전체 조회 비용이 남아 있다. 커서가 삭제되거나 필터에 없으면 400이며 클라이언트는 처음부터 재조회한다.
+- 기본 50, 최대 10,000행이다. 전건이 필요한 담당자 선택·월 집계는 `api.getAll<T>()`로 200행씩 마지막 페이지까지 순회한다.
 - 항상 안정 정렬을 유지한다.
 
 ### 5.4 Soft delete
@@ -335,7 +337,7 @@ npm run db:migrate
 ## 자동 검증
 
 ```bash
-npm run check                 # lint → typecheck → build → API smoke
+npm run check                 # lint → typecheck → build → API smoke → regression
 npx playwright install chromium
 npm run test:ui               # 별도 UI 검증
 ```
@@ -403,3 +405,15 @@ db.select().from(workItems);
 const tickets = await db.select().from(workTickets) ...
 const assignees = await db.select().from(teamMembers) ...
 ```
+
+
+## 출시 검수에서 추가한 규칙
+
+- 기간 PATCH는 입력 필드뿐 아니라 기존 행과 병합한 최종 날짜 범위를 트랜잭션 안에서 검증한다. 작업은 같은 시작/종료일 및 null 해제를 허용하며, 일정은 종료 시각이 시작보다 뒤여야 한다. 날짜 필터는 실재 날짜와 순서를 검증한다.
+- TODO PATCH의 `checklist` 생략은 기존 항목 유지, 배열 제공은 해당 순서로 전체 대체다. 기존 항목은 ID를 유지하고, 다른 TODO·삭제된 항목 ID 및 중복 ID를 거부한다. 부모·자식·각 감사 로그는 한 트랜잭션에서 반영한다.
+- TODO 드로어는 `expectedUpdatedAt`을 보낸다. TODO PATCH와 자식 쓰기 모두 부모 `updatedAt`을 `max(now, previous + 1ms)`로 갱신해 같은 밀리초에도 버전이 달라진다. 충돌 시 409이며 클라이언트 초안을 유지한다.
+- 비동기 목록·상세 조회는 이전 요청을 취소하고 최신 응답만 반영한다. 폼 초기화 effect는 부모가 재렌더할 때 바뀌는 콜백에 의존하지 않는다.
+- 캘린더·간트의 `eventDayKeys` 호출에는 KST 자정 기준 `[fromMs, toMs)` 표시 범위를 넘겨 긴 기간 일정을 화면 밖까지 펼치지 않는다.
+- 로딩, 조회 실패, 필터 결과 없음은 다른 상태다. 오류에서 다시 시도할 수 있어야 하며, 실패를 데이터가 없다는 뜻으로 표시하지 않는다.
+- 페이지 전체에 최소 데스크톱 폭을 강제하지 않는다. 넓은 표·캘린더만 내부 스크롤하며, 팝오버는 화면의 사용 가능한 높이/폭 안에 둔다.
+- 수동 검수 기록과 실제 실행 결과는 [출시 검수 기록](RELEASE_AUDIT_20261022.md)에 둔다.

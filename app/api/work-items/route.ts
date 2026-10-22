@@ -95,7 +95,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       : undefined,
   ].filter(Boolean);
 
-  const rows = await db
+  const query = db
     .select()
     .from(workItems)
     .where(and(...conditions))
@@ -104,6 +104,10 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
         ? [desc(workItems.transferDate), desc(workItems.createdAt), desc(workItems.id)]
         : [asc(workItems.order), desc(workItems.createdAt), desc(workItems.id)]),
     );
+
+  // Only materialize the requested first page. Cursor pages retain the stable
+  // ordering above until the API moves to a versioned keyset cursor.
+  const rows = await (cursor ? query : query.limit(take + 1));
 
   const { items: pageItems, nextCursor } = slicePageAfterCursor(rows, cursor, take);
   const items = await hydrateWorkItems(pageItems, "list");

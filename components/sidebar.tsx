@@ -159,20 +159,23 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "sticky top-0 flex h-screen shrink-0 flex-col border-r bg-card transition-[width] duration-200",
-        collapsed ? "w-16" : "w-60",
+        "sticky top-0 flex h-auto w-full shrink-0 flex-col border-b bg-card transition-[width] duration-200 md:h-dvh md:border-b-0 md:border-r",
+        collapsed ? "md:w-16" : "md:w-60",
       )}
     >
       {/* 헤더 */}
       <div className="flex h-14 items-center justify-between border-b px-3">
-        {!collapsed ? (
-          <Link href="/" className="truncate text-sm font-semibold tracking-tight">
+        <Link href="/" className={cn("min-w-0 truncate text-sm font-semibold tracking-tight", collapsed && "md:hidden")}>
             {serviceName}
-          </Link>
-        ) : (
-          <span className="sr-only">{serviceName}</span>
-        )}
+        </Link>
+        <div className="ml-auto flex shrink-0 items-center md:hidden">
+          <Button variant="ghost" size="icon" onClick={openNameDialog} aria-label="이름 변경">
+            <UserCog className="h-4 w-4" />
+          </Button>
+          <ThemeToggle />
+        </div>
         <Button
+          className="hidden md:inline-flex"
           variant="ghost"
           size="icon"
           onClick={toggleCollapsed}
@@ -187,7 +190,7 @@ export function Sidebar() {
       </div>
 
       {/* 네비게이션 */}
-      <nav className="flex-1 space-y-1 p-2">
+      <nav aria-label="주 메뉴" className="grid grid-cols-6 gap-1 p-2 md:block md:flex-1 md:space-y-1">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = item.exact
@@ -198,20 +201,22 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "relative flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+                "relative flex min-h-11 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium transition-colors md:h-9 md:min-h-0 md:flex-row md:justify-start md:gap-3 md:px-3 md:text-sm",
                 active
                   ? "bg-secondary text-secondary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                collapsed && "justify-center px-0",
+                collapsed && "md:justify-center md:px-0",
               )}
+              aria-label={item.label}
+              aria-current={active ? "page" : undefined}
               title={collapsed ? item.label : undefined}
             >
               <Icon className="h-4 w-4 shrink-0" />
+              <span className={cn("min-w-0 md:flex-1", collapsed && "md:hidden")}>{item.label}</span>
               {!collapsed ? (
                 <>
-                  <span className="min-w-0 flex-1">{item.label}</span>
                   {item.href === "/todos" && openTodoCount > 0 ? (
-                    <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-muted text-muted-foreground px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums">
+                    <span className="absolute right-0 top-0 inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-muted text-muted-foreground px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums md:static">
                       {openTodoCount > 99 ? "99+" : openTodoCount}
                     </span>
                   ) : null}
@@ -227,7 +232,7 @@ export function Sidebar() {
       </nav>
 
       {/* 하단: 액터 + 테마 */}
-      <div className="border-t p-2">
+      <div className="hidden border-t p-2 md:block">
         {!collapsed ? (
           <div className="flex items-center justify-between gap-2">
             <button

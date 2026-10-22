@@ -1,0 +1,124 @@
+▶ TODO edits commit the parent, checklist and audit records atomically
+  ✖ one PATCH preserves existing IDs, creates/deletes children and returns the saved draft (21.691708ms)
+  ✖ foreign and duplicate checklist IDs are rejected before any draft is committed (12.995166ms)
+  ✖ a checklist write failure rolls back parent, removals and audits, then a retry succeeds once (9.153167ms)
+  ✖ omitting checklist preserves children and individual checklist APIs keep working (18.874125ms)
+✖ TODO edits commit the parent, checklist and audit records atomically (417.514208ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 651.100458
+
+✖ failing tests:
+
+test at scripts/todo-regression.test.mjs:29:11
+✖ one PATCH preserves existing IDs, creates/deletes children and returns the saved draft (21.691708ms)
+  AssertionError [ERR_ASSERTION]: PATCH must return the saved checklist without another GET
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:40:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:29:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/todo-regression.test.mjs:59:11
+✖ foreign and duplicate checklist IDs are rejected before any draft is committed (12.995166ms)
+  AssertionError [ERR_ASSERTION]: PATCH /api/todos/qpfs2scvpncm1mh06hkxtw27: {"id":"qpfs2scvpncm1mh06hkxtw27","title":"must not persist","note":null,"status":"OPEN","dueDate":null,"order":0,"assigneeId":null,"createdAt":"2026-10-22T09:09:28.984Z","updatedAt":"2026-10-22T09:09:28.994Z","deletedAt":null}
+  ▲ Next.js 16.4.1
+  - Local:         http://127.0.0.1:55986
+  - Network:       http://127.0.0.1:55986
+  ✓ Ready in 95ms
+  ✓ Running next.config.js took 7ms
+  [backup] 자동 백업 스케줄 등록됨 (0 0 0 29 2 *)
+
+
+  200 !== 400
+
+      at request (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:22:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:64:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:59:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 400,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/todo-regression.test.mjs:76:11
+✖ a checklist write failure rolls back parent, removals and audits, then a retry succeeds once (9.153167ms)
+  AssertionError [ERR_ASSERTION]: PATCH /api/todos/rrmcus6vbs7k57ipygz9ikci: {"id":"rrmcus6vbs7k57ipygz9ikci","title":"retried draft","note":null,"status":"OPEN","dueDate":null,"order":0,"assigneeId":null,"createdAt":"2026-10-22T09:09:28.997Z","updatedAt":"2026-10-22T09:09:29.003Z","deletedAt":null}
+  ▲ Next.js 16.4.1
+  - Local:         http://127.0.0.1:55986
+  - Network:       http://127.0.0.1:55986
+  ✓ Ready in 95ms
+  ✓ Running next.config.js took 7ms
+  [backup] 자동 백업 스케줄 등록됨 (0 0 0 29 2 *)
+
+
+  200 !== 500
+
+      at request (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:22:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:86:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:76:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 500,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/todo-regression.test.mjs:99:11
+✖ omitting checklist preserves children and individual checklist APIs keep working (18.874125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   {
+  +     assignee: null,
+  +     assigneeId: null,
+  +     content: 'preserved',
+  +     createdAt: '2026-10-22T09:09:29.006Z',
+  +     deletedAt: null,
+  +     done: false,
+  +     id: 'iw69a527y6wvj4cc6drbilnc',
+  +     order: 0,
+  +     todoId: 'txekoorh4ik7tomkske1voqj',
+  +     updatedAt: '2026-10-22T09:09:29.006Z'
+  +   }
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:109:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/todo-regression.test.mjs:99:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { id: 'iw69a527y6wvj4cc6drbilnc', todoId: 'txekoorh4ik7tomkske1voqj', content: 'preserved', done: false, order: 0, assigneeId: null, createdAt: '2026-10-22T09:09:29.006Z', updatedAt: '2026-10-22T09:09:29.006Z', deletedAt: null, assignee: null } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

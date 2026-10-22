@@ -1,0 +1,15 @@
+npm notice run cc-simply-tasks@0.1.0 test:ui
+npm notice run node --test scripts/ui.test.mjs
+▶ browser workflows on a disposable production database
+  ✔ actor registration, settings, members, codes and light/dark themes (2147.755291ms)
+  ✔ work item views, date picker and TODO Enter/checklist saving (5873.344542ms)
+  ✔ calendar event creation, backup controls and browser errors (2222.857917ms)
+✔ browser workflows on a disposable production database (11736.801458ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12074.486375

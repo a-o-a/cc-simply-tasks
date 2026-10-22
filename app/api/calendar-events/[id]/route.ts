@@ -8,7 +8,7 @@ import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { emitCalendarChanged } from "@/lib/calendar-bus";
-import { calendarEventUpdateSchema } from "@/lib/validation/calendarEvent";
+import { calendarEventDateRangeSchema, calendarEventUpdateSchema } from "@/lib/validation/calendarEvent";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -67,6 +67,7 @@ export const PATCH = withErrorHandler(
         ...(input.note !== undefined ? { note: input.note } : {}),
         updatedAt,
       };
+      calendarEventDateRangeSchema.parse(after);
       await tx.update(calendarEvents).set(after).where(eq(calendarEvents.id, routeParams.id));
       await withAudit(tx, {
         entityType: "CalendarEvent",

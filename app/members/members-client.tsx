@@ -27,10 +27,10 @@ import { cn } from "@/lib/utils";
  * Phase 4 Step 3 — 가장 단순한 모델로 list/create/edit/delete + 낙관적 락 +
  * 토스트 패턴을 검증한다. 이 페이지에서 정착시킨 패턴을 다른 페이지가 답습한다.
  *
- * - GET /api/team-members (cursor 페이지네이션이지만 1차는 첫 페이지만)
+ * - GET /api/team-members (모든 페이지 조회)
  * - POST /api/team-members
- * - PATCH /api/team-members/:id (If-Match: updatedAt)
- * - DELETE /api/team-members/:id (If-Match: updatedAt)
+ * - PATCH /api/team-members/:id
+ * - DELETE /api/team-members/:id
  *
  * 낙관적 락 충돌(409)이 나면 최신 데이터를 다시 불러오라는 토스트만 띄우고
  * 자동 reload (간단). 더 정교한 머지 UI는 작업/티켓 단계에서 다룰 예정.
@@ -43,8 +43,6 @@ type Member = {
   createdAt: string;
   updatedAt: string;
 };
-
-type ListResponse = { items: Member[]; nextCursor: string | null };
 
 type DialogState =
   | { mode: "closed" }
@@ -62,8 +60,7 @@ export function MembersClient() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<ListResponse>("/api/team-members");
-      setItems(res.items);
+      setItems(await api.getAll<Member>("/api/team-members"));
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "목록 조회 실패";
       setError(message);

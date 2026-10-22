@@ -1,0 +1,23 @@
+npm notice run cc-simply-tasks@0.1.0 test:smoke
+npm notice run node --test scripts/smoke.test.mjs
+▶ production application smoke tests (isolated SQLite database)
+  ✔ all application pages and their JavaScript assets are served (64.036916ms)
+  ✔ team members, categories and systems support CRUD and restore (37.177ms)
+  ✔ work items, ticket replacement, bulk status and transfer filters (37.663459ms)
+  ✔ concurrent work writes commit their data and audit logs together (39.491375ms)
+  ✔ todos, checklist assignment/completion/reorder/deletion and counts (29.824417ms)
+  ✔ calendar events preserve members, date ranges and soft deletion (12.35475ms)
+  ✔ calendar changes reach an open server-sent event stream (109.8885ms)
+  ✔ settings update immediately and audit logs retain actor and before/after data (10.635792ms)
+  ✔ invalid input and missing resources return structured client errors (16.365667ms)
+  ✔ manual and direct backups contain the latest data and pass SQLite integrity checks (20.425ms)
+✔ production application smoke tests (isolated SQLite database) (656.597291ms)
+ℹ 155 HTTP checks completed against a disposable database.
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 870.937708

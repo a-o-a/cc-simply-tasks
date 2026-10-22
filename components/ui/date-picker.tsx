@@ -72,13 +72,13 @@ function CalendarGrid({
     <>
       {/* 헤더 */}
       <div className="mb-2 flex items-center justify-between">
-        <button type="button" onClick={onPrev} className="rounded-sm p-1 hover:bg-accent">
+        <button type="button" aria-label="이전 달" onClick={onPrev} className="rounded-sm p-1 hover:bg-accent">
           <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-medium">
           {viewYear}년 {String(viewMonth).padStart(2, "0")}월
         </span>
-        <button type="button" onClick={onNext} className="rounded-sm p-1 hover:bg-accent">
+        <button type="button" aria-label="다음 달" onClick={onNext} className="rounded-sm p-1 hover:bg-accent">
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -233,21 +233,13 @@ export function DatePicker({
 
   return (
     <Popover.Root open={open} onOpenChange={disabled ? undefined : setOpen}>
-      <Popover.Trigger asChild>
-        <div
-          id={id}
-          role="button"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          tabIndex={disabled ? -1 : 0}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
-          className={cn(
-            "flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors",
-            "focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring",
-            disabled && "cursor-not-allowed opacity-50",
-            className,
-          )}
-        >
+      <div className={cn(
+        "flex h-9 w-full items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors focus-within:ring-1 focus-within:ring-ring",
+        disabled && "cursor-not-allowed opacity-50", className,
+      )}>
+        <Popover.Trigger asChild>
+          <button id={id} type="button" disabled={disabled}
+            className="flex h-full min-w-0 flex-1 items-center gap-2 text-left outline-none disabled:cursor-not-allowed">
           <span
             className={cn(
               "min-w-0 flex-1 truncate tabular-nums",
@@ -256,19 +248,16 @@ export function DatePicker({
           >
             {displayLabel || placeholder}
           </span>
-          {clearable && value && !disabled && (
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={(e) => { e.stopPropagation(); onChange(""); }}
-              className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </div>
-      </Popover.Trigger>
+            <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </button>
+        </Popover.Trigger>
+        {clearable && value && !disabled && (
+          <button type="button" aria-label="날짜 지우기" onClick={() => onChange("")}
+            className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
 
       <Popover.Portal>
         <Popover.Content align="start" sideOffset={4} className={popoverContentClass}>
@@ -449,21 +438,13 @@ export function DateTimePicker({
 
   return (
     <Popover.Root open={open} onOpenChange={disabled ? undefined : setOpen}>
-      <Popover.Trigger asChild>
-        <div
-          id={id}
-          role="button"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          tabIndex={disabled ? -1 : 0}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
-          className={cn(
-            "flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors",
-            "focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring",
-            disabled && "cursor-not-allowed opacity-50",
-            className,
-          )}
-        >
+      <div className={cn(
+        "flex h-9 w-full items-center gap-2 rounded-md border border-input bg-background px-3 text-sm transition-colors focus-within:ring-1 focus-within:ring-ring",
+        disabled && "cursor-not-allowed opacity-50", className,
+      )}>
+        <Popover.Trigger asChild>
+          <button id={id} type="button" disabled={disabled}
+            className="flex h-full min-w-0 flex-1 items-center gap-2 text-left outline-none disabled:cursor-not-allowed">
           <span
             className={cn(
               "min-w-0 flex-1 truncate tabular-nums",
@@ -472,19 +453,16 @@ export function DateTimePicker({
           >
             {displayLabel || placeholder}
           </span>
-          {clearable && value && !disabled && (
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={(e) => { e.stopPropagation(); onChange(""); }}
-              className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </div>
-      </Popover.Trigger>
+            <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </button>
+        </Popover.Trigger>
+        {clearable && value && !disabled && (
+          <button type="button" aria-label="날짜 지우기" onClick={() => onChange("")}
+            className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
 
       <Popover.Portal>
         <Popover.Content align="start" sideOffset={4} className={popoverContentClass}>

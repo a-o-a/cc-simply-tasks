@@ -331,7 +331,7 @@ export function EventFormDialog({
             </label>
 
             {state.allDay ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="ce-start-date">시작일</Label>
                   <DatePicker
@@ -352,7 +352,7 @@ export function EventFormDialog({
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="ce-start-dt">시작 시각</Label>
                   <DateTimePicker

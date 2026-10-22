@@ -129,6 +129,23 @@ async function request<T>(
 }
 
 export const api = {
+  // 담당자 선택·월 집계처럼 전체 목록이 필요한 화면은 마지막 페이지까지 조회합니다.
+  getAll: async <T>(path: string, options: Omit<RequestOptions, "body"> = {}): Promise<T[]> => {
+    const items: T[] = [];
+    const cursors = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const page = await request<{ items: T[]; nextCursor?: string | null }>("GET", path, {
+        ...options,
+        query: { ...options.query, pageSize: 200, cursor },
+      });
+      items.push(...page.items);
+      cursor = page.nextCursor ?? undefined;
+      if (cursor && cursors.has(cursor)) throw new ApiError("BAD_REQUEST", "목록을 다시 불러와 주세요", 400);
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+    return items;
+  },
   get: <T>(path: string, options?: Omit<RequestOptions, "body">) =>
     request<T>("GET", path, options),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, "body">) =>

@@ -1,0 +1,75 @@
+▶ partial date updates validate the stored range
+  ✖ work-items: single-ended updates and rollback (21.993375ms)
+  ✖ calendar-events: single-ended updates and rollback (9.926375ms)
+  ✖ nonexistent dates and reversed filter ranges return 400 (3.065333ms)
+✖ partial date updates validate the stored range (272.203542ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 472.235292
+
+✖ failing tests:
+
+test at scripts/date-regression.test.mjs:20:13
+✖ work-items: single-ended updates and rollback (21.993375ms)
+  AssertionError [ERR_ASSERTION]: {"status":200,"body":{"id":"aq1tucq6a02h3cy8sz7imqfr","title":"날짜 검수","description":null,"additionalNotes":null,"category":"","status":"WAITING","priority":"NORMAL","order":0,"assigneeId":null,"startDate":"2026-10-23T00:00:00.000Z","endDate":"2026-10-22T01:00:00.000Z","transferDate":null,"requestType":null,"requestor":null,"requestNumber":null,"requestContent":null,"createdAt":"2026-10-22T09:09:34.880Z","updatedAt":"2026-10-22T09:09:34.889Z","deletedAt":null}}
+
+  200 !== 400
+
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/date-regression.test.mjs:29:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/date-regression.test.mjs:20:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 400,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/date-regression.test.mjs:20:13
+✖ calendar-events: single-ended updates and rollback (9.926375ms)
+  AssertionError [ERR_ASSERTION]: {"status":200,"body":{"id":"n7p9yj8owqbkbvf1pbjtndz7","title":"날짜 검수","category":"ETC","startDateTime":"2026-10-23T00:00:00.000Z","endDateTime":"2026-10-22T01:00:00.000Z","allDay":false,"note":null,"createdAt":"2026-10-22T09:09:34.896Z","updatedAt":"2026-10-22T09:09:34.900Z","deletedAt":null,"members":[]}}
+
+  200 !== 400
+
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/date-regression.test.mjs:29:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/date-regression.test.mjs:20:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 400,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/date-regression.test.mjs:40:11
+✖ nonexistent dates and reversed filter ranges return 400 (3.065333ms)
+  AssertionError [ERR_ASSERTION]: /api/work-items?transferDate=2026-02-30
+
+  200 !== 400
+
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/date-regression.test.mjs:47:15)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/date-regression.test.mjs:40:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 400,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

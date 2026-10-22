@@ -162,13 +162,13 @@ export function DashboardClient() {
       });
 
     Promise.all([
-      api.get<ListResponse<Member>>("/api/team-members"),
+      api.getAll<Member>("/api/team-members"),
       api.get<{ items: WorkCategory[] }>("/api/work-categories"),
       api.get<{ items: WorkSystem[] }>("/api/work-systems"),
     ])
       .then(([membersRes, catRes, sysRes]) => {
         if (cancelled) return;
-        setMembers(membersRes.items);
+        setMembers(membersRes);
         setCategories(catRes.items);
         setSystems(sysRes.items);
       })
@@ -211,7 +211,7 @@ export function DashboardClient() {
   }
 
   return (
-    <div className="px-8 py-6 space-y-6">
+    <div className="px-4 py-4 md:px-8 md:py-6 space-y-6">
       {/* 헤더 */}
       <header>
         <h1 className="text-xl font-semibold">홈</h1>

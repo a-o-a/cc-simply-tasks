@@ -8,6 +8,4 @@ export const isoDateTimeSchema = z.iso
 
 export const optionalIsoDateTimeSchema = isoDateTimeSchema.optional().nullable();
 
-export const kstDateStringSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD 형식이어야 합니다");
+export const kstDateStringSchema = z.iso.date({ error: "유효한 YYYY-MM-DD 날짜여야 합니다" });

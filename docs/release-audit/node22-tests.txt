@@ -1,0 +1,262 @@
+TAP version 13
+# Subtest: long calendar events expand only into the visible month
+ok 1 - long calendar events expand only into the visible month
+  ---
+  duration_ms: 99.691375
+  ...
+# Subtest: range clipping preserves all-day exclusive endings and timed boundaries
+ok 2 - range clipping preserves all-day exclusive endings and timed boundaries
+  ---
+  duration_ms: 0.277375
+  ...
+# Subtest: partial date updates validate the stored range
+    # Subtest: work-items: single-ended updates and rollback
+    ok 1 - work-items: single-ended updates and rollback
+      ---
+      duration_ms: 62.606542
+      ...
+    # Subtest: calendar-events: single-ended updates and rollback
+    ok 2 - calendar-events: single-ended updates and rollback
+      ---
+      duration_ms: 20.027375
+      ...
+    # Subtest: nonexistent dates and reversed filter ranges return 400
+    ok 3 - nonexistent dates and reversed filter ranges return 400
+      ---
+      duration_ms: 9.668958
+      ...
+    1..3
+ok 3 - partial date updates validate the stored range
+  ---
+  duration_ms: 438.597041
+  ...
+# Subtest: pagination and work-list regression checks
+    # Subtest: first page, tied sort keys, filters and subsequent pages match the full ordered result
+    ok 1 - first page, tied sort keys, filters and subsequent pages match the full ordered result
+      ---
+      duration_ms: 93.643875
+      ...
+    # Subtest: a missing cursor gives an explicit recoverable error instead of repeating page one
+    ok 2 - a missing cursor gives an explicit recoverable error instead of repeating page one
+      ---
+      duration_ms: 27.016417
+      ...
+    # Subtest: the 51st active item is reachable in table, kanban and gantt views
+    ok 3 - the 51st active item is reachable in table, kanban and gantt views
+      ---
+      duration_ms: 3229.27525
+      ...
+    # Subtest: a deleted next-page cursor keeps visible work and offers a restart
+    ok 4 - a deleted next-page cursor keeps visible work and offers a restart
+      ---
+      duration_ms: 180.112959
+      ...
+    # Subtest: debounced search ignores an older response and retries a failed load
+    ok 5 - debounced search ignores an older response and retries a failed load
+      ---
+      duration_ms: 1182.209334
+      ...
+    # Subtest: holding work stays accessible in the default kanban and status filter
+    ok 6 - holding work stays accessible in the default kanban and status filter
+      ---
+      duration_ms: 1397.768792
+      ...
+    # Subtest: mobile filter labels and controls remain within the viewport
+    ok 7 - mobile filter labels and controls remain within the viewport
+      ---
+      duration_ms: 31.532375
+      ...
+    1..7
+ok 4 - pagination and work-list regression checks
+  ---
+  duration_ms: 6643.191958
+  ...
+# Subtest: release UI regressions on an isolated production database
+    # Subtest: mobile navigation and page controls fit a 390px viewport
+    ok 1 - mobile navigation and page controls fit a 390px viewport
+      ---
+      duration_ms: 927.40575
+      ...
+    # Subtest: work table detail can be opened and closed with the keyboard
+    ok 2 - work table detail can be opened and closed with the keyboard
+      ---
+      duration_ms: 957.282417
+      ...
+    # Subtest: a late initial TODO response cannot erase a new draft
+    ok 3 - a late initial TODO response cannot erase a new draft
+      ---
+      duration_ms: 164.635083
+      ...
+    # Subtest: TODO failure is distinct from empty data and retry recovers
+    ok 4 - TODO failure is distinct from empty data and retry recovers
+      ---
+      duration_ms: 244.295583
+      ...
+    # Subtest: calendar failure has a retry and recovers without changing month
+    ok 5 - calendar failure has a retry and recovers without changing month
+      ---
+      duration_ms: 181.685625
+      ...
+    # Subtest: the 51st member is available in management and assignment
+    ok 6 - the 51st member is available in management and assignment
+      ---
+      duration_ms: 866.038416
+      ...
+    # Subtest: late TODO search results cannot replace the current filter
+    ok 7 - late TODO search results cannot replace the current filter
+      ---
+      duration_ms: 699.656
+      ...
+    # Subtest: failed TODO save preserves its draft and retries as a single write
+    ok 8 - failed TODO save preserves its draft and retries as a single write
+      ---
+      duration_ms: 1331.340292
+      ...
+    # Subtest: calendar counts all pages of transfer work
+    ok 9 - calendar counts all pages of transfer work
+      ---
+      duration_ms: 421.195375
+      ...
+    # Subtest: a stale work detail response cannot replace the newly selected work
+    ok 10 - a stale work detail response cannot replace the newly selected work
+      ---
+      duration_ms: 1042.219375
+      ...
+    # Subtest: concurrent TODO edits keep the draft and protect another user's checklist
+    ok 11 - concurrent TODO edits keep the draft and protect another user's checklist
+      ---
+      duration_ms: 272.878375
+      ...
+    1..11
+ok 5 - release UI regressions on an isolated production database
+  ---
+  duration_ms: 7566.247375
+  ...
+# Subtest: production application smoke tests (isolated SQLite database)
+    # Subtest: all application pages and their JavaScript assets are served
+    ok 1 - all application pages and their JavaScript assets are served
+      ---
+      duration_ms: 65.224334
+      ...
+    # Subtest: team members, categories and systems support CRUD and restore
+    ok 2 - team members, categories and systems support CRUD and restore
+      ---
+      duration_ms: 49.307833
+      ...
+    # Subtest: work items, ticket replacement, bulk status and transfer filters
+    ok 3 - work items, ticket replacement, bulk status and transfer filters
+      ---
+      duration_ms: 47.587166
+      ...
+    # Subtest: concurrent work writes commit their data and audit logs together
+    ok 4 - concurrent work writes commit their data and audit logs together
+      ---
+      duration_ms: 71.765166
+      ...
+    # Subtest: todos, checklist assignment/completion/reorder/deletion and counts
+    ok 5 - todos, checklist assignment/completion/reorder/deletion and counts
+      ---
+      duration_ms: 44.428833
+      ...
+    # Subtest: calendar events preserve members, date ranges and soft deletion
+    ok 6 - calendar events preserve members, date ranges and soft deletion
+      ---
+      duration_ms: 23.61375
+      ...
+    # Subtest: calendar changes reach an open server-sent event stream
+    ok 7 - calendar changes reach an open server-sent event stream
+      ---
+      duration_ms: 113.738584
+      ...
+    # Subtest: settings update immediately and audit logs retain actor and before/after data
+    ok 8 - settings update immediately and audit logs retain actor and before/after data
+      ---
+      duration_ms: 16.518167
+      ...
+    # Subtest: invalid input and missing resources return structured client errors
+    ok 9 - invalid input and missing resources return structured client errors
+      ---
+      duration_ms: 35.026792
+      ...
+    # Subtest: manual and direct backups contain the latest data and pass SQLite integrity checks
+    ok 10 - manual and direct backups contain the latest data and pass SQLite integrity checks
+      ---
+      duration_ms: 29.499125
+      ...
+    1..10
+ok 6 - production application smoke tests (isolated SQLite database)
+  ---
+  duration_ms: 902.875625
+  ...
+# 155 HTTP checks completed against a disposable database.
+# Subtest: TODO edits commit the parent, checklist and audit records atomically
+    # Subtest: one PATCH preserves existing IDs, creates/deletes children and returns the saved draft
+    ok 1 - one PATCH preserves existing IDs, creates/deletes children and returns the saved draft
+      ---
+      duration_ms: 58.472167
+      ...
+    # Subtest: foreign and duplicate checklist IDs are rejected before any draft is committed
+    ok 2 - foreign and duplicate checklist IDs are rejected before any draft is committed
+      ---
+      duration_ms: 21.552875
+      ...
+    # Subtest: a checklist write failure rolls back parent, removals and audits, then a retry succeeds once
+    ok 3 - a checklist write failure rolls back parent, removals and audits, then a retry succeeds once
+      ---
+      duration_ms: 28.876292
+      ...
+    # Subtest: omitting checklist preserves children and individual checklist APIs keep working
+    ok 4 - omitting checklist preserves children and individual checklist APIs keep working
+      ---
+      duration_ms: 20.742709
+      ...
+    # Subtest: a stale drawer cannot overwrite another client's checklist add
+    ok 5 - a stale drawer cannot overwrite another client's checklist add
+      ---
+      duration_ms: 12.385958
+      ...
+    # Subtest: a stale drawer cannot overwrite another client's checklist complete
+    ok 6 - a stale drawer cannot overwrite another client's checklist complete
+      ---
+      duration_ms: 13.599084
+      ...
+    # Subtest: every parent/checklist write advances the parent version even when the clock has not advanced
+    ok 7 - every parent/checklist write advances the parent version even when the clock has not advanced
+      ---
+      duration_ms: 22.362417
+      ...
+    1..7
+ok 7 - TODO edits commit the parent, checklist and audit records atomically
+  ---
+  duration_ms: 525.334917
+  ...
+# Subtest: browser workflows on a disposable production database
+    # Subtest: actor registration, settings, members, codes and light/dark themes
+    ok 1 - actor registration, settings, members, codes and light/dark themes
+      ---
+      duration_ms: 2099.598375
+      ...
+    # Subtest: work item views, date picker and TODO Enter/checklist saving
+    ok 2 - work item views, date picker and TODO Enter/checklist saving
+      ---
+      duration_ms: 5895.6755
+      ...
+    # Subtest: calendar event creation, backup controls and browser errors
+    ok 3 - calendar event creation, backup controls and browser errors
+      ---
+      duration_ms: 2254.006459
+      ...
+    1..3
+ok 8 - browser workflows on a disposable production database
+  ---
+  duration_ms: 10739.754959
+  ...
+1..8
+# tests 49
+# suites 0
+# pass 49
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11011.784

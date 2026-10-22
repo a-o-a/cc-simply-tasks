@@ -9,7 +9,7 @@ import { StatusBadge } from "./status-badge";
 
 /**
  * 작업 테이블 보기.
- * 행 클릭 → 드로어 오픈. 액션 버튼 없이 행 자체가 인터랙션 단위.
+ * 행 클릭 또는 제목 버튼의 키보드 조작으로 드로어를 엽니다.
  */
 export function TableView({
   items,
@@ -27,7 +27,7 @@ export function TableView({
 
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[720px] text-sm">
         <thead className="border-b text-left text-xs uppercase text-muted-foreground">
           <tr>
             <th className="px-4 py-3 font-medium">분류</th>
@@ -56,7 +56,12 @@ export function TableView({
               <td className="px-4 py-3">
                 <StatusBadge status={item.status} />
               </td>
-              <td className="px-4 py-3 font-medium">{item.title}</td>
+              <td className="px-4 py-3 font-medium">
+                <button type="button" className="max-w-md break-words rounded-sm text-left hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                  onClick={(event) => { event.stopPropagation(); onOpen(item); }}>
+                  {item.title}
+                </button>
+              </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {item.assignee?.name ?? "미배정"}
               </td>

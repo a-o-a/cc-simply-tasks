@@ -1,0 +1,40 @@
+▶ pagination and work-list regression checks
+  ✔ first page, tied sort keys, filters and subsequent pages match the full ordered result (52.859083ms)
+  ✔ a missing cursor gives an explicit recoverable error instead of repeating page one (13.801959ms)
+  ✔ the 51st active item is reachable in table, kanban and gantt views (3178.073ms)
+  ✔ a deleted next-page cursor keeps visible work and offers a restart (182.88675ms)
+  ✔ debounced search ignores an older response and retries a failed load (1176.349667ms)
+  ✖ holding work stays accessible in the default kanban and status filter (8077.61625ms)
+  ✔ mobile filter labels and controls remain within the viewport (29.83625ms)
+✖ pagination and work-list regression checks (13066.12425ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 6
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13734.611959
+
+✖ failing tests:
+
+test at scripts/pagination-regression.test.mjs:175:11
+✖ holding work stays accessible in the default kanban and status filter (8077.61625ms)
+  Error: expect(locator).toBeVisible() failed
+
+  Locator: getByText('페이지 작업 117', { exact: true })
+  Expected: visible
+  Timeout: 8000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toBeVisible" getByText('페이지 작업 117', { exact: true }) with timeout 8000ms
+    - waiting for getByText('페이지 작업 117', { exact: true })
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeVisible (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/pagination-regression.test.mjs:182:24)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/pagination-regression.test.mjs:175:3) {
+    matcherResult: { message: `expect(locator).toBeVisible() failed\n\nLocator: getByText('페이지 작업 117', { exact: true })\nExpected: visible\nTimeout: 8000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toBeVisible" getByText('페이지 작업 117', { exact: true }) with timeout 8000ms\n  - waiting for getByText('페이지 작업 117', { exact: true })\n`, pass: false, actual: undefined, name: 'toBeVisible', expected: 'visible', log: [ `  - Expect "toBeVisible" getByText('페이지 작업 117', { exact: true }) with timeout 8000ms`, "  - waiting for getByText('페이지 작업 117', { exact: true })" ], timeout: 8000, ariaSnapshot: '- complementary:\n  - link "cc-simply-tasks":\n    - /url: /\n  - button "사이드바 접기"\n  - navigation "주 메뉴":\n    - link "홈":\n      - /url: /\n    - link "작업":\n      - /url: /work-items\n    - link "이관":\n      - /url: /transfer\n    - link "할 일":\n      - /url: /todos\n      - text: 할 일 81\n    - link "캘린더":\n      - /url: /calendar\n    - link "설정":\n      - /url: /settings\n  - button "페이지 검증"\n  - button "테마 전환"\n- main:\n  - heading "작업" [level=1]\n  - button "진행 작업" [pressed]\n  - button "이관 완료"\n  - button "테이블"\n  - button "칸반" [pressed]\n  - button "간트"\n  - button "작업 추가"\n  - text: 분류 설정에서 분류를 추가하세요 상태\n  - button "대기"\n  - button "진행 중"\n  - button "내부테스트"\n  - button "현업테스트"\n  - button "QA테스트"\n  - button "이관대기"\n  - text: 담당자\n  - button "팀원"\n  - text: 우선순위\n  - button "낮음"\n  - button "보통"\n  - button "높음"\n  - text: 이관일\n  - button "날짜 선택"\n  - text: 제목\n  - textbox "제목":\n    - /placeholder: ""\n  - text: 시스템\n  - button "시스템"\n  - text: 요청구분\n  - textbox "요청구분":\n    - /placeholder: ""\n  - text: 요청자\n  - textbox "요청자":\n    - /placeholder: ""\n  - text: 요청번호\n  - textbox "요청번호":\n    - /placeholder: ""\n  - button "필터 숨기기"\n  - button "초기화"\n  - button\n  - text: 대기 49\n  - button "페이지 작업 114 미배정 이관 2026-10-24"\n  - button "페이지 작업 111 미배정 이관 2026-10-25"\n  - button "페이지 작업 108 미배정 이관 2026-10-22"\n  - button "페이지 작업 102 미배정 이관 2026-10-24"\n  - button "페이지 작업 099 미배정 이관 2026-10-25"\n  - button "페이지 작업 096 미배정 이관 2026-10-22"\n  - button "페이지 작업 093 미배정 이관 2026-10-23"\n  - button "페이지 작업 087 미배정 이관 2026-10-25"\n  - button "페이지 작업 084 미배정 이관 2026-10-22"\n  - button "페이지 작업 081 미배정 이관 2026-10-23"\n  - button "페이지 작업 078 미배정 이관 2026-10-24"\n  - button "페이지 작업 072 미배정 이관 2026-10-22"\n  - button "페이지 작업 069 미배정 이관 2026-10-23"\n  - button "페이지 작업 066 미배정 이관 2026-10-24"\n  - button "페이지 작업 063 미배정 이관 2026-10-25"\n  - button "페이지 작업 057 미배정 이관 2026-10-23"\n  - button "페이지 작업 054 미배정 이관 2026-10-24"\n  - button "페이지 작업 051 미배정 이관 2026-10-25"\n  - button "페이지 작업 048 미배정 이관 2026-10-22"\n  - button "페이지 작업 042 미배정 이관 2026-10-24"\n  - button "페이지 작업 039 미배정 이관 2026-10-25"\n  - button "페이지 작업 036 미배정 이관 2026-10-22"\n  - button "페이지 작업 033 미배정 이관 2026-10-23"\n  - button "페이지 작업 027 미배정 이관 2026-10-25"\n  - button "페이지 작업 024 미배정 이관 2026-10-22"\n  - button "페이지 작업 021 미배정 이관 2026-10-23"\n  - button "페이지 작업 018 미배정 이관 2026-10-24"\n  - button "페이지 작업 012 미배정 이관 2026-10-22"\n  - button "페이지 작업 009 미배정 이관 2026-10-23"\n  - button "페이지 작업 006 미배정 이관 2026-10-24"\n  - button "페이지 작업 003 미배정 이관 2026-10-25"\n  - button "먼저 검색 작업 미배정 이관 2026-10-23"\n  - button "페이지 작업 118 미배정 이관 2026-10-24"\n  - button "페이지 작업 112 미배정 이관 2026-10-22"\n  - button "페이지 작업 109 미배정 이관 2026-10-23"\n  - button "페이지 작업 106 미배정 이관 2026-10-24"\n  - button "페이지 작업 103 미배정 이관 2026-10-25"\n  - button "페이지 작업 097 미배정 이관 2026-10-23"\n  - button "페이지 작업 094 미배정 이관 2026-10-24"\n  - button "페이지 작업 091 미배정 이관 2026-10-25"\n  - button "페이지 작업 088 미배정 이관 2026-10-22"\n  - button "페이지 작업 082 미배정 이관 2026-10-24"\n  - button "페이지 작업 079 미배정 이관 2026-10-25"\n  - button "페이지 작업 076 미배정 이관 2026-10-22"\n  - button "페이지 작업 073 미배정 이관 2026-10-23"\n  - button "페이지 작업 067 미배정 이관 2026-10-25"\n  - button "페이지 작업 064 미배정 이관 2026-10-22"\n  - button "페이지 작업 061 미배정 이관 2026-10-23"\n  - button "페이지 작업 058 미배정 이관 2026-10-24"\n  - text: 진행 중 0\n  - paragraph: 비어 있음\n  - text: 내부테스트 0\n  - paragraph: 비어 있음\n  - text: 현업테스트 0\n  - paragraph: 비어 있음\n  - text: QA테스트 0\n  - paragraph: 비어 있음\n  - text: 이관대기 0\n  - paragraph: 비어 있음\n  - status\n  - paragraph: 50건 표시 · 더 많은 작업이 있습니다\n  - button "더 보기"\n- region "Notifications (F8)":\n  - list\n- alert' }
+  }

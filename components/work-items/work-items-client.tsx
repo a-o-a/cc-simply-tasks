@@ -44,15 +44,15 @@ import { WorkItemDrawer } from "./work-item-drawer";
 import { WorkItemFormDialog } from "./work-item-form-dialog";
 
 /**
- * 작업 페이지 클라이언트 — Phase 4 Step 4.
+ * 작업 페이지 클라이언트.
  *
  * 책임:
  *  - 팀원 + 작업 목록 fetch
  *  - 필터 (status / assignee / category / priority / ticket)
- *  - 보기 모드 토글 (table / kanban) — localStorage에 저장
+ *  - 보기 모드 토글 (table / kanban / gantt) — localStorage에 저장
  *  - 생성/수정 다이얼로그 + 상세 드로어 트리거
  *
- * 1차 범위는 첫 페이지(50건)만 보여준다. 페이지네이션 next는 후속 단계에서.
+ * 진행 작업은 50건씩 더 보기, 이관 완료 작업은 이전/다음 페이지로 조회한다.
  */
 
 type ViewMode = "table" | "kanban" | "gantt";
@@ -66,6 +66,7 @@ const ACTIVE_STATUSES: Status[] = [
   "BUSINESS_TEST",
   "QA_TEST",
   "TRANSFER_READY",
+  "HOLDING",
 ];
 
 interface Filters {
@@ -104,12 +105,19 @@ export function WorkItemsClient() {
   const [transferredPageIndex, setTransferredPageIndex] = React.useState(0);
   const [transferredPageCursors, setTransferredPageCursors] = React.useState<(string | null)[]>([null]);
   const [transferredNextCursor, setTransferredNextCursor] = React.useState<string | null>(null);
+  const [activeNextCursor, setActiveNextCursor] = React.useState<string | null>(null);
   const [members, setMembers] = React.useState<Member[]>([]);
   const [categories, setCategories] = React.useState<WorkCategory[]>([]);
   const [systems, setSystems] = React.useState<WorkSystem[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
   const [filterVisible, setFilterVisible] = React.useState(true);
+  const [filterResetKey, setFilterResetKey] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = React.useState<string | null>(null);
+  const [resetRequired, setResetRequired] = React.useState(false);
+  const itemsRequest = React.useRef<AbortController | null>(null);
+  const requestSequence = React.useRef(0);
 
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<WorkItemListItem | null>(null);
@@ -143,20 +151,24 @@ export function WorkItemsClient() {
     setTransferredPageIndex(0);
     setTransferredPageCursors([null]);
     setTransferredNextCursor(null);
+    setActiveNextCursor(null);
     window.localStorage.setItem(SCOPE_KEY, next);
   }
 
-  function handleFilterChange(next: Filters) {
+  const handleFilterChange = React.useCallback((next: Filters) => {
     setFilters(next);
+    setActiveNextCursor(null);
     if (scope === "transferred") {
       setTransferredPageIndex(0);
       setTransferredPageCursors([null]);
       setTransferredNextCursor(null);
     }
-  }
+  }, [scope]);
 
   function handleReset() {
+    setFilterResetKey((value) => value + 1);
     setFilters(defaultFilters(scope));
+    setActiveNextCursor(null);
     if (scope === "transferred") {
       setTransferredPageIndex(0);
       setTransferredPageCursors([null]);
@@ -166,8 +178,8 @@ export function WorkItemsClient() {
 
   const loadMembers = React.useCallback(async () => {
     try {
-      const res = await api.get<ListResponse<Member>>("/api/team-members");
-      setMembers(res.items);
+      const allMembers = await api.getAll<Member>("/api/team-members");
+      setMembers(allMembers);
     } catch (err) {
       toast({
         title: "팀원 목록 조회 실패",
@@ -195,17 +207,26 @@ export function WorkItemsClient() {
     }
   }, []);
 
-  const loadItems = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const loadItems = React.useCallback(async (appendCursor?: string) => {
+    itemsRequest.current?.abort();
+    const controller = new AbortController();
+    itemsRequest.current = controller;
+    const sequence = ++requestSequence.current;
+    const isCurrent = () => !controller.signal.aborted && sequence === requestSequence.current;
+    setLoading(!appendCursor);
+    setLoadingMore(Boolean(appendCursor));
+    if (!appendCursor) setError(null);
+    setLoadMoreError(null);
+    setResetRequired(false);
     try {
       const cursor =
         scope === "transferred"
           ? transferredPageCursors[transferredPageIndex] ?? undefined
-          : undefined;
+          : appendCursor;
       const res = await api.get<ListResponse<WorkItemListItem>>(
         "/api/work-items",
         {
+          signal: controller.signal,
           query: {
             scope,
             cursor,
@@ -226,20 +247,33 @@ export function WorkItemsClient() {
           },
         },
       );
-      setItems(res.items);
+      if (!isCurrent()) return;
+      setItems((previous) => {
+        if (!appendCursor) return res.items;
+        const existing = new Set(previous.map((item) => item.id));
+        return [...previous, ...res.items.filter((item) => !existing.has(item.id))];
+      });
       if (scope === "transferred") {
         setTransferredNextCursor(res.nextCursor);
+      } else {
+        setActiveNextCursor(res.nextCursor);
       }
     } catch (err) {
+      if (!isCurrent()) return;
       const message = err instanceof ApiError ? err.message : "목록 조회 실패";
-      setError(message);
+      if (appendCursor) setLoadMoreError(message);
+      else setError(message);
+      setResetRequired(err instanceof ApiError && err.code === "BAD_REQUEST");
       toast({
         title: "작업 목록 조회 실패",
         description: message,
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (isCurrent()) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, [filters, scope, transferredPageCursors, transferredPageIndex]);
 
@@ -251,7 +285,18 @@ export function WorkItemsClient() {
 
   React.useEffect(() => {
     void loadItems();
+    return () => itemsRequest.current?.abort();
   }, [loadItems]);
+
+  function retryItems() {
+    if (resetRequired && scope === "transferred" && transferredPageIndex > 0) {
+      setTransferredPageIndex(0);
+      setTransferredPageCursors([null]);
+      setTransferredNextCursor(null);
+      return;
+    }
+    void loadItems();
+  }
 
   function openCreate() {
     setEditing(null);
@@ -323,14 +368,14 @@ export function WorkItemsClient() {
   }, [items, scope]);
 
   return (
-    <div className="px-8 py-6">
-      <header className="flex items-center">
+    <div className="px-4 py-6 sm:px-8">
+      <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold">작업</h1>
-        <div className="flex flex-1 items-center justify-center gap-3">
+        <div className="order-3 flex w-full flex-wrap items-center justify-center gap-2 lg:order-none lg:w-auto lg:flex-1 lg:gap-3">
           <ScopeToggle value={scope} onChange={changeScope} />
           <ViewToggle value={view} onChange={changeView} scope={scope} />
         </div>
-        <Button onClick={openCreate}>
+        <Button onClick={openCreate} className="ml-auto lg:ml-0">
           <Plus className="mr-2 h-4 w-4" />
           작업 추가
         </Button>
@@ -338,6 +383,7 @@ export function WorkItemsClient() {
 
       {filterVisible && (
         <FilterBar
+          key={`${scope}:${filterResetKey}`}
           scope={scope}
           filters={filters}
           members={members}
@@ -361,9 +407,10 @@ export function WorkItemsClient() {
         </Button>
       </div>
 
-      <section className={cn("mt-4", loading && "pointer-events-none opacity-60")}>
+      {loading && <p role="status" className="mt-4 text-sm text-muted-foreground">작업을 불러오는 중…</p>}
+      <section aria-busy={loading || loadingMore} className={cn("mt-4", loading && "pointer-events-none opacity-60")}>
         {error ? (
-          <ErrorState message={error} onRetry={() => void loadItems()} />
+          <ErrorState message={error} onRetry={retryItems} />
         ) : items.length === 0 && !loading ? (
           <EmptyState onCreate={openCreate} scope={scope} />
         ) : scope === "transferred" || view === "table" ? (
@@ -381,11 +428,29 @@ export function WorkItemsClient() {
         )}
       </section>
 
+      {scope === "active" && !error && !loading && items.length > 0 && (
+        <div className="mt-4 flex flex-col items-center gap-2">
+          <p className="text-xs text-muted-foreground" aria-live="polite">{items.length}건 표시{activeNextCursor ? " · 더 많은 작업이 있습니다" : ""}</p>
+          {loadMoreError ? (
+            <div role="alert" className="flex flex-wrap items-center justify-center gap-2">
+              <p className="text-sm text-destructive">{loadMoreError}</p>
+              <Button variant="outline" onClick={() => void loadItems(resetRequired ? undefined : activeNextCursor ?? undefined)}>
+                {resetRequired ? "처음부터 다시 조회" : "다시 시도"}
+              </Button>
+            </div>
+          ) : activeNextCursor ? (
+            <Button variant="outline" disabled={loadingMore} onClick={() => void loadItems(activeNextCursor)}>
+              {loadingMore ? "불러오는 중…" : "더 보기"}
+            </Button>
+          ) : null}
+        </div>
+      )}
+
       {scope === "transferred" && !error && items.length > 0 ? (
         <TransferredPagination
           page={transferredPageIndex + 1}
-          hasPrevious={transferredPageIndex > 0}
-          hasNext={Boolean(transferredNextCursor)}
+          hasPrevious={!loading && transferredPageIndex > 0}
+          hasNext={!loading && Boolean(transferredNextCursor)}
           onPrevious={() => setTransferredPageIndex((p) => Math.max(0, p - 1))}
           onNext={() => {
             if (!transferredNextCursor) return;
@@ -555,11 +620,12 @@ function FilterBar({
   systems: WorkSystem[];
   onChange: (next: Filters) => void;
 }) {
-  // 텍스트 입력은 로컬 state — Enter/blur 시 필터 반영
+  // 입력 중인 값은 유지하고, 250ms 멈추거나 Enter/blur 시 검색한다.
   const [localTitle, setLocalTitle] = React.useState(filters.title);
   const [localRequestType, setLocalRequestType] = React.useState(filters.requestType);
   const [localRequestor, setLocalRequestor] = React.useState(filters.requestor);
   const [localRequestNumber, setLocalRequestNumber] = React.useState(filters.requestNumber);
+  const [composing, setComposing] = React.useState(false);
 
   // 외부(초기화)에서 filters가 비워지면 로컬도 동기화
   React.useEffect(() => { setLocalTitle(filters.title); }, [filters.title]);
@@ -567,11 +633,20 @@ function FilterBar({
   React.useEffect(() => { setLocalRequestor(filters.requestor); }, [filters.requestor]);
   React.useEffect(() => { setLocalRequestNumber(filters.requestNumber); }, [filters.requestNumber]);
 
+  React.useEffect(() => {
+    if (composing) return;
+    const text = { title: localTitle, requestType: localRequestType, requestor: localRequestor, requestNumber: localRequestNumber };
+    if (text.title === filters.title && text.requestType === filters.requestType && text.requestor === filters.requestor && text.requestNumber === filters.requestNumber) return;
+    const timeout = window.setTimeout(() => onChange({ ...filters, ...text }), 250);
+    return () => window.clearTimeout(timeout);
+  }, [composing, filters, localTitle, localRequestType, localRequestor, localRequestNumber, onChange]);
+
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
     onChange({ ...filters, [key]: value });
   }
 
   function applyText(key: "title" | "requestType" | "requestor" | "requestNumber", value: string) {
+    if (filters[key] === value) return;
     onChange({ ...filters, [key]: value });
   }
 
@@ -583,9 +658,11 @@ function FilterBar({
     return {
       value: local,
       onChange: (e: React.ChangeEvent<HTMLInputElement>) => setLocal(e.target.value),
-      onBlur: () => applyText(key, local),
+      onCompositionStart: () => setComposing(true),
+      onCompositionEnd: () => setComposing(false),
+      onBlur: () => { if (!composing) applyText(key, local); },
       onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Enter") applyText(key, local);
+        if (e.key === "Enter" && !e.nativeEvent.isComposing) applyText(key, local);
       },
     };
   }
@@ -629,16 +706,16 @@ function FilterBar({
   return (
     <div className="mt-4 rounded-lg border bg-card p-3 space-y-3">
       {/* 1행: 분류 / 상태 / 담당자 / 우선순위 / 이관일 */}
-      <div className="flex divide-x divide-border">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 xl:divide-x xl:divide-border xl:gap-0">
         {/* 분류 */}
-        <div className="flex-1 space-y-1.5 pr-3">
+        <div className="min-w-0 space-y-1.5 xl:pr-3">
           <Label className="text-xs">분류</Label>
           <div className="flex flex-wrap gap-1">
             {categories.length === 0 ? (
               <span className="text-xs text-muted-foreground">설정에서 분류를 추가하세요</span>
             ) : (
               categories.map((c) => (
-                <button key={c.code} onClick={() => toggleCategory(c.code)} className={chipCls(filters.category.includes(c.code))}>
+                <button type="button" key={c.code} aria-pressed={filters.category.includes(c.code)} onClick={() => toggleCategory(c.code)} className={chipCls(filters.category.includes(c.code))}>
                   {c.name}
                 </button>
               ))
@@ -647,12 +724,12 @@ function FilterBar({
         </div>
 
         {/* 상태 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="min-w-0 space-y-1.5 xl:px-3">
           <Label className="text-xs">상태</Label>
           {scope === "active" ? (
             <div className="flex flex-wrap gap-1">
               {ACTIVE_STATUSES.map((s) => (
-                <button key={s} onClick={() => toggleStatus(s)} className={chipCls(filters.status.includes(s))}>
+                <button type="button" key={s} aria-pressed={filters.status.includes(s)} onClick={() => toggleStatus(s)} className={chipCls(filters.status.includes(s))}>
                   {STATUS_LABELS[s]}
                 </button>
               ))}
@@ -667,7 +744,7 @@ function FilterBar({
         </div>
 
         {/* 담당자 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="min-w-0 space-y-1.5 xl:px-3">
           <Label className="text-xs">담당자</Label>
           <div className="flex flex-wrap gap-1">
             <MemberFilter
@@ -686,11 +763,11 @@ function FilterBar({
         </div>
 
         {/* 우선순위 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="min-w-0 space-y-1.5 xl:px-3">
           <Label className="text-xs">우선순위</Label>
           <div className="flex flex-wrap gap-1">
             {PRIORITIES.map((p) => (
-              <button key={p} onClick={() => togglePriority(p)} className={chipCls(filters.priority.includes(p))}>
+              <button type="button" key={p} aria-pressed={filters.priority.includes(p)} onClick={() => togglePriority(p)} className={chipCls(filters.priority.includes(p))}>
                 {PRIORITY_LABELS[p]}
               </button>
             ))}
@@ -698,9 +775,9 @@ function FilterBar({
         </div>
 
         {/* 이관일 */}
-        <div className="flex-1 space-y-1.5 pl-3">
-          <Label className="text-xs">이관일</Label>
-          <DatePicker value={filters.transferDate} onChange={(v) => set("transferDate", v)} placeholder="날짜 선택" className="h-7 text-xs" />
+        <div className="min-w-0 space-y-1.5 xl:pl-3">
+          <Label className="text-xs" htmlFor="work-filter-transfer-date">이관일</Label>
+          <DatePicker id="work-filter-transfer-date" value={filters.transferDate} onChange={(v) => set("transferDate", v)} placeholder="날짜 선택" className="h-7 text-xs" />
         </div>
       </div>
 
@@ -708,11 +785,12 @@ function FilterBar({
       <div className="border-t border-border" />
 
       {/* 2행: 제목 / 시스템 / 요청구분 / 요청자 / 요청번호 */}
-      <div className="flex divide-x divide-border">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 xl:divide-x xl:divide-border xl:gap-0">
         {/* 제목 */}
-        <div className="flex-1 space-y-1.5 pr-3">
-          <Label className="text-xs">제목</Label>
+        <div className="min-w-0 space-y-1.5 xl:pr-3">
+          <Label className="text-xs" htmlFor="work-filter-title">제목</Label>
           <Input
+            id="work-filter-title"
             placeholder=""
             className="h-7 text-xs"
             {...textInputProps("title", localTitle, setLocalTitle)}
@@ -720,7 +798,7 @@ function FilterBar({
         </div>
 
         {/* 시스템 */}
-        <div className="flex-1 space-y-1.5 px-3">
+        <div className="min-w-0 space-y-1.5 xl:px-3">
           <Label className="text-xs">시스템</Label>
           <div>
             <SystemFilter
@@ -733,9 +811,10 @@ function FilterBar({
         </div>
 
         {/* 요청구분 */}
-        <div className="flex-1 space-y-1.5 px-3">
-          <Label className="text-xs">요청구분</Label>
+        <div className="min-w-0 space-y-1.5 xl:px-3">
+          <Label className="text-xs" htmlFor="work-filter-request-type">요청구분</Label>
           <Input
+            id="work-filter-request-type"
             placeholder=""
             className="h-7 text-xs"
             {...textInputProps("requestType", localRequestType, setLocalRequestType)}
@@ -743,9 +822,10 @@ function FilterBar({
         </div>
 
         {/* 요청자 */}
-        <div className="flex-1 space-y-1.5 px-3">
-          <Label className="text-xs">요청자</Label>
+        <div className="min-w-0 space-y-1.5 xl:px-3">
+          <Label className="text-xs" htmlFor="work-filter-requestor">요청자</Label>
           <Input
+            id="work-filter-requestor"
             placeholder=""
             className="h-7 text-xs"
             {...textInputProps("requestor", localRequestor, setLocalRequestor)}
@@ -753,9 +833,10 @@ function FilterBar({
         </div>
 
         {/* 요청번호 */}
-        <div className="flex-1 space-y-1.5 pl-3">
-          <Label className="text-xs">요청번호</Label>
+        <div className="min-w-0 space-y-1.5 xl:pl-3">
+          <Label className="text-xs" htmlFor="work-filter-request-number">요청번호</Label>
           <Input
+            id="work-filter-request-number"
             placeholder=""
             className="h-7 text-xs"
             {...textInputProps("requestNumber", localRequestNumber, setLocalRequestNumber)}
@@ -853,7 +934,7 @@ function ErrorState({
   onRetry: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border bg-card py-16 text-center">
+    <div role="alert" className="flex flex-col items-center gap-3 rounded-lg border bg-card py-16 text-center">
       <p className="text-sm font-medium">목록을 불러오지 못했습니다</p>
       <p className="text-xs text-muted-foreground">{message}</p>
       <Button variant="outline" onClick={onRetry}>
@@ -877,7 +958,7 @@ function TransferredPagination({
   onNext: () => void;
 }) {
   return (
-    <div className="mt-4 flex items-center justify-between rounded-lg border bg-card px-4 py-3">
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
       <p className="text-xs text-muted-foreground">
         이관 완료 작업 50건씩 조회
       </p>

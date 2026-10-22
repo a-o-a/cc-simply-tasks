@@ -58,21 +58,25 @@ export function GanttView({
   const [holidayDates, setHolidayDates] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
+    const controller = new AbortController();
     const from = new Date(window.startMs).toISOString();
     const to = new Date(window.startMs + window.totalDays * DAY_MS).toISOString();
     api
       .get<{ items: CalendarEvent[] }>("/api/calendar-events", {
+        signal: controller.signal,
         query: { from, to },
       })
       .then((res) => {
+        if (controller.signal.aborted) return;
         const dates = new Set<string>();
         for (const ev of res.items) {
           if (ev.category !== "HOLIDAY") continue;
-          for (const key of eventDayKeys(ev)) dates.add(key);
+          for (const key of eventDayKeys(ev, { fromMs: window.startMs, toMs: window.startMs + window.totalDays * DAY_MS })) dates.add(key);
         }
         setHolidayDates(dates);
       })
       .catch(() => {});
+    return () => controller.abort();
   }, [window.startMs, window.totalDays]);
 
   const scrollRef = React.useRef<HTMLDivElement>(null);

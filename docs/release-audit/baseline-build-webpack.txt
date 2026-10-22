@@ -1,0 +1,57 @@
+npm notice run cc-simply-tasks@0.1.0 build
+npm notice run next build --webpack
+▲ Next.js 16.4.1 (webpack)
+- Environments: .env.production, .env
+✓ Running next.config.js took 6ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.4s
+  Running TypeScript ...
+  Finished TypeScript in 1359ms ...
+  Collecting page data using 13 workers ...
+  Generating static pages using 13 workers (0/21) ...
+  Generating static pages using 13 workers (5/21)
+  Generating static pages using 13 workers (10/21)
+  Generating static pages using 13 workers (15/21)
+✓ Generating static pages using 13 workers (21/21) in 160ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/audit-logs
+├ ƒ /api/backup
+├ ƒ /api/backup/files
+├ ƒ /api/backup/files/[filename]
+├ ƒ /api/backup/trigger
+├ ƒ /api/calendar-events
+├ ƒ /api/calendar-events/[id]
+├ ƒ /api/calendar-events/stream
+├ ƒ /api/db-stats
+├ ƒ /api/settings
+├ ƒ /api/team-members
+├ ƒ /api/team-members/[id]
+├ ƒ /api/todos
+├ ƒ /api/todos/[id]
+├ ƒ /api/todos/[id]/checklist
+├ ƒ /api/todos/[id]/checklist/[itemId]
+├ ƒ /api/todos/count
+├ ƒ /api/work-categories
+├ ƒ /api/work-categories/[id]
+├ ƒ /api/work-items
+├ ƒ /api/work-items/[id]
+├ ƒ /api/work-items/bulk-status
+├ ƒ /api/work-items/count
+├ ƒ /api/work-systems
+├ ƒ /api/work-systems/[id]
+├ ○ /calendar
+├ ○ /members
+├ ○ /settings
+├ ○ /todos
+├ ○ /transfer
+└ ○ /work-items
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

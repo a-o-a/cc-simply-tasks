@@ -243,7 +243,7 @@ export function MonthView({
                   </div>
                   <button
                     onClick={() => onAddClick(dayKey)}
-                    className="shrink-0 rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"
+                    className="shrink-0 rounded-sm p-0.5 text-muted-foreground opacity-100 transition-opacity hover:bg-accent md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
                     aria-label="이벤트 추가"
                   >
                     <Plus className="h-3 w-3" />

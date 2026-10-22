@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TODO_STATUSES } from "../enums";
-import { cuidSchema, optionalIsoDateTimeSchema } from "./common";
+import { cuidSchema, isoDateTimeSchema, kstDateStringSchema, optionalIsoDateTimeSchema } from "./common";
 
 const checklistItemSchema = z.object({
   content: z.string().min(1).max(500),
@@ -20,12 +20,21 @@ export const todoCreateSchema = z.object({
 });
 
 export const todoUpdateSchema = z.object({
+  expectedUpdatedAt: isoDateTimeSchema.optional(),
   title: z.string().min(1).max(300).optional(),
   note: z.string().max(10_000).nullable().optional(),
   status: z.enum(TODO_STATUSES).optional(),
   dueDate: optionalIsoDateTimeSchema,
   order: z.number().int().optional(),
   assigneeId: cuidSchema.nullable().optional(),
+  // When present, replace the active checklist in array order. Existing IDs
+  // are preserved; new items omit their ID and receive one inside the transaction.
+  checklist: z.array(checklistItemSchema.extend({ id: cuidSchema.optional() }))
+    .refine((items) => {
+      const ids = items.flatMap((item) => item.id ? [item.id] : []);
+      return new Set(ids).size === ids.length;
+    }, { error: "체크리스트 항목 ID가 중복되었습니다" })
+    .optional(),
 });
 
 export const todoListQuerySchema = z.object({
@@ -48,13 +57,16 @@ export const todoListQuerySchema = z.object({
     .transform((v) => (v ? v.split(",").filter(Boolean) : undefined))
     .pipe(z.array(z.string()).optional()),
   title: z.string().max(300).optional(),
-  dueDateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  dueDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dueDateFrom: kstDateStringSchema.optional(),
+  dueDateTo: kstDateStringSchema.optional(),
   include: z
     .string()
     .optional()
     .transform((v) => (v ? v.split(",").filter(Boolean) : []))
     .pipe(z.array(z.string())),
+}).refine((input) => !input.dueDateFrom || !input.dueDateTo || input.dueDateFrom <= input.dueDateTo, {
+  error: "종료일은 시작일 이후여야 합니다",
+  path: ["dueDateTo"],
 });
 
 export const todoChecklistCreateSchema = checklistItemSchema;

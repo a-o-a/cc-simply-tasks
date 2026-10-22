@@ -7,7 +7,7 @@ import { workItems, workTickets } from "@/lib/db/schema";
 import { withErrorHandler, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { workItemUpdateSchema } from "@/lib/validation/workItem";
+import { workItemDateRangeSchema, workItemUpdateSchema } from "@/lib/validation/workItem";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,7 +27,7 @@ export const GET = withErrorHandler(
 
 /**
  * PATCH /api/work-items/:id
- * 부분 업데이트. If-Match 필수.
+ * 부분 업데이트. 기존 행과 병합한 날짜 범위도 검증합니다.
  * tickets 배열이 있으면 기존 티켓을 soft delete 후 새로 생성(전체 대체).
  */
 export const PATCH = withErrorHandler(
@@ -70,6 +70,7 @@ export const PATCH = withErrorHandler(
           : {}),
         updatedAt,
       };
+      workItemDateRangeSchema.parse(after);
       await tx.update(workItems).set(after).where(eq(workItems.id, routeParams.id));
 
       // tickets 배열이 전달된 경우: 기존 soft delete 후 전체 재생성
@@ -110,7 +111,7 @@ export const PATCH = withErrorHandler(
 
 /**
  * DELETE /api/work-items/:id
- * soft delete. If-Match 필수.
+ * soft delete.
  */
 export const DELETE = withErrorHandler(
   async (req: NextRequest, { params }: Params) => {

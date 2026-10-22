@@ -1,0 +1,37 @@
+✔ long calendar events expand only into the visible month (92.357083ms)
+✔ range clipping preserves all-day exclusive endings and timed boundaries (0.269667ms)
+▶ partial date updates validate the stored range
+  ✔ work-items: single-ended updates and rollback (37.4355ms)
+  ✔ calendar-events: single-ended updates and rollback (17.138292ms)
+  ✔ nonexistent dates and reversed filter ranges return 400 (9.138042ms)
+✔ partial date updates validate the stored range (341.631916ms)
+▶ production application smoke tests (isolated SQLite database)
+  ✔ all application pages and their JavaScript assets are served (50.990625ms)
+  ✔ team members, categories and systems support CRUD and restore (37.128584ms)
+  ✔ work items, ticket replacement, bulk status and transfer filters (37.342209ms)
+  ✔ concurrent work writes commit their data and audit logs together (31.829ms)
+  ✔ todos, checklist assignment/completion/reorder/deletion and counts (29.370917ms)
+  ✔ calendar events preserve members, date ranges and soft deletion (10.827125ms)
+  ✔ calendar changes reach an open server-sent event stream (111.588333ms)
+  ✔ settings update immediately and audit logs retain actor and before/after data (10.76625ms)
+  ✔ invalid input and missing resources return structured client errors (16.251584ms)
+  ✔ manual and direct backups contain the latest data and pass SQLite integrity checks (17.689042ms)
+✔ production application smoke tests (isolated SQLite database) (661.760917ms)
+ℹ 155 HTTP checks completed against a disposable database.
+▶ TODO edits commit the parent, checklist and audit records atomically
+  ✔ one PATCH preserves existing IDs, creates/deletes children and returns the saved draft (37.587666ms)
+  ✔ foreign and duplicate checklist IDs are rejected before any draft is committed (16.52375ms)
+  ✔ a checklist write failure rolls back parent, removals and audits, then a retry succeeds once (22.067667ms)
+  ✔ omitting checklist preserves children and individual checklist APIs keep working (19.289959ms)
+  ✔ a stale drawer cannot overwrite another client's checklist add (9.390875ms)
+  ✔ a stale drawer cannot overwrite another client's checklist complete (9.100416ms)
+  ✔ every parent/checklist write advances the parent version even when the clock has not advanced (18.146375ms)
+✔ TODO edits commit the parent, checklist and audit records atomically (411.176417ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 886.085792

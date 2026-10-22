@@ -70,28 +70,38 @@ export function WorkItemDrawer({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const requestRef = React.useRef<AbortController | null>(null);
+  const returnFocusRef = React.useRef<HTMLElement | null>(null);
 
   const loadDetail = React.useCallback(async (id: string) => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
+    setDetail(null);
     setError(null);
     try {
-      const res = await api.get<WorkItemDetail>(`/api/work-items/${id}`);
+      const res = await api.get<WorkItemDetail>(`/api/work-items/${id}`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       setDetail(res);
     } catch (err) {
+      if (controller.signal.aborted) return;
       const message = err instanceof ApiError ? err.message : "상세 조회 실패";
       setError(message);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, []);
 
   React.useEffect(() => {
     if (!workItemId) {
+      requestRef.current?.abort();
       setDetail(null);
       setError(null);
       return;
     }
     void loadDetail(workItemId);
+    return () => requestRef.current?.abort();
   }, [workItemId, reloadKey, loadDetail]);
 
   async function handleDelete() {
@@ -115,7 +125,16 @@ export function WorkItemDrawer({
   return (
     <>
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-        <SheetContent className="w-full sm:max-w-2xl gap-2">
+        <SheetContent className="w-full sm:max-w-2xl gap-2"
+          onOpenAutoFocus={() => {
+            returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            if (returnFocusRef.current?.isConnected) {
+              event.preventDefault();
+              returnFocusRef.current.focus();
+            }
+          }}>
           {loading ? (
             <DrawerSkeleton />
           ) : error ? (
@@ -275,7 +294,7 @@ function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: Wor
     <div className="mt-4 space-y-3">
       {/* 기본 정보 */}
       <Section title="기본 정보">
-        <dl className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
+        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3 text-sm">
           <Field label="상태"><StatusBadge status={detail.status} /></Field>
           <Field label="우선순위">{PRIORITY_LABELS[detail.priority]}</Field>
           <Field label="담당자">
@@ -299,7 +318,7 @@ function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: Wor
       {/* 요청 정보 */}
       {hasRequestInfo && (
         <Section title="요청 정보">
-          <dl className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
+          <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3 text-sm">
             {detail.requestType && (
               <Field label="요청구분">{detail.requestType}</Field>
             )}
@@ -361,7 +380,7 @@ function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: Wor
 
       {/* 등록 / 수정 */}
       <Section title="등록 / 수정">
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <Field label="등록자">{actors?.creator ?? "—"}</Field>
           <Field label="등록일시">{formatDateTime(detail.createdAt)}</Field>
           <Field label="수정자">{actors?.modifier ?? "—"}</Field>

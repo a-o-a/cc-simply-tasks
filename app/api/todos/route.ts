@@ -43,11 +43,13 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       : undefined,
   ].filter(Boolean);
 
-  const rows = await db
+  const query = db
     .select()
     .from(todos)
     .where(and(...conditions))
     .orderBy(asc(todos.order), desc(todos.createdAt), desc(todos.id));
+
+  const rows = await (cursor ? query : query.limit(take + 1));
 
   const { items: pageItems, nextCursor } = slicePageAfterCursor(rows, cursor, take);
   const withChecklist = filters.include?.includes("checklist") ?? false;

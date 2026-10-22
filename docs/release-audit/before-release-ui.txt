@@ -1,0 +1,146 @@
+▶ release UI regressions on an isolated production database
+  ✖ mobile navigation and page controls fit a 390px viewport (5187.540167ms)
+  ✖ work table detail can be opened and closed with the keyboard (5109.026833ms)
+  ✖ a late initial TODO response cannot erase a new draft (5199.084208ms)
+  ✖ TODO failure is distinct from empty data and retry recovers (5097.656625ms)
+  ✖ calendar failure has a retry and recovers without changing month (5114.5705ms)
+  ✖ the 51st member is available in management and assignment (5222.703291ms)
+✖ release UI regressions on an isolated production database (31469.095917ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 0
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32243.672375
+
+✖ failing tests:
+
+test at scripts/release-ui.test.mjs:25:11
+✖ mobile navigation and page controls fit a 390px viewport (5187.540167ms)
+  Error: /: page-level horizontal overflow
+
+  /: page-level horizontal overflow
+
+  expect(received).toBeLessThanOrEqual(expected)
+
+  Expected: <= 1
+  Received:    618
+
+  Call Log:
+  - Timeout 5000ms exceeded while waiting on the predicate
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeLessThanOrEqual (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:30:159)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:25:3) {
+    matcherResult: { pass: false, message: '/: page-level horizontal overflow\n\nexpect(received).toBeLessThanOrEqual(expected)\n\nExpected: <= 1\nReceived:    618\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate', name: 'toBeLessThanOrEqual' }
+  }
+
+test at scripts/release-ui.test.mjs:43:11
+✖ work table detail can be opened and closed with the keyboard (5109.026833ms)
+  Error: expect(locator).toBeVisible() failed
+
+  Locator: getByRole('button', { name: '키보드로 여는 작업', exact: true })
+  Expected: visible
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toBeVisible" getByRole('button', { name: '키보드로 여는 작업', exact: true }) with timeout 5000ms
+    - waiting for getByRole('button', { name: '키보드로 여는 작업', exact: true })
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeVisible (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:48:25)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:43:3) {
+    matcherResult: { message: `expect(locator).toBeVisible() failed\n\nLocator: getByRole('button', { name: '키보드로 여는 작업', exact: true })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toBeVisible" getByRole('button', { name: '키보드로 여는 작업', exact: true }) with timeout 5000ms\n  - waiting for getByRole('button', { name: '키보드로 여는 작업', exact: true })\n`, pass: false, actual: undefined, name: 'toBeVisible', expected: 'visible', log: [ `  - Expect "toBeVisible" getByRole('button', { name: '키보드로 여는 작업', exact: true }) with timeout 5000ms`, "  - waiting for getByRole('button', { name: '키보드로 여는 작업', exact: true })" ], timeout: 5000, ariaSnapshot: '- complementary:\n  - link "cc-simply-tasks":\n    - /url: /\n  - button "사이드바 접기"\n  - navigation:\n    - link "홈":\n      - /url: /\n    - link "작업":\n      - /url: /work-items\n    - link "이관":\n      - /url: /transfer\n    - link "할 일":\n      - /url: /todos\n    - link "캘린더":\n      - /url: /calendar\n    - link "설정":\n      - /url: /settings\n  - button "출시 검수"\n  - button "테마 전환"\n- main:\n  - heading "작업" [level=1]\n  - button "진행 작업" [pressed]\n  - button "이관 완료"\n  - button "테이블" [pressed]\n  - button "칸반"\n  - button "간트"\n  - button "작업 추가"\n  - text: 분류 설정에서 분류를 추가하세요 상태\n  - button "대기"\n  - button "진행 중"\n  - button "내부테스트"\n  - button "현업테스트"\n  - button "QA테스트"\n  - button "이관대기"\n  - text: 담당자\n  - button "팀원"\n  - text: 우선순위\n  - button "낮음"\n  - button "보통"\n  - button "높음"\n  - text: 이관일\n  - button "날짜 선택"\n  - text: 제목\n  - textbox\n  - text: 시스템\n  - button "시스템"\n  - text: 요청구분\n  - textbox\n  - text: 요청자\n  - textbox\n  - text: 요청번호\n  - textbox\n  - button "필터 숨기기"\n  - button "초기화"\n  - table:\n    - rowgroup:\n      - row "분류 상태 제목 담당자 우선순위 시작 종료 이관일":\n        - columnheader "분류"\n        - columnheader "상태"\n        - columnheader "제목"\n        - columnheader "담당자"\n        - columnheader "우선순위"\n        - columnheader "시작"\n        - columnheader "종료"\n        - columnheader "이관일"\n    - rowgroup:\n      - row "— 대기 키보드로 여는 작업 미배정 보통 — — —":\n        - cell "—"\n        - cell "대기"\n        - cell "키보드로 여는 작업"\n        - cell "미배정"\n        - cell "보통"\n        - cell "—"\n        - cell "—"\n        - cell "—"\n- region "Notifications (F8)":\n  - list\n- alert' }
+  }
+
+test at scripts/release-ui.test.mjs:58:11
+✖ a late initial TODO response cannot erase a new draft (5199.084208ms)
+  Error: expect(locator).toHaveValue(expected) failed
+
+  Locator:  getByRole('dialog', { name: '새 TODO', exact: true }).getByLabel('제목', { exact: true })
+  Expected: "목록이 늦게 와도 유지할 초안"
+  Received: ""
+  Timeout:  5000ms
+
+  Call log:
+    - Expect "toHaveValue" getByRole('dialog', { name: '새 TODO', exact: true }).getByLabel('제목', { exact: true }) with timeout 5000ms
+    - waiting for getByRole('dialog', { name: '새 TODO', exact: true }).getByLabel('제목', { exact: true })
+      14 × locator resolved to <input value="" placeholder="" id="todo-title" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"/>
+         - unexpected value ""
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toHaveValue (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:74:25)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:58:3) {
+    matcherResult: { name: 'toHaveValue', expected: '목록이 늦게 와도 유지할 초안', message: `expect(locator).toHaveValue(expected) failed\n\nLocator:  getByRole('dialog', { name: '새 TODO', exact: true }).getByLabel('제목', { exact: true })\nExpected: "목록이 늦게 와도 유지할 초안"\nReceived: ""\nTimeout:  5000ms\n\nCall log:\n  - Expect "toHaveValue" getByRole('dialog', { name: '새 TODO', exact: true }).getByLabel('제목', { exact: true }) with timeout 5000ms\n  - waiting for getByRole('dialog', { name: '새 TODO', exact: true }).getByLabel('제목', { exact: true })\n    14 × locator resolved to <input value="" placeholder="" id="todo-title" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"/>\n       - unexpected value ""\n`, pass: false, actual: '', log: [ `  - Expect "toHaveValue" getByRole('dialog', { name: '새 TODO', exact: true }).getByLabel('제목', { exact: true }) with timeout 5000ms`, "  - waiting for getByRole('dialog', { name: '새 TODO', exact: true }).getByLabel('제목', { exact: true })", '    14 × locator resolved to <input value="" placeholder="" id="todo-title" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"/>', '       - unexpected value ""' ], timeout: 5000, ariaSnapshot: '- textbox "제목":\n  - /placeholder: ""' }
+  }
+
+test at scripts/release-ui.test.mjs:77:11
+✖ TODO failure is distinct from empty data and retry recovers (5097.656625ms)
+  Error: expect(locator).toBeVisible() failed
+
+  Locator: locator('main').getByRole('alert')
+  Expected: visible
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toBeVisible" locator('main').getByRole('alert') with timeout 5000ms
+    - waiting for locator('main').getByRole('alert')
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeVisible (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:85:25)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:77:3) {
+    matcherResult: { message: `expect(locator).toBeVisible() failed\n\nLocator: locator('main').getByRole('alert')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toBeVisible" locator('main').getByRole('alert') with timeout 5000ms\n  - waiting for locator('main').getByRole('alert')\n`, pass: false, actual: undefined, name: 'toBeVisible', expected: 'visible', log: [ `  - Expect "toBeVisible" locator('main').getByRole('alert') with timeout 5000ms`, "  - waiting for locator('main').getByRole('alert')" ], timeout: 5000, ariaSnapshot: '- complementary:\n  - link "cc-simply-tasks":\n    - /url: /\n  - button "사이드바 접기"\n  - navigation:\n    - link "홈":\n      - /url: /\n    - link "작업":\n      - /url: /work-items\n    - link "이관":\n      - /url: /transfer\n    - link "할 일":\n      - /url: /todos\n    - link "캘린더":\n      - /url: /calendar\n    - link "설정":\n      - /url: /settings\n  - button "출시 검수"\n  - button "테마 전환"\n- main:\n  - heading "할 일" [level=1]\n  - button "TODO 추가"\n  - text: 상태\n  - button "진행 중"\n  - button "완료"\n  - text: 담당자\n  - button "팀원"\n  - text: 제목\n  - textbox\n  - button "필터 숨기기"\n  - button "초기화"\n  - paragraph: 등록된 TODO가 없습니다\n  - paragraph: 새 TODO를 추가해보세요.\n  - button "TODO 추가"\n- region "Notifications (F8)":\n  - list\n- alert' }
+  }
+
+test at scripts/release-ui.test.mjs:93:11
+✖ calendar failure has a retry and recovers without changing month (5114.5705ms)
+  Error: expect(locator).toBeVisible() failed
+
+  Locator: locator('main').getByRole('alert')
+  Expected: visible
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toBeVisible" locator('main').getByRole('alert') with timeout 5000ms
+    - waiting for locator('main').getByRole('alert')
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeVisible (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:101:25)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:93:3) {
+    matcherResult: { message: `expect(locator).toBeVisible() failed\n\nLocator: locator('main').getByRole('alert')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toBeVisible" locator('main').getByRole('alert') with timeout 5000ms\n  - waiting for locator('main').getByRole('alert')\n`, pass: false, actual: undefined, name: 'toBeVisible', expected: 'visible', log: [ `  - Expect "toBeVisible" locator('main').getByRole('alert') with timeout 5000ms`, "  - waiting for locator('main').getByRole('alert')" ], timeout: 5000, ariaSnapshot: '- complementary:\n  - link "cc-simply-tasks":\n    - /url: /\n  - button "사이드바 접기"\n  - navigation:\n    - link "홈":\n      - /url: /\n    - link "작업":\n      - /url: /work-items\n    - link "이관":\n      - /url: /transfer\n    - link "할 일":\n      - /url: /todos\n    - link "캘린더":\n      - /url: /calendar\n    - link "설정":\n      - /url: /settings\n  - button "출시 검수"\n  - button "테마 전환"\n- main:\n  - heading "캘린더" [level=1]\n  - button "이전"\n  - text: 2026년 10월\n  - button "다음"\n  - button "오늘"\n  - button "팀원"\n  - button "이벤트 추가"\n  - text: 일 월 화 수 목 금 토 27\n  - button "이벤트 추가"\n  - text: "28"\n  - button "이벤트 추가"\n  - text: "29"\n  - button "이벤트 추가"\n  - text: "30"\n  - button "이벤트 추가"\n  - text: "1"\n  - button "이벤트 추가"\n  - text: "2"\n  - button "이벤트 추가"\n  - text: "3"\n  - button "이벤트 추가"\n  - text: "4"\n  - button "이벤트 추가"\n  - text: "5"\n  - button "이벤트 추가"\n  - text: "6"\n  - button "이벤트 추가"\n  - text: "7"\n  - button "이벤트 추가"\n  - text: "8"\n  - button "이벤트 추가"\n  - text: "9"\n  - button "이벤트 추가"\n  - text: "10"\n  - button "이벤트 추가"\n  - text: "11"\n  - button "이벤트 추가"\n  - text: "12"\n  - button "이벤트 추가"\n  - text: "13"\n  - button "이벤트 추가"\n  - text: "14"\n  - button "이벤트 추가"\n  - text: "15"\n  - button "이벤트 추가"\n  - text: "16"\n  - button "이벤트 추가"\n  - text: "17"\n  - button "이벤트 추가"\n  - text: "18"\n  - button "이벤트 추가"\n  - text: "19"\n  - button "이벤트 추가"\n  - text: "20"\n  - button "이벤트 추가"\n  - text: "21"\n  - button "이벤트 추가"\n  - text: "22"\n  - button "이벤트 추가"\n  - text: "23"\n  - button "이벤트 추가"\n  - text: "24"\n  - button "이벤트 추가"\n  - text: "25"\n  - button "이벤트 추가"\n  - text: "26"\n  - button "이벤트 추가"\n  - text: "27"\n  - button "이벤트 추가"\n  - text: "28"\n  - button "이벤트 추가"\n  - text: "29"\n  - button "이벤트 추가"\n  - text: "30"\n  - button "이벤트 추가"\n  - text: "31"\n  - button "이벤트 추가"\n  - text: "1"\n  - button "이벤트 추가"\n  - text: "2"\n  - button "이벤트 추가"\n  - text: "3"\n  - button "이벤트 추가"\n  - text: "4"\n  - button "이벤트 추가"\n  - text: "5"\n  - button "이벤트 추가"\n  - text: "6"\n  - button "이벤트 추가"\n  - text: "7"\n  - button "이벤트 추가"\n  - status\n- region "Notifications (F8)":\n  - list\n- alert' }
+  }
+
+test at scripts/release-ui.test.mjs:108:11
+✖ the 51st member is available in management and assignment (5222.703291ms)
+  Error: expect(locator).toBeVisible() failed
+
+  Locator: getByRole('cell', { name: '검수 팀원 50', exact: true })
+  Expected: visible
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toBeVisible" getByRole('cell', { name: '검수 팀원 50', exact: true }) with timeout 5000ms
+    - waiting for getByRole('cell', { name: '검수 팀원 50', exact: true })
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeVisible (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:113:77)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:108:3) {
+    matcherResult: { message: `expect(locator).toBeVisible() failed\n\nLocator: getByRole('cell', { name: '검수 팀원 50', exact: true })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toBeVisible" getByRole('cell', { name: '검수 팀원 50', exact: true }) with timeout 5000ms\n  - waiting for getByRole('cell', { name: '검수 팀원 50', exact: true })\n`, pass: false, actual: undefined, name: 'toBeVisible', expected: 'visible', log: [ `  - Expect "toBeVisible" getByRole('cell', { name: '검수 팀원 50', exact: true }) with timeout 5000ms`, "  - waiting for getByRole('cell', { name: '검수 팀원 50', exact: true })" ], timeout: 5000, ariaSnapshot: '- complementary:\n  - link "cc-simply-tasks":\n    - /url: /\n  - button "사이드바 접기"\n  - navigation:\n    - link "홈":\n      - /url: /\n    - link "작업":\n      - /url: /work-items\n    - link "이관":\n      - /url: /transfer\n    - link "할 일":\n      - /url: /todos\n    - link "캘린더":\n      - /url: /calendar\n    - link "설정":\n      - /url: /settings\n  - button "출시 검수"\n  - button "테마 전환"\n- main:\n  - heading "설정" [level=1]\n  - tablist:\n    - tab "서비스"\n    - tab "팀원" [selected]\n    - tab "코드 관리"\n    - tab "백업"\n  - tabpanel "팀원":\n    - paragraph: 팀원 정보를 관리합니다. 작업/캘린더의 담당자로 사용됩니다.\n    - button "팀원 추가"\n    - table:\n      - rowgroup:\n        - row "이름 역할 생성":\n          - columnheader "이름"\n          - columnheader "역할"\n          - columnheader "생성"\n          - columnheader\n      - rowgroup:\n        - row "검수 팀원 00 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 00"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 01 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 01"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 02 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 02"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 03 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 03"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 04 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 04"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 05 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 05"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 06 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 06"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 07 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 07"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 08 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 08"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 09 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 09"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 10 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 10"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 11 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 11"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 12 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 12"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 13 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 13"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 14 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 14"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 15 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 15"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 16 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 16"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 17 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 17"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 18 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 18"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 19 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 19"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 20 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 20"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 21 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 21"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 22 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 22"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 23 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 23"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 24 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 24"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 25 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 25"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 26 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 26"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 27 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 27"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 28 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 28"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 29 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 29"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 30 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 30"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 31 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 31"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 32 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 32"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 33 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 33"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 34 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 34"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 35 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 35"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 36 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 36"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 37 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 37"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 38 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 38"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 39 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 39"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 40 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 40"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 41 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 41"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 42 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 42"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 43 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 43"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n            - button "수정"\n            - button "삭제"\n        - row "검수 팀원 44 웹개발 2026-10-22 수정 삭제":\n          - cell "검수 팀원 44"\n          - cell "웹개발"\n          - cell "2026-10-22"\n          - cell "수정 삭제":\n      '... 1123 more characters }
+  }

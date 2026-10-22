@@ -42,7 +42,7 @@ import {
  * 작업 생성/수정 다이얼로그.
  *
  * - editing이 null이면 생성, 있으면 수정
- * - 수정 시 `If-Match: editing.updatedAt` 자동 처리
+ * - 저장 성공 시 목록과 상세를 다시 조회
  * - tickets 배열을 payload에 포함해 한 트랜잭션으로 sync
  */
 
@@ -351,7 +351,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 요청 정보 3열 */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label htmlFor="wi-req-type">요청구분</Label>
               <Input
@@ -410,7 +410,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 상태 / 우선순위 / 담당자 */}
-          <div className="grid grid-cols-3 items-end gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 items-end gap-3">
             <div className="space-y-2">
               <Label htmlFor="wi-status">상태</Label>
               <Select
@@ -539,7 +539,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 일정 */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label htmlFor="wi-start">시작일</Label>
               <DatePicker

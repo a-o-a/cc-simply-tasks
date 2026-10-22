@@ -50,6 +50,8 @@ export function CalendarClient() {
   const [transferItems, setTransferItems] = React.useState<WorkItemListItem[]>([]);
   const [openTodos, setOpenTodos] = React.useState<TodoItem[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const requestRef = React.useRef<AbortController | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = React.useState(
     new Set<string>(),
   );
@@ -73,47 +75,58 @@ export function CalendarClient() {
   // ── 데이터 로드 ─────────────────────────────────────────────────────────────
 
   const loadEvents = React.useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
+    setError(null);
+    setEvents([]);
+    setTransferItems([]);
+    setOpenTodos([]);
     try {
       const fromDate = utcMsToKstDateString(gridFromMs);
       const toDate = utcMsToKstDateString(gridToMs - 1);
       const [eventsRes, workRes, todoRes] = await Promise.all([
         api.get<ListResponse>("/api/calendar-events", {
+          signal: controller.signal,
           query: {
             from: new Date(gridFromMs).toISOString(),
             to: new Date(gridToMs).toISOString(),
           },
         }),
-        api.get<{ items: WorkItemListItem[]; nextCursor: string | null }>("/api/work-items", {
+        api.getAll<WorkItemListItem>("/api/work-items", {
+          signal: controller.signal,
           query: { transferDate: fromDate, transferDateTo: toDate },
         }),
-        api.get<{ items: TodoItem[]; nextCursor: string | null }>("/api/todos", {
+        api.getAll<TodoItem>("/api/todos", {
+          signal: controller.signal,
           query: {
             status: "OPEN",
             dueDateFrom: fromDate,
             dueDateTo: toDate,
-            pageSize: 10000,
           },
         }),
       ]);
+      if (controller.signal.aborted) return;
       setEvents(eventsRes.items);
-      setTransferItems(workRes.items);
-      setOpenTodos(todoRes.items);
+      setTransferItems(workRes);
+      setOpenTodos(todoRes);
     } catch (err) {
+      if (controller.signal.aborted) return;
+      setError(err instanceof ApiError ? err.message : "캘린더를 불러오지 못했습니다");
       toast({
         title: "캘린더 조회 실패",
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [gridFromMs, gridToMs]);
 
   const loadMembers = React.useCallback(async () => {
     try {
-      const res = await api.get<{ items: Member[] }>("/api/team-members");
-      setMembers(res.items);
+      setMembers(await api.getAll<Member>("/api/team-members"));
     } catch {
       // 실패해도 캘린더는 동작
     }
@@ -124,6 +137,7 @@ export function CalendarClient() {
   }, [loadMembers]);
   React.useEffect(() => {
     void loadEvents();
+    return () => requestRef.current?.abort();
   }, [loadEvents]);
 
   // ── SSE: 다른 클라이언트의 변경을 실시간으로 반영 ────────────────────────────
@@ -149,14 +163,14 @@ export function CalendarClient() {
   const eventsByDay = React.useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const event of filteredEvents) {
-      for (const key of eventDayKeys(event)) {
+      for (const key of eventDayKeys(event, { fromMs: gridFromMs, toMs: gridToMs })) {
         const list = map.get(key) ?? [];
         list.push(event);
         map.set(key, list);
       }
     }
     return map;
-  }, [filteredEvents]);
+  }, [filteredEvents, gridFromMs, gridToMs]);
 
   const transfersByDay = React.useMemo(() => {
     const map = new Map<string, number>();
@@ -252,19 +266,19 @@ export function CalendarClient() {
       }}
       onDragCancel={() => setActiveDragData(null)}
     >
-      <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex min-h-full flex-col">
         {/* ── 헤더 ── */}
-        <header className="flex shrink-0 items-center px-8 py-6">
+        <header className="flex shrink-0 flex-wrap items-center gap-3 px-4 py-4 md:px-8 md:py-6">
           {/* 왼쪽: 타이틀 */}
           <h1 className="text-xl font-semibold">캘린더</h1>
 
           {/* 가운데: 월 선택 + 오늘 + 팀원 필터 */}
-          <div className="flex flex-1 items-center justify-center gap-3">
+          <div className="order-3 flex w-full flex-wrap items-center gap-2 md:order-none md:w-auto md:flex-1 md:justify-center md:gap-3">
             <div className="flex items-center rounded-md border bg-card">
               <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="min-w-[10rem] px-3 text-center text-sm font-medium tabular-nums">
+              <span className="min-w-[7rem] px-2 text-center text-sm font-medium tabular-nums">
                 {headerLabel}
               </span>
               <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음">
@@ -285,9 +299,9 @@ export function CalendarClient() {
           </div>
 
           {/* 오른쪽: 로딩 + 이벤트 추가 */}
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             {loading && (
-              <span className="text-xs text-muted-foreground">불러오는 중…</span>
+              <span role="status" className="text-xs text-muted-foreground">불러오는 중…</span>
             )}
             <Button
               onClick={() =>
@@ -301,7 +315,12 @@ export function CalendarClient() {
         </header>
 
         {/* 캘린더 영역 */}
-        <div className="flex-1 overflow-hidden px-8 py-6">
+        {error && <div role="alert" className="mx-4 mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-destructive p-4 md:mx-8">
+          <p className="text-sm">캘린더 조회 실패: {error}</p>
+          <Button variant="outline" onClick={() => void loadEvents()}>다시 시도</Button>
+        </div>}
+        <div aria-busy={loading} className="min-h-0 flex-1 overflow-x-auto px-4 pb-4 md:px-8 md:pb-6">
+          <div className="min-w-[700px]">
           <MonthView
             grid={grid}
             cursor={cursor}
@@ -316,6 +335,7 @@ export function CalendarClient() {
               setDialogState({ mode: "edit", event })
             }
           />
+          </div>
         </div>
       </div>
 

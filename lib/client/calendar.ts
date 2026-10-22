@@ -59,15 +59,15 @@ export function eventDayKeys(event: {
   startDateTime: string;
   endDateTime: string;
   allDay: boolean;
-}): string[] {
+}, range?: { fromMs: number; toMs: number }): string[] {
   const start = new Date(event.startDateTime).getTime();
   const end = new Date(event.endDateTime).getTime();
 
-  const startDay = kstDateStringToUtcMs(utcMsToKstDateString(start));
+  const startDay = Math.max(kstDateStringToUtcMs(utcMsToKstDateString(start)), range?.fromMs ?? -Infinity);
   // allDay end는 반열림이라 end-1ms의 날짜를 사용해 마지막 포함 day를 구한다
   // (예: end = 2026-04-12 KST 00:00 → end-1ms = 2026-04-11 KST 23:59:59 → 4/11)
   const endRefMs = event.allDay ? end - 1 : end;
-  const endDay = kstDateStringToUtcMs(utcMsToKstDateString(endRefMs));
+  const endDay = Math.min(kstDateStringToUtcMs(utcMsToKstDateString(endRefMs)), range ? range.toMs - 1 : Infinity);
 
   const out: string[] = [];
   for (let ms = startDay; ms <= endDay; ms += DAY_MS) {

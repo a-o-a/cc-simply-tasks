@@ -168,6 +168,7 @@ export function TransferClient() {
   const [systems, setSystems] = React.useState<WorkSystem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const requestRef = React.useRef<AbortController | null>(null);
 
   const [drawerId, setDrawerId] = React.useState<string | null>(null);
   const [drawerReloadKey, setDrawerReloadKey] = React.useState(0);
@@ -177,6 +178,9 @@ export function TransferClient() {
   const [confirmingDate, setConfirmingDate] = React.useState<DateGroup | null>(null);
 
   const loadAll = React.useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
     setError(null);
     try {
@@ -185,32 +189,37 @@ export function TransferClient() {
       const toDate = `${cursor.year}-${String(cursor.month0 + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
 
       const [itemsRes, membersRes, catsRes, sysRes] = await Promise.all([
-        api.get<ListResponse<WorkItemListItem>>("/api/work-items", {
+        api.getAll<WorkItemListItem>("/api/work-items", {
+          signal: controller.signal,
           query: {
             hasTransferDate: "true",
             transferDate: fromDate,
             transferDateTo: toDate,
-            pageSize: 10000,
           },
         }),
-        api.get<ListResponse<Member>>("/api/team-members"),
+        api.getAll<Member>("/api/team-members", { signal: controller.signal }),
         api.get<ListResponse<WorkCategory>>("/api/work-categories"),
         api.get<ListResponse<WorkSystem>>("/api/work-systems"),
       ]);
-      setItems(itemsRes.items);
-      setMembers(membersRes.items);
+      if (controller.signal.aborted) return;
+      setItems(itemsRes);
+      setMembers(membersRes);
       setCategories(catsRes.items);
       setSystems(sysRes.items);
     } catch (err) {
+      if (controller.signal.aborted) return;
       const message = err instanceof ApiError ? err.message : "데이터 조회 실패";
       setError(message);
       toast({ title: "이관 현황 조회 실패", description: message, variant: "destructive" });
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [cursor]);
 
-  React.useEffect(() => { void loadAll(); }, [loadAll]);
+  React.useEffect(() => {
+    void loadAll();
+    return () => requestRef.current?.abort();
+  }, [loadAll]);
 
   const dateGroups = React.useMemo(() => groupItems(items), [items]);
 
@@ -296,8 +305,8 @@ export function TransferClient() {
   const headerLabel = `${cursor.year}년 ${cursor.month0 + 1}월`;
 
   return (
-    <div className="px-8 py-6">
-      <header className="flex items-center justify-between">
+    <div className="px-4 py-4 md:px-8 md:py-6">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-xl font-semibold">이관 현황</h1>
           {!loading && !error && (
@@ -308,12 +317,12 @@ export function TransferClient() {
         </div>
 
         {/* 가운데: 월 선택 */}
-        <div className="flex flex-1 items-center justify-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-2 md:flex-1 md:gap-3">
           <div className="flex items-center rounded-md border bg-card">
             <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전" disabled={loading}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="min-w-[10rem] px-3 text-center text-sm font-medium tabular-nums">
+            <span className="min-w-[7rem] px-2 text-center text-sm font-medium tabular-nums">
               {headerLabel}
             </span>
             <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음" disabled={loading}>
@@ -326,7 +335,7 @@ export function TransferClient() {
           </Button>
         </div>
 
-        <div className="flex flex-1 justify-end"></div>
+        <div className="hidden md:flex md:flex-1" />
       </header>
 
       <div className="mt-6">

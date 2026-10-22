@@ -20,16 +20,16 @@ export const POST = withErrorHandler(
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const input = todoChecklistCreateSchema.parse(await req.json());
-    const timestamp = now();
 
     const created = await db.transaction(async (tx) => {
       const parent = await tx
-        .select({ id: todos.id })
+        .select({ id: todos.id, updatedAt: todos.updatedAt })
         .from(todos)
         .where(and(eq(todos.id, routeParams.id), isNull(todos.deletedAt)))
         .limit(1);
       if (!parent[0])
         throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
+      const timestamp = new Date(Math.max(now().getTime(), parent[0].updatedAt.getTime() + 1));
 
       const row = {
         id: newId(),
@@ -43,7 +43,7 @@ export const POST = withErrorHandler(
         deletedAt: null,
       } satisfies typeof todoChecklist.$inferInsert;
       await tx.insert(todoChecklist).values(row);
-      // 부모 updatedAt도 갱신 (If-Match 동기화)
+      // 부모 버전도 증가시켜 열린 TODO 초안의 충돌을 감지한다.
       await tx
         .update(todos)
         .set({ updatedAt: timestamp })
@@ -69,9 +69,12 @@ export const PATCH = withErrorHandler(
     await ensureSqlitePragma();
     const actor = getActorContext(req);
     const { ids } = todoChecklistReorderSchema.parse(await req.json());
-    const timestamp = now();
 
     await db.transaction(async (tx) => {
+      const [parent] = await tx.select({ updatedAt: todos.updatedAt }).from(todos)
+        .where(and(eq(todos.id, routeParams.id), isNull(todos.deletedAt))).limit(1);
+      if (!parent) throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
+      const timestamp = new Date(Math.max(now().getTime(), parent.updatedAt.getTime() + 1));
       const existing = await tx
         .select()
         .from(todoChecklist)
