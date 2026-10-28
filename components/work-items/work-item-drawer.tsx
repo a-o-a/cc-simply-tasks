@@ -70,6 +70,9 @@ export function WorkItemDrawer({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const deletingRef = React.useRef(false);
   const requestRef = React.useRef<AbortController | null>(null);
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
 
@@ -105,7 +108,10 @@ export function WorkItemDrawer({
   }, [workItemId, reloadKey, loadDetail]);
 
   async function handleDelete() {
-    if (!detail) return;
+    if (!detail || deletingRef.current) return;
+    deletingRef.current = true;
+    setDeleting(true);
+    setDeleteError(null);
     try {
       await api.delete(`/api/work-items/${detail.id}`);
       toast({ title: "작업을 삭제했습니다" });
@@ -114,17 +120,21 @@ export function WorkItemDrawer({
       onDeleted();
       onMutated();
     } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : "작업을 삭제하지 못했습니다");
       toast({
         title: "작업 삭제 실패",
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
     }
   }
 
   return (
     <>
-      <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <Sheet open={open} onOpenChange={(o) => !o && !deletingRef.current && onClose()}>
         <SheetContent className="w-full sm:max-w-2xl gap-2"
           onOpenAutoFocus={() => {
             returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -156,27 +166,28 @@ export function WorkItemDrawer({
               categories={categories}
               systems={systems}
               onEdit={() => onEdit(detail)}
-              onRequestDelete={() => setConfirmDelete(true)}
+              onRequestDelete={() => { setDeleteError(null); setConfirmDelete(true); }}
             />
           ) : <DrawerSkeleton />}
         </SheetContent>
       </Sheet>
 
-      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <DialogContent>
+      <Dialog open={confirmDelete} onOpenChange={(value) => { if (!deletingRef.current) setConfirmDelete(value); }}>
+        <DialogContent hideCloseButton={deleting}>
           <DialogHeader>
             <DialogTitle>작업 삭제</DialogTitle>
             <DialogDescription>
               <span className="font-medium text-foreground">{detail?.title}</span>
-              {" "}작업을 삭제하시겠습니까? (soft delete)
+              {" "}작업을 삭제하시겠습니까?
             </DialogDescription>
           </DialogHeader>
+          {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            <Button variant="ghost" disabled={deleting} onClick={() => setConfirmDelete(false)}>
               취소
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              삭제
+            <Button variant="destructive" disabled={deleting} onClick={handleDelete}>
+              {deleting ? "삭제 중…" : "삭제"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -267,28 +278,34 @@ function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: Wor
     creator: string | null;
     modifier: string | null;
   } | null>(null);
+  const [actorsError, setActorsError] = React.useState<string | null>(null);
+  const actorsRequestRef = React.useRef<AbortController | null>(null);
+
+  const loadActors = React.useCallback(async () => {
+    actorsRequestRef.current?.abort();
+    const controller = new AbortController();
+    actorsRequestRef.current = controller;
+    setActors(null);
+    setActorsError(null);
+    try {
+      const [created, updated] = await Promise.all(["CREATE", "UPDATE"].map((action) =>
+        api.get<ListResponse<AuditLog>>("/api/audit-logs", {
+          signal: controller.signal,
+          query: { entityType: "WorkItem", entityId: detail.id, action, pageSize: 1 },
+        }),
+      ));
+      if (controller.signal.aborted) return;
+      setActors({ creator: created.items[0]?.actorName ?? null, modifier: updated.items[0]?.actorName ?? null });
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      setActorsError(err instanceof ApiError ? err.message : "작성자 정보 조회 실패");
+    }
+  }, [detail.id]);
 
   React.useEffect(() => {
-    let cancelled = false;
-    api
-      .get<ListResponse<AuditLog>>("/api/audit-logs", {
-        query: { entityType: "WorkItem", entityId: detail.id, pageSize: 100 },
-      })
-      .then((res) => {
-        if (cancelled) return;
-        // createdAt DESC 정렬 — 첫 번째 CREATE가 등록자, 첫 번째 UPDATE가 최근 수정자
-        const createLog = res.items.find((l) => l.action === "CREATE");
-        const updateLog = res.items.find((l) => l.action === "UPDATE");
-        setActors({
-          creator: createLog?.actorName ?? null,
-          modifier: updateLog?.actorName ?? null,
-        });
-      })
-      .catch(() => { });
-    return () => {
-      cancelled = true;
-    };
-  }, [detail.id]);
+    void loadActors();
+    return () => actorsRequestRef.current?.abort();
+  }, [loadActors, detail.updatedAt]);
 
   return (
     <div className="mt-4 space-y-3">
@@ -380,10 +397,14 @@ function DetailPanel({ detail, systems }: { detail: WorkItemDetail; systems: Wor
 
       {/* 등록 / 수정 */}
       <Section title="등록 / 수정">
+        {actorsError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-destructive">
+          <span>작성자 정보 조회 실패: {actorsError}</span>
+          <Button variant="outline" size="sm" onClick={() => void loadActors()}>다시 시도</Button>
+        </div>}
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <Field label="등록자">{actors?.creator ?? "—"}</Field>
+          <Field label="등록자">{actorsError ? "조회 실패" : actors === null ? "불러오는 중…" : actors.creator ?? "—"}</Field>
           <Field label="등록일시">{formatDateTime(detail.createdAt)}</Field>
-          <Field label="수정자">{actors?.modifier ?? "—"}</Field>
+          <Field label="수정자">{actorsError ? "조회 실패" : actors === null ? "불러오는 중…" : actors.modifier ?? "—"}</Field>
           <Field label="수정일시">{formatDateTime(detail.updatedAt)}</Field>
         </dl>
       </Section>
@@ -422,62 +443,86 @@ function Field({
 }
 
 function ActivityPanel({ workItemId }: { workItemId: string }) {
-  const [logs, setLogs] = React.useState<AuditLog[] | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [logs, setLogs] = React.useState<AuditLog[]>([]);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<{ message: string; cursor?: string; restart: boolean } | null>(null);
+  const requestRef = React.useRef<AbortController | null>(null);
 
-  React.useEffect(() => {
-    let cancelled = false;
-    setLogs(null);
+  const loadLogs = React.useCallback(async (cursor?: string) => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setLoading(true);
     setError(null);
-    api
-      .get<ListResponse<AuditLog>>("/api/audit-logs", {
-        query: { entityType: "WorkItem", entityId: workItemId },
-      })
-      .then((res) => {
-        if (!cancelled) setLogs(res.items);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "활동 로그 조회 실패");
+    if (!cursor) {
+      setLogs([]);
+      setNextCursor(null);
+    }
+    try {
+      const res = await api.get<ListResponse<AuditLog>>("/api/audit-logs", {
+        signal: controller.signal,
+        query: { entityType: "WorkItem", entityId: workItemId, cursor },
       });
-    return () => {
-      cancelled = true;
-    };
+      if (controller.signal.aborted) return;
+      setLogs((previous) => cursor
+        ? [...new Map([...previous, ...res.items].map((log) => [log.id, log])).values()]
+        : res.items);
+      setNextCursor(res.nextCursor);
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      setError({
+        message: err instanceof ApiError ? err.message : "활동 로그 조회 실패",
+        cursor,
+        restart: Boolean(cursor && err instanceof ApiError && err.code === "BAD_REQUEST"),
+      });
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
   }, [workItemId]);
 
-  if (error) {
-    return <p className="text-sm text-destructive">{error}</p>;
-  }
-  if (logs === null) {
-    return <p className="text-sm text-muted-foreground">불러오는 중...</p>;
-  }
-  if (logs.length === 0) {
+  React.useEffect(() => {
+    void loadLogs();
+    return () => requestRef.current?.abort();
+  }, [loadLogs]);
+
+  if (!error && !loading && logs.length === 0) {
     return <p className="text-sm text-muted-foreground">기록된 활동이 없습니다.</p>;
   }
 
   return (
-    <ol className="space-y-3">
-      {logs.map((log) => (
-        <li key={log.id} className="rounded-md border p-3 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="font-medium">
-              {ACTION_LABELS[log.action] ?? log.action}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {formatDateTime(log.createdAt)}
-            </span>
-          </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {log.actorName ?? "익명"}
-          </div>
-          {log.afterJson ? (
-            <pre className="mt-2 max-h-40 overflow-auto rounded-sm bg-muted/40 p-2 text-[11px] leading-snug">
-              {prettyJson(log.afterJson)}
-            </pre>
-          ) : null}
-        </li>
-      ))}
-    </ol>
+    <div className="space-y-3" aria-busy={loading}>
+      <ol className="space-y-3">
+        {logs.map((log) => (
+          <li key={log.id} className="rounded-md border p-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">
+                {ACTION_LABELS[log.action] ?? log.action}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {formatDateTime(log.createdAt)}
+              </span>
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {log.actorName ?? "익명"}
+            </div>
+            {log.afterJson ? (
+              <pre className="mt-2 max-h-40 overflow-auto rounded-sm bg-muted/40 p-2 text-[11px] leading-snug">
+                {prettyJson(log.afterJson)}
+              </pre>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+      {error && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-destructive">
+        <span>활동 로그 조회 실패: {error.message}</span>
+        <Button variant="outline" size="sm" onClick={() => void loadLogs(error.restart ? undefined : error.cursor)}>
+          {error.restart ? "처음부터 다시 조회" : "다시 시도"}
+        </Button>
+      </div>}
+      {loading && <p role="status" className="text-sm text-muted-foreground">불러오는 중…</p>}
+      {nextCursor && !error && <Button variant="outline" disabled={loading} onClick={() => void loadLogs(nextCursor)}>더 보기</Button>}
+    </div>
   );
 }
 

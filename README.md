@@ -205,9 +205,10 @@ npm run start
 | `npm run lint` | flat config 기반 `eslint . --max-warnings=0` |
 | `npm run typecheck` | `next typegen` 후 `tsc --noEmit` |
 | `npm run test:smoke` | Node 테스트 러너로 API·DB·백업 검증 |
-| `npm run test:ui` | Playwright Chromium 정상 흐름·모바일·오류 복구·목록 경계 회귀 검증 |
-| `npm run test:regression` | 날짜·TODO 원자 저장/동시 편집·캘린더 범위 회귀 검증 |
-| `npm run benchmark` | 격리 메모리 DB와 합성 데이터로 조회·날짜 계산 전후 비교 |
+| `npm run test:ui` | Chromium 핵심 흐름·모바일·오류 복구·키보드·활동 더보기·장기 간트 검증 |
+| `npm run test:regression` | 날짜·TODO 원자 저장/동시 편집·캘린더 범위·관계 감사·커서 회귀 검증 |
+| `npm run benchmark` | 격리 메모리 DB와 합성 데이터로 첫 조회·날짜 계산 전후 비교 |
+| `npm run benchmark:cursor` | 현재 SQL 커서 구현과 기존 전체 조회를 같은 데이터·정렬로 비교 |
 | `npm run check` | lint → typecheck → build → smoke → regression 순서 실행 |
 | `npm run db:generate` | 개발 스키마 변경에서 migration SQL 생성 |
 | `npm run db:migrate` | 커밋된 migration 적용 |
@@ -268,7 +269,7 @@ curl --fail --output backup.db http://localhost:3000/api/backup
 | **2** | 공통 인프라 (time, actor, audit, validation, http, pagination, DB bootstrap) | ✅ 완료 |
 | **3** | API 라우트 (team-members, work-items, calendar-events, audit-logs 등) | ✅ 완료 |
 | **4** | UI (디자인 토큰 + shadcn/ui + 테이블/드로어/Gantt/캘린더 + 대시보드) | ✅ 완료 |
-| **4+** | 캘린더 개선 (주 보기, 드래그 이동, 팀원 필터, 카테고리 정리, 다중 담당자) | ✅ 완료 |
+| **4+** | 캘린더 개선 (월 보기, 드래그 이동, 팀원 필터, 카테고리 정리, 다중 담당자) | ✅ 완료 |
 | **4++** | 대시보드 개편 (3열 레이아웃, 진행중인 작업, 작업 드로어 연동) | ✅ 완료 |
 | **5** | 폴리싱 (설정 페이지, 상태값 개편, 분류 동적화, DatePicker, 캘린더 이관 표시 등) | ✅ 완료 |
 | **5+** | UI 통일 · 캘린더 SSE · 필터 개선 · 날짜 포맷 통일 · DB 현황 등 | ✅ 완료 |
@@ -377,7 +378,7 @@ Node 22 / Next 16 / React 19 / Tailwind 4 / Zod 4로 실행 기준을 갱신했�
 - **DatePicker / DateTimePicker** — Radix Popover 기반 커스텀 날짜 선택기 (아이콘 우측 배치, X 클리어 버튼)
 - **사이드바 개선** — 이름 변경 `window.prompt` → Dialog 팝업, 다크모드 두번 클릭 버그 수정 (`resolvedTheme`)
 - **액터 이름 동기화** — ActorNameGate 저장 후 사이드바 즉시 반영 (`actor-name-changed` CustomEvent)
-- **캘린더 이관 건수 표시** — 월/주 보기 각 셀 최상단에 emerald `[이관] N건` 칩
+- **캘린더 이관 건수 표시** — 월 보기 각 셀 최상단에 emerald `[이관] N건` 칩
   - `GET /api/work-items?transferDate=&transferDateTo=` 범위 조회 지원 추가
 - **TODO 모듈 추가/개선** — `/todos` 페이지, checklist CRUD, 30건 `더보기`, 체크리스트 Enter로 다음 항목 추가
 - **TODO 드로어 저장 UX 개편** — 자동저장 제거, 명시적 저장 버튼, 닫기/삭제 시 공통 Dialog 확인
@@ -390,7 +391,7 @@ Node 22 / Next 16 / React 19 / Tailwind 4 / Zod 4로 실행 기준을 갱신했�
 - **이벤트 정렬 통일** — 종일 우선 → 카테고리 → 제목 asc (대시보드·캘린더 공통 `sortEvents()`)
 
 ### Phase 4+ 캘린더 개선 완료 내역 (2026-04-12)
-- **주 보기(Week view)** — 타임그리드 64px/hr, 종일 스트립, 겹치는 이벤트 컬럼 분할
+- **보기 범위** — 현재 구현은 월 보기만 제공합니다. 이전 주 보기 구현은 현재 코드에 남아 있지 않습니다.
 - **드래그로 날짜 이동** — `@dnd-kit/core` + 낙관적 업데이트 → PATCH → 실패 시 롤백
 - **팀원 필터** — `components/member-filter.tsx` (재사용 가능), 헤더에 배치
 - **카테고리 정리** — 5종 → 4종 (HOLIDAY/WORK/ABSENCE/ETC), 구값 폴백
@@ -416,17 +417,21 @@ Node 22 / Next 16 / React 19 / Tailwind 4 / Zod 4로 실행 기준을 갱신했�
 - **Soft delete** (`deletedAt`) — 인증 없는 환경에서 복구 수단 확보
 - **TODO 편집 충돌 보호** — 드로어 저장 시 `expectedUpdatedAt`을 보내며, 다른 곳에서 변경된 경우 409로 거부하고 초안을 보존합니다. 체크리스트와 부모 필드는 같은 트랜잭션에서 저장합니다. 다른 API 및 버전을 생략한 호출은 동시 편집 보호 대상이 아닙니다.
 - **시간 저장은 UTC, 표시는 `Asia/Seoul`** — 한 곳(`lib/time.ts`)에서 관리
-- **cursor 기반 페이지네이션** — 기본 50, 최대 10,000. 작업/TODO/감사 로그의 첫 페이지는 DB에서 필요한 행만 조회하며, 누락된 커서는 400 오류로 알림
-- **Postgres 이관 대비**: `id`는 cuid2, JSON은 문자열로 저장; SQLite 전용 구문은 DB·백업 계층에 한정
+- **cursor 기반 페이지네이션** — 기본 50, 최대 10,000. 작업/TODO/감사 로그는 첫 페이지와 후속 페이지 모두 SQL에서 행 수를 제한하며, 누락된 커서는 400 오류로 알림
+- **Postgres 이관 대비**: `id`는 cuid2, JSON은 문자열로 저장; 전환 시 DB 드라이버·스키마·백업과 커서의 SQLite NULL 정렬/`IS` 비교를 함께 점검
 
 
 ## 출시 전 회귀 검수
 
-검수 결과·측정 조건·전후 화면·남은 제약은 [2026-10-22 검수 기록](docs/RELEASE_AUDIT_20261022.md)에 있습니다.
+현재 검수 결과·측정 조건·전후 화면·남은 제약은 [2026-10-28 검수 기록](docs/RELEASE_AUDIT_20261028.md)에 있습니다. [2026-10-22 기록](docs/RELEASE_AUDIT_20261022.md)은 이전 검수 이력입니다.
 
 - 모바일에서는 상단 메뉴와 한 열 필터를 사용합니다. 테이블·간트·월간 캘린더처럼 넓은 정보는 해당 영역 안에서 가로로 스크롤합니다.
 - 진행 작업은 `더보기`, 이관 완료는 `이전`·`다음`으로 후속 항목에 접근합니다. 팀원 선택과 월별 집계는 마지막 페이지까지 조회합니다.
-- 작업 제목 버튼은 키보드 Enter/Space로 상세를 열고, Escape로 닫으면 원래 버튼으로 돌아옵니다.
+- 작업·이관 제목 버튼은 키보드 Enter/Space로 상세를 열고, Escape로 닫으면 원래 버튼으로 돌아옵니다. 휴일도 일자 옆의 개별 제목 버튼으로 수정·삭제합니다.
+- 작업·일정 저장 중에는 입력/닫기를 잠시 막고 완료 상태를 표시합니다. 실패하면 폼 안에 오류와 초안을 유지해 다시 저장할 수 있습니다. 모바일 시스템 연동은 시스템 선택과 티켓번호를 두 줄로 표시합니다.
+- 홈의 이번주 이관 예정·진행 작업은 마지막 페이지까지 집계합니다. 조회 실패는 0건과 구분하고, 갱신 실패에는 이전 결과임을 표시하며 재시도할 수 있습니다.
+- 상세의 활동은 50개씩 `더 보기`로 과거 이력까지 조회합니다. 등록자·최종 수정자는 로그 수와 관계없이 해당 작업의 생성/수정 기록에서 조회합니다.
+- 간트는 전체 작업 기간과 작업바를 유지하고, 현재 보이는 날짜 열과 앞뒤 4열만 렌더링합니다. 차트에 포커스한 뒤 방향키 또는 가로 스크롤로 다른 날짜를 확인할 수 있습니다.
 - 목록 조회 실패는 빈 결과와 구분하며 `다시 시도`를 제공합니다. 삭제된 페이지 커서로 조회할 경우 처음부터 다시 불러옵니다.
 - TODO 제목·메모·상태·담당자·날짜·체크리스트는 저장 버튼 또는 제목의 Enter로 함께 저장합니다. 기존 체크 ID는 유지하고 생략된 항목은 soft delete합니다. 충돌·실패 시 초안은 그대로 남으며, 충돌 안내에 따라 최신 내용을 다시 확인합니다.
 

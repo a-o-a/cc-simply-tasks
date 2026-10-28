@@ -1,0 +1,14 @@
+▶ dashboard totals and failure recovery reflect the actual data
+  ✔ both work summaries include the 205th result beyond the first API page (434.6135ms)
+  ✔ a failed initial work load is not shown as zero or empty and can retry (272.111292ms)
+  ✔ today's schedule and recent activity distinguish failure from an empty result (280.856625ms)
+  ✔ late refreshes cannot replace newer results and failures preserve the last successful data (334.704958ms)
+✔ dashboard totals and failure recovery reflect the actual data (1886.391417ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2262.080833

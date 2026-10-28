@@ -1,0 +1,68 @@
+{"name":"gantt-long-period","viewport":"1323x972","rendered_days":31,"chart_nodes":136,"scroll_width_px":117536}
+▶ long Gantt timelines render a bounded viewport and preserve all dates
+  ✖ the first displayed day uses KST holiday dates without shifting the UTC-based labels (5024.9805ms)
+  ✖ holiday requests cover exactly the displayed KST dates and exclude next midnight (0.7625ms)
+  ✔ desktop renders only visible date columns with overscan (2.37375ms)
+  ✔ horizontal scrolling reaches the final date with the same track width (29.887875ms)
+  ✔ middle dates stay aligned with the original day grid (33.556ms)
+  ✔ the work bar remains keyboard-accessible after scrolling (862.256541ms)
+  ✔ mobile resize recalculates columns and retains internal horizontal scrolling (115.785917ms)
+✖ long Gantt timelines render a bounded viewport and preserve all dates (7385.497875ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 5
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8030.790292
+
+✖ failing tests:
+
+test at scripts/gantt-regression.test.mjs:46:11
+✖ the first displayed day uses KST holiday dates without shifting the UTC-based labels (5024.9805ms)
+  Error: expect(locator).toHaveClass(expected) failed
+
+  Locator: locator('main .overflow-x-auto.cursor-grab').locator('div[title="2019-12-25"]')
+  Expected pattern: /\btext-red-500\b/
+  Received string:  "relative shrink-0 border-r text-center text-[10px] leading-tight transition-colors font-semibold"
+  Timeout: 5000ms
+
+  Call log:
+    - Expect "toHaveClass" locator('main .overflow-x-auto.cursor-grab').locator('div[title="2019-12-25"]') with timeout 5000ms
+    - waiting for locator('main .overflow-x-auto.cursor-grab').locator('div[title="2019-12-25"]')
+      14 × locator resolved to <div title="2019-12-25" class="relative shrink-0 border-r text-center text-[10px] leading-tight transition-colors font-semibold">…</div>
+         - unexpected value "relative shrink-0 border-r text-center text-[10px] leading-tight transition-colors font-semibold"
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toHaveClass (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:50:25)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:46:3) {
+    matcherResult: { name: 'toHaveClass', expected: /\btext-red-500\b/, message: `expect(locator).toHaveClass(expected) failed\n\nLocator: locator('main .overflow-x-auto.cursor-grab').locator('div[title="2019-12-25"]')\nExpected pattern: /\\btext-red-500\\b/\nReceived string:  "relative shrink-0 border-r text-center text-[10px] leading-tight transition-colors font-semibold"\nTimeout: 5000ms\n\nCall log:\n  - Expect "toHaveClass" locator('main .overflow-x-auto.cursor-grab').locator('div[title="2019-12-25"]') with timeout 5000ms\n  - waiting for locator('main .overflow-x-auto.cursor-grab').locator('div[title="2019-12-25"]')\n    14 × locator resolved to <div title="2019-12-25" class="relative shrink-0 border-r text-center text-[10px] leading-tight transition-colors font-semibold">…</div>\n       - unexpected value "relative shrink-0 border-r text-center text-[10px] leading-tight transition-colors font-semibold"\n`, pass: false, actual: 'relative shrink-0 border-r text-center text-[10px] leading-tight transition-colors font-semibold', log: [ `  - Expect "toHaveClass" locator('main .overflow-x-auto.cursor-grab').locator('div[title="2019-12-25"]') with timeout 5000ms`, `  - waiting for locator('main .overflow-x-auto.cursor-grab').locator('div[title="2019-12-25"]')`, '    14 × locator resolved to <div title="2019-12-25" class="relative shrink-0 border-r text-center text-[10px] leading-tight transition-colors font-semibold">…</div>', '       - unexpected value "relative shrink-0 border-r text-center text-[10px] leading-tight transition-colors font-semibold"' ], timeout: 5000, ariaSnapshot: '- text: 12월 25' }
+  }
+
+test at scripts/gantt-regression.test.mjs:54:11
+✖ holiday requests cover exactly the displayed KST dates and exclude next midnight (0.7625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + '2019-12-25T00:00:00.000Z'
+  - '2019-12-24T15:00:00.000Z'
+              ^
+
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:56:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at TestContext.test (node:internal/test_runner/test:400:20)
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:54:11)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '2019-12-25T00:00:00.000Z',
+    expected: '2019-12-24T15:00:00.000Z',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

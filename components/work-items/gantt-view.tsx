@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const COL_WIDTH = 32; // 1일 = 32px
 const LABEL_WIDTH = 160;
+const OVERSCAN_COLUMNS = 4;
 
 type ScheduledItem = WorkItemListItem & {
   // KST 자정 기준 epoch ms
@@ -59,8 +60,12 @@ export function GanttView({
 
   React.useEffect(() => {
     const controller = new AbortController();
-    const from = new Date(window.startMs).toISOString();
-    const to = new Date(window.startMs + window.totalDays * DAY_MS).toISOString();
+    // The grid stores KST date labels on a UTC-midnight axis. Convert that
+    // label axis to actual KST midnights for API ranges and eventDayKeys.
+    const fromMs = window.startMs - 9 * 60 * 60 * 1000;
+    const toMs = fromMs + window.totalDays * DAY_MS;
+    const from = new Date(fromMs).toISOString();
+    const to = new Date(toMs).toISOString();
     api
       .get<{ items: CalendarEvent[] }>("/api/calendar-events", {
         signal: controller.signal,
@@ -71,7 +76,7 @@ export function GanttView({
         const dates = new Set<string>();
         for (const ev of res.items) {
           if (ev.category !== "HOLIDAY") continue;
-          for (const key of eventDayKeys(ev, { fromMs: window.startMs, toMs: window.startMs + window.totalDays * DAY_MS })) dates.add(key);
+          for (const key of eventDayKeys(ev, { fromMs, toMs })) dates.add(key);
         }
         setHolidayDates(dates);
       })
@@ -80,6 +85,7 @@ export function GanttView({
   }, [window.startMs, window.totalDays]);
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [visibleRange, setVisibleRange] = React.useState({ start: 0, end: 40 });
   const [canLeft, setCanLeft] = React.useState(false);
   const [canRight, setCanRight] = React.useState(false);
   const isDragging = React.useRef(false);
@@ -95,7 +101,13 @@ export function GanttView({
     if (!el) return;
     setCanLeft(el.scrollLeft > 2);
     setCanRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 2);
-  }, []);
+    // Sticky labels cover the first LABEL_WIDTH pixels. Preserve the complete
+    // track and every work bar, but mount only viewport date cells + overscan.
+    const start = Math.max(0, Math.floor(el.scrollLeft / COL_WIDTH) - OVERSCAN_COLUMNS);
+    const end = Math.min(window.totalDays,
+      Math.ceil((el.scrollLeft + Math.max(1, el.clientWidth - LABEL_WIDTH)) / COL_WIDTH) + OVERSCAN_COLUMNS);
+    setVisibleRange((previous) => previous.start === start && previous.end === end ? previous : { start, end });
+  }, [window.totalDays]);
 
   React.useEffect(() => {
     const el = scrollRef.current;
@@ -171,6 +183,9 @@ export function GanttView({
 
   const totalDays = window.totalDays;
   const trackWidth = totalDays * COL_WIDTH;
+  const visibleStart = Math.min(visibleRange.start, totalDays);
+  const visibleEnd = Math.min(visibleRange.end, totalDays);
+  const visibleColumns = Array.from({ length: Math.max(0, visibleEnd - visibleStart) }, (_, i) => visibleStart + i);
 
   // 오늘 열 인덱스
   const todayMs = toDayStart(new Date().toISOString());
@@ -182,6 +197,7 @@ export function GanttView({
       {canLeft && (
         <button
           onClick={() => scrollBy(-320)}
+          aria-label="이전 날짜 보기"
           className="absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center h-6 w-6 rounded-full bg-card border shadow-xs hover:bg-accent"
           style={{ left: LABEL_WIDTH + 4 }}
         >
@@ -193,6 +209,7 @@ export function GanttView({
       {canRight && (
         <button
           onClick={() => scrollBy(320)}
+          aria-label="다음 날짜 보기"
           className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-4 bg-linear-to-l from-card via-card/70 to-transparent"
         >
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -201,6 +218,9 @@ export function GanttView({
 
       <div
         ref={scrollRef}
+        role="region"
+        aria-label="작업 간트 차트"
+        tabIndex={0}
         onMouseDown={handleMouseDown}
         onMouseMove={handleContainerMouseMove}
         onMouseLeave={handleContainerMouseLeave}
@@ -215,8 +235,8 @@ export function GanttView({
             >
               담당자
             </div>
-            <div className="flex" style={{ width: trackWidth }}>
-              {Array.from({ length: totalDays }).map((_, i) => {
+            <div className="flex shrink-0" style={{ width: trackWidth, paddingLeft: visibleStart * COL_WIDTH }}>
+              {visibleColumns.map((i) => {
                 const ms = window.startMs + i * DAY_MS;
                 const date = new Date(ms);
                 const day = date.getUTCDate();
@@ -285,8 +305,8 @@ export function GanttView({
                   style={{ width: trackWidth, minHeight: 56 }}
                 >
                   {/* 날짜 열 배경 (weekend + 크로스헤어 열 하이라이트) */}
-                  <div className="absolute inset-0 flex">
-                    {Array.from({ length: totalDays }).map((_, i) => {
+                  <div className="absolute inset-0 flex" style={{ paddingLeft: visibleStart * COL_WIDTH }}>
+                    {visibleColumns.map((i) => {
                       const date = new Date(window.startMs + i * DAY_MS);
                       const isSaturday = date.getUTCDay() === 6;
                       const isSunday = date.getUTCDay() === 0;

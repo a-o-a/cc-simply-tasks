@@ -236,9 +236,19 @@ export function MonthView({
                       {dayNum}
                     </span>
                     {holidayEvents.length > 0 && (
-                      <span className="truncate text-[10px] font-medium text-rose-400 leading-tight">
-                        {holidayEvents.map((e) => e.title).join(" · ")}
-                      </span>
+                      <div className="flex min-w-0 flex-col items-start gap-0.5">
+                        {holidayEvents.map((event) => (
+                          <button
+                            key={event.id}
+                            type="button"
+                            onClick={() => onEventClick(event)}
+                            title={event.title}
+                            className="max-w-full truncate rounded-sm text-left text-[10px] font-medium leading-tight text-rose-500 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                          >
+                            {event.title}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <button

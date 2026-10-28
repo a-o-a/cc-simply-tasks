@@ -1,0 +1,45 @@
+▶ long work activity histories remain accessible
+  ✔ the creator remains visible after more than 100 edits (275.446041ms)
+  ✔ all activity pages are reachable without duplicate entries on mobile (779.541333ms)
+  ✔ initial and subsequent activity failures can retry without losing visible entries (812.496208ms)
+  ✔ deleting a work item blocks dismissal and duplicate deletion until the request settles (1015.876542ms)
+✔ long work activity histories remain accessible (3342.755166ms)
+▶ bounded cursor pages preserve filters, ties and date boundaries
+  ✔ all cursor pages match full ordering, including NULL transfer dates and tied timestamps (624.00075ms)
+  ✔ missing, soft-deleted and filtered-out anchors remain recoverable 400 errors (11.880833ms)
+  ✔ a cursor moved to another sort group uses its current position (5.1545ms)
+  ✔ transfer date's inclusive final day includes its final 999 milliseconds (2.077083ms)
+  ✔ TODO date filter and count both include the final millisecond, excluding next midnight (4.265541ms)
+✔ bounded cursor pages preserve filters, ties and date boundaries (971.786042ms)
+▶ dashboard totals and failure recovery reflect the actual data
+  ✔ both work summaries include the 205th result beyond the first API page (285.287792ms)
+  ✔ a failed initial work load is not shown as zero or empty and can retry (300.235667ms)
+  ✔ today's schedule and recent activity distinguish failure from an empty result (276.889041ms)
+  ✔ late refreshes cannot replace newer results and failures preserve the last successful data (353.047917ms)
+✔ dashboard totals and failure recovery reflect the actual data (1688.540542ms)
+{"name":"gantt-long-period","viewport":"1323x972","rendered_days":31,"chart_nodes":136,"scroll_width_px":117536}
+▶ long Gantt timelines render a bounded viewport and preserve all dates
+  ✔ the first displayed day uses KST holiday dates without shifting the UTC-based labels (10.834792ms)
+  ✔ holiday requests cover exactly the displayed KST dates and exclude next midnight (1.392708ms)
+  ✔ desktop renders only visible date columns with overscan (1.973583ms)
+  ✔ horizontal scrolling reaches the final date with the same track width (29.6765ms)
+  ✔ middle dates stay aligned with the original day grid (32.787667ms)
+  ✔ the work bar remains keyboard-accessible after scrolling (838.975334ms)
+  ✔ mobile resize recalculates columns and retains internal horizontal scrolling (90.784583ms)
+✔ long Gantt timelines render a bounded viewport and preserve all dates (1746.352916ms)
+▶ relationship changes are present in their parent's audit trail
+  ✔ work creation records the initial tickets (22.282458ms)
+  ✔ ticket-only changes retain before and after values (15.735542ms)
+  ✔ removing all tickets records the prior values and empty result (11.999875ms)
+  ✔ calendar member replacements retain the previous membership (17.7765ms)
+  ✔ unchanged memberships do not appear as relation changes (10.761125ms)
+  ✔ an audit write failure rolls back the parent and ticket replacement (19.314291ms)
+✔ relationship changes are present in their parent's audit trail (411.196625ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3726.725542

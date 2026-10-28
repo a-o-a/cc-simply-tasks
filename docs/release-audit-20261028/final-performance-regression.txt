@@ -1,0 +1,23 @@
+▶ bounded cursor pages preserve filters, ties and date boundaries
+  ✔ all cursor pages match full ordering, including NULL transfer dates and tied timestamps (467.7775ms)
+  ✔ missing, soft-deleted and filtered-out anchors remain recoverable 400 errors (8.255041ms)
+  ✔ a cursor moved to another sort group uses its current position (4.033625ms)
+  ✔ transfer date's inclusive final day includes its final 999 milliseconds (1.667375ms)
+  ✔ TODO date filter and count both include the final millisecond, excluding next midnight (3.459333ms)
+✔ bounded cursor pages preserve filters, ties and date boundaries (819.539583ms)
+{"name":"gantt-long-period","viewport":"1323x972","rendered_days":31,"chart_nodes":136,"scroll_width_px":117536}
+▶ long Gantt timelines render a bounded viewport and preserve all dates
+  ✔ desktop renders only visible date columns with overscan (1.571666ms)
+  ✔ horizontal scrolling reaches the final date with the same track width (50.301584ms)
+  ✔ middle dates stay aligned with the original day grid (56.460583ms)
+  ✔ the work bar remains keyboard-accessible after scrolling (838.198791ms)
+  ✔ mobile resize recalculates columns and retains internal horizontal scrolling (70.001208ms)
+✔ long Gantt timelines render a bounded viewport and preserve all dates (1650.656125ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2042.623667

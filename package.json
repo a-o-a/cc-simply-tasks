@@ -15,9 +15,10 @@
     "db:migrate": "drizzle-kit migrate",
     "test:smoke": "node --test scripts/smoke.test.mjs",
     "check": "npm run lint && npm run typecheck && npm run build && npm run test:smoke && npm run test:regression",
-    "test:ui": "node --test scripts/ui.test.mjs scripts/release-ui.test.mjs scripts/pagination-regression.test.mjs",
-    "test:regression": "node --test scripts/date-regression.test.mjs scripts/todo-regression.test.mjs scripts/calendar-range.test.mjs",
-    "benchmark": "node scripts/benchmark-pagination.mjs"
+    "test:ui": "node --test scripts/ui.test.mjs scripts/release-ui.test.mjs scripts/pagination-regression.test.mjs scripts/interaction-regression.test.mjs scripts/activity-ui-regression.test.mjs scripts/gantt-regression.test.mjs scripts/dashboard-regression.test.mjs",
+    "test:regression": "node --test scripts/date-regression.test.mjs scripts/todo-regression.test.mjs scripts/calendar-range.test.mjs scripts/relation-audit-regression.test.mjs scripts/cursor-pagination.test.mjs",
+    "benchmark": "node scripts/benchmark-pagination.mjs",
+    "benchmark:cursor": "node scripts/benchmark-cursor-pagination.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",

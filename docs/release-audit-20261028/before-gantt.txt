@@ -1,0 +1,69 @@
+{"name":"gantt-long-period","viewport":"1323x972","rendered_days":3668,"chart_nodes":14686,"scroll_width_px":117536}
+▶ long Gantt timelines render a bounded viewport and preserve all dates
+  ✖ desktop renders only visible date columns with overscan (4930.838875ms)
+  ✖ horizontal scrolling reaches the final date with the same track width (4950.897792ms)
+  ✔ middle dates stay aligned with the original day grid (36.321166ms)
+  ✔ the work bar remains keyboard-accessible after scrolling (447.831083ms)
+  ✖ mobile resize recalculates columns and retains internal horizontal scrolling (4958.609666ms)
+✖ long Gantt timelines render a bounded viewport and preserve all dates (16364.167625ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 2
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16737.575709
+
+✖ failing tests:
+
+test at scripts/gantt-regression.test.mjs:30:11
+✖ desktop renders only visible date columns with overscan (4930.838875ms)
+  Error: expect(received).toBeLessThanOrEqual(expected)
+
+  Expected: <= 50
+  Received:    3668
+
+  Call Log:
+  - Timeout 5000ms exceeded while waiting on the predicate
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeLessThanOrEqual (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:31:33)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:30:11) {
+    matcherResult: { pass: false, message: 'expect(received).toBeLessThanOrEqual(expected)\n\nExpected: <= 50\nReceived:    3668\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate', name: 'toBeLessThanOrEqual' }
+  }
+
+test at scripts/gantt-regression.test.mjs:33:11
+✖ horizontal scrolling reaches the final date with the same track width (4950.897792ms)
+  Error: expect(received).toBeLessThanOrEqual(expected)
+
+  Expected: <= 50
+  Received:    3668
+
+  Call Log:
+  - Timeout 5000ms exceeded while waiting on the predicate
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeLessThanOrEqual (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:36:33)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:33:3) {
+    matcherResult: { pass: false, message: 'expect(received).toBeLessThanOrEqual(expected)\n\nExpected: <= 50\nReceived:    3668\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate', name: 'toBeLessThanOrEqual' }
+  }
+
+test at scripts/gantt-regression.test.mjs:57:11
+✖ mobile resize recalculates columns and retains internal horizontal scrolling (4958.609666ms)
+  Error: expect(received).toBeLessThanOrEqual(expected)
+
+  Expected: <= 20
+  Received:    3668
+
+  Call Log:
+  - Timeout 5000ms exceeded while waiting on the predicate
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeLessThanOrEqual (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:59:33)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/gantt-regression.test.mjs:57:3) {
+    matcherResult: { pass: false, message: 'expect(received).toBeLessThanOrEqual(expected)\n\nExpected: <= 20\nReceived:    3668\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate', name: 'toBeLessThanOrEqual' }
+  }

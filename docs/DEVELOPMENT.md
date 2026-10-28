@@ -257,7 +257,8 @@ export const PATCH = withErrorHandler(
 
 - `parsePagination(searchParams)` → `{ take, cursor }`
 - 작업/TODO/감사 로그의 커서 없는 첫 페이지는 SQL `LIMIT take + 1`로 조회한 뒤 `toPage()`로 응답한다.
-- 기존 ID 커서가 있는 후속 페이지는 정렬 결과를 `slicePageAfterCursor()`로 자른다. 이 경로는 전체 조회 비용이 남아 있다. 커서가 삭제되거나 필터에 없으면 400이며 클라이언트는 처음부터 재조회한다.
+- 작업/TODO/감사 로그의 후속 페이지는 같은 필터를 적용한 `page_cursor` CTE에서 커서의 정렬 키를 찾고 `inclusiveCursorCondition()`으로 커서 자신부터 `LIMIT take + 2`행만 조회한다. 마지막 `id`까지 ORDER BY 순서/방향과 일치해야 한다. 커서 자체를 포함하므로 `slicePageAfterCursor()`가 삭제/필터 이탈 커서(0행, 400)와 정상 마지막 커서(1행, 빈 페이지)를 구분한다. 앵커와 결과는 하나의 SQL 스냅샷에서 읽는다.
+- 이관완료의 `transferDate DESC`는 NULL 마지막 순서를 유지한다. `inclusiveCursorCondition`의 NULL 정렬 및 `IS` 동등 비교는 SQLite 기준이다. 팀원 목록은 기존 전체 조회 후 절단 방식이며 이 최적화 범위가 아니다.
 - 기본 50, 최대 10,000행이다. 전건이 필요한 담당자 선택·월 집계는 `api.getAll<T>()`로 200행씩 마지막 페이지까지 순회한다.
 - 항상 안정 정렬을 유지한다.
 
@@ -273,6 +274,7 @@ export const PATCH = withErrorHandler(
 - `UPDATE`: `before`, `after`
 - `DELETE`: `before`, `after`
 - 변경 diff가 비면 `UPDATE` 로그는 자동 스킵된다.
+- 작업 생성 감사에는 초기 tickets를, 티켓 교체/제거 PATCH에는 이전/이후 시스템·티켓번호를 포함한다. tickets 생략 PATCH는 관계를 변경하지 않는다. 일정 담당자 교체의 before/after에는 정렬된 memberIds를 포함한다. 관계 스냅샷도 같은 트랜잭션 안에서 읽는다.
 - 그래도 write 패턴에서는 `withAudit` 호출 자체를 유지한다.
 
 ### 5.6 시간 처리
@@ -416,4 +418,9 @@ const assignees = await db.select().from(teamMembers) ...
 - 캘린더·간트의 `eventDayKeys` 호출에는 KST 자정 기준 `[fromMs, toMs)` 표시 범위를 넘겨 긴 기간 일정을 화면 밖까지 펼치지 않는다.
 - 로딩, 조회 실패, 필터 결과 없음은 다른 상태다. 오류에서 다시 시도할 수 있어야 하며, 실패를 데이터가 없다는 뜻으로 표시하지 않는다.
 - 페이지 전체에 최소 데스크톱 폭을 강제하지 않는다. 넓은 표·캘린더만 내부 스크롤하며, 팝오버는 화면의 사용 가능한 높이/폭 안에 둔다.
-- 수동 검수 기록과 실제 실행 결과는 [출시 검수 기록](RELEASE_AUDIT_20261022.md)에 둔다.
+- 홈 작업 요약은 `getAll()`로 페이지를 모두 읽고 최신 요청만 반영한다. 요약·최근 활동·오늘 일정의 조회 실패는 빈 데이터와 구분하며, 갱신 실패 시 이전 데이터와 오류 안내를 함께 보여준다.
+- 작업·일정의 쓰기 요청 중에는 동기 ref 가드로 재진입/닫기를 막고 필드를 비활성화한다. 실패 후 초안을 유지하며 지속적인 오류 안내와 재시도를 제공한다.
+- 활동 이력은 커서로 더보기를 제공하고 실패한 다음 페이지 재시도에서 기존 목록을 보존한다. 등록자는 임의 최근 N개 안에서 찾지 않고 action 필터로 조회한다.
+- 날짜 전용 종료 필터는 KST 다음 날 자정 미만으로 비교해 마지막 999ms도 포함한다.
+- 간트 날짜 헤더와 배경은 viewport 및 overscan 4열만 렌더링한다. 전체 트랙 폭과 작업바는 유지해 가상화로 접근 가능한 기간이 줄지 않게 한다.
+- 현재 수동 검수 기록과 실행 결과는 [2026-10-28 출시 검수](RELEASE_AUDIT_20261028.md), 이전 이력은 [2026-10-22 기록](RELEASE_AUDIT_20261022.md)에 둔다.

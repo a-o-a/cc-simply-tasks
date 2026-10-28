@@ -1,0 +1,87 @@
+{
+  "scope": "React view click to DOM commit and forced layout; excludes paint, not whole-page loading",
+  "results": [
+    {
+      "name": "one-month",
+      "warmup": {
+        "elapsedMs": 2.8000000044703484,
+        "layoutWidth": 1019,
+        "elements": 196,
+        "dayCells": 45
+      },
+      "samples": [
+        {
+          "elapsedMs": 2.7999999970197678,
+          "layoutWidth": 1019,
+          "elements": 196,
+          "dayCells": 45
+        },
+        {
+          "elapsedMs": 3.899999998509884,
+          "layoutWidth": 1019,
+          "elements": 196,
+          "dayCells": 45
+        },
+        {
+          "elapsedMs": 2.2999999970197678,
+          "layoutWidth": 1019,
+          "elements": 196,
+          "dayCells": 45
+        },
+        {
+          "elapsedMs": 2.399999998509884,
+          "layoutWidth": 1019,
+          "elements": 196,
+          "dayCells": 45
+        },
+        {
+          "elapsedMs": 2.5,
+          "layoutWidth": 1019,
+          "elements": 196,
+          "dayCells": 45
+        }
+      ]
+    },
+    {
+      "name": "ten-years",
+      "warmup": {
+        "elapsedMs": 59.70000000298023,
+        "layoutWidth": 1019,
+        "elements": 14688,
+        "dayCells": 3668
+      },
+      "samples": [
+        {
+          "elapsedMs": 60.19999999552965,
+          "layoutWidth": 1019,
+          "elements": 14688,
+          "dayCells": 3668
+        },
+        {
+          "elapsedMs": 57.29999999701977,
+          "layoutWidth": 1019,
+          "elements": 14688,
+          "dayCells": 3668
+        },
+        {
+          "elapsedMs": 58.79999999701977,
+          "layoutWidth": 1019,
+          "elements": 14688,
+          "dayCells": 3668
+        },
+        {
+          "elapsedMs": 64.5,
+          "layoutWidth": 1019,
+          "elements": 14688,
+          "dayCells": 3668
+        },
+        {
+          "elapsedMs": 60.600000001490116,
+          "layoutWidth": 1019,
+          "elements": 14688,
+          "dayCells": 3668
+        }
+      ]
+    }
+  ]
+}

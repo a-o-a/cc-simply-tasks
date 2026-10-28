@@ -45,6 +45,13 @@ export const PATCH = withErrorHandler(
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "이벤트를 찾을 수 없습니다");
 
+      const beforeMemberIds = input.memberIds !== undefined
+        ? (await tx.select({ memberId: calendarEventMembers.memberId })
+            .from(calendarEventMembers)
+            .where(eq(calendarEventMembers.eventId, routeParams.id)))
+            .map((row) => row.memberId).sort()
+        : undefined;
+
       // memberIds가 제공된 경우 기존 팀원 교체
       if (input.memberIds !== undefined) {
         await tx.delete(calendarEventMembers).where(eq(calendarEventMembers.eventId, routeParams.id));
@@ -73,11 +80,14 @@ export const PATCH = withErrorHandler(
         entityType: "CalendarEvent",
         entityId: after.id,
         action: "UPDATE",
-        before: before as unknown as Record<string, unknown>,
+        before: {
+          ...before,
+          ...(beforeMemberIds !== undefined ? { memberIds: beforeMemberIds } : {}),
+        },
         after: {
           ...after,
-          ...(input.memberIds !== undefined ? { memberIds: input.memberIds } : {}),
-        } as unknown as Record<string, unknown>,
+          ...(input.memberIds !== undefined ? { memberIds: [...input.memberIds].sort() } : {}),
+        },
         actor,
       });
     });
