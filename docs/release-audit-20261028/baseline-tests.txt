@@ -1,0 +1,93 @@
+✔ long calendar events expand only into the visible month (94.073334ms)
+✔ range clipping preserves all-day exclusive endings and timed boundaries (0.270708ms)
+▶ partial date updates validate the stored range
+  ✔ work-items: single-ended updates and rollback (43.3165ms)
+  ✔ calendar-events: single-ended updates and rollback (18.339166ms)
+  ✔ nonexistent dates and reversed filter ranges return 400 (10.382208ms)
+✔ partial date updates validate the stored range (378.780542ms)
+▶ pagination and work-list regression checks
+  ✔ first page, tied sort keys, filters and subsequent pages match the full ordered result (71.713ms)
+  ✔ a missing cursor gives an explicit recoverable error instead of repeating page one (17.554334ms)
+✖ pagination and work-list regression checks (401.644541ms)
+✖ release UI regressions on an isolated production database (309.445458ms)
+▶ production application smoke tests (isolated SQLite database)
+  ✔ all application pages and their JavaScript assets are served (59.425916ms)
+  ✔ team members, categories and systems support CRUD and restore (48.144875ms)
+  ✔ work items, ticket replacement, bulk status and transfer filters (46.134958ms)
+  ✔ concurrent work writes commit their data and audit logs together (38.579542ms)
+  ✔ todos, checklist assignment/completion/reorder/deletion and counts (31.974875ms)
+  ✔ calendar events preserve members, date ranges and soft deletion (12.68575ms)
+  ✔ calendar changes reach an open server-sent event stream (108.269458ms)
+  ✔ settings update immediately and audit logs retain actor and before/after data (13.129459ms)
+  ✔ invalid input and missing resources return structured client errors (21.005375ms)
+  ✔ manual and direct backups contain the latest data and pass SQLite integrity checks (21.447125ms)
+✔ production application smoke tests (isolated SQLite database) (758.89825ms)
+ℹ 155 HTTP checks completed against a disposable database.
+▶ TODO edits commit the parent, checklist and audit records atomically
+  ✔ one PATCH preserves existing IDs, creates/deletes children and returns the saved draft (42.464125ms)
+  ✔ foreign and duplicate checklist IDs are rejected before any draft is committed (19.708167ms)
+  ✔ a checklist write failure rolls back parent, removals and audits, then a retry succeeds once (24.973958ms)
+  ✔ omitting checklist preserves children and individual checklist APIs keep working (20.634625ms)
+  ✔ a stale drawer cannot overwrite another client's checklist add (12.011375ms)
+  ✔ a stale drawer cannot overwrite another client's checklist complete (11.963667ms)
+  ✔ every parent/checklist write advances the parent version even when the clock has not advanced (25.887166ms)
+✔ TODO edits commit the parent, checklist and audit records atomically (472.387042ms)
+✖ browser workflows on a disposable production database (309.140291ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 27
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1001.045541
+
+✖ failing tests:
+
+test at scripts/pagination-regression.test.mjs:13:1
+✖ pagination and work-list regression checks (401.644541ms)
+  browserType.launch: Executable doesn't exist at /Users/nonz/Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell
+  ╔════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright was just installed or updated.       ║
+  ║ Please run the following command to download new browsers: ║
+  ║                                                            ║
+  ║     npx playwright install                                 ║
+  ║                                                            ║
+  ║ <3 Playwright Team                                         ║
+  ╚════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/pagination-regression.test.mjs:80:34) {
+    name: 'Error',
+    log: []
+  }
+
+test at scripts/release-ui.test.mjs:7:1
+✖ release UI regressions on an isolated production database (309.445458ms)
+  browserType.launch: Executable doesn't exist at /Users/nonz/Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell
+  ╔════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright was just installed or updated.       ║
+  ║ Please run the following command to download new browsers: ║
+  ║                                                            ║
+  ║     npx playwright install                                 ║
+  ║                                                            ║
+  ║ <3 Playwright Team                                         ║
+  ╚════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/release-ui.test.mjs:9:34) {
+    name: 'Error',
+    log: []
+  }
+
+test at scripts/ui.test.mjs:13:1
+✖ browser workflows on a disposable production database (309.140291ms)
+  browserType.launch: Executable doesn't exist at /Users/nonz/Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell
+  ╔════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright was just installed or updated.       ║
+  ║ Please run the following command to download new browsers: ║
+  ║                                                            ║
+  ║     npx playwright install                                 ║
+  ║                                                            ║
+  ║ <3 Playwright Team                                         ║
+  ╚════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/ui.test.mjs:15:34) {
+    name: 'Error',
+    log: []
+  }

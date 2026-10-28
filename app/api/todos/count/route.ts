@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { todos } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
@@ -28,7 +28,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       ? gte(todos.dueDate, new Date(`${filters.dueDateFrom}T00:00:00+09:00`))
       : undefined,
     filters.dueDateTo
-      ? lte(todos.dueDate, new Date(`${filters.dueDateTo}T23:59:59+09:00`))
+      ? lt(todos.dueDate, new Date(Date.parse(`${filters.dueDateTo}T00:00:00+09:00`) + 86_400_000))
       : undefined,
   ].filter(Boolean);
 

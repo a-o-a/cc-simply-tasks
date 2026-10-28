@@ -5,11 +5,12 @@ import {
   desc,
   eq,
   exists,
+  getTableColumns,
   gte,
   inArray,
   isNotNull,
   isNull,
-  lte,
+  lt,
   ne,
 } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
@@ -19,7 +20,7 @@ import { workItems, workTickets } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { parsePagination, slicePageAfterCursor } from "@/lib/pagination";
+import { inclusiveCursorCondition, parsePagination, slicePageAfterCursor } from "@/lib/pagination";
 import {
   workItemCreateSchema,
   workItemListQuerySchema,
@@ -29,7 +30,7 @@ import {
  * GET /api/work-items
  *   ?status, ?assigneeId, ?category, ?priority, ?ticket, ?cursor, ?pageSize
  *
- * soft delete 제외. tickets는 목록에서는 include하지 않음(상세에서만).
+ * soft delete 제외. 목록은 담당자 및 시스템·티켓번호를 함께 반환한다.
  */
 export const GET = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
@@ -91,23 +92,33 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       ? gte(workItems.transferDate, new Date(`${filters.transferDate}T00:00:00+09:00`))
       : undefined,
     filters.transferDateTo
-      ? lte(workItems.transferDate, new Date(`${filters.transferDateTo}T23:59:59+09:00`))
+      ? lt(workItems.transferDate, new Date(Date.parse(`${filters.transferDateTo}T00:00:00+09:00`) + 86_400_000))
       : undefined,
   ].filter(Boolean);
 
-  const query = db
-    .select()
+  const anchor = db.$with("page_cursor").as(db
+    .select({ order: workItems.order, transferDate: workItems.transferDate, createdAt: workItems.createdAt, id: workItems.id })
     .from(workItems)
+    .where(and(...conditions, cursor ? eq(workItems.id, cursor) : undefined))
+    .limit(1));
+  const boundary = inclusiveCursorCondition([
+    filters.scope === "transferred"
+      ? { column: workItems.transferDate, anchor: anchor.transferDate, direction: "desc", nullable: true }
+      : { column: workItems.order, anchor: anchor.order, direction: "asc" },
+    { column: workItems.createdAt, anchor: anchor.createdAt, direction: "desc" },
+    { column: workItems.id, anchor: anchor.id, direction: "desc" },
+  ]);
+  const query = cursor
+    ? db.with(anchor).select(getTableColumns(workItems)).from(workItems).innerJoin(anchor, boundary)
+    : db.select(getTableColumns(workItems)).from(workItems);
+  const rows = await query
     .where(and(...conditions))
     .orderBy(
       ...(filters.scope === "transferred"
         ? [desc(workItems.transferDate), desc(workItems.createdAt), desc(workItems.id)]
         : [asc(workItems.order), desc(workItems.createdAt), desc(workItems.id)]),
-    );
-
-  // Only materialize the requested first page. Cursor pages retain the stable
-  // ordering above until the API moves to a versioned keyset cursor.
-  const rows = await (cursor ? query : query.limit(take + 1));
+    )
+    .limit(take + (cursor ? 2 : 1));
 
   const { items: pageItems, nextCursor } = slicePageAfterCursor(rows, cursor, take);
   const items = await hydrateWorkItems(pageItems, "list");
@@ -166,7 +177,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       entityType: "WorkItem",
       entityId: row.id,
       action: "CREATE",
-      after: row as unknown as Record<string, unknown>,
+      after: { ...row, tickets: input.tickets ?? [] },
       actor,
     });
     return row;

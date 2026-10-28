@@ -1,0 +1,35 @@
+▶ pagination and work-list regression checks
+  ✔ first page, tied sort keys, filters and subsequent pages match the full ordered result (66.191792ms)
+  ✔ a missing cursor gives an explicit recoverable error instead of repeating page one (18.332583ms)
+  ✔ the 51st active item is reachable in table, kanban and gantt views (3351.843584ms)
+  ✔ a deleted next-page cursor keeps visible work and offers a restart (182.113375ms)
+  ✔ debounced search ignores an older response and retries a failed load (1163.508ms)
+  ✔ holding work stays accessible in the default kanban and status filter (1401.117917ms)
+  ✔ mobile filter labels and controls remain within the viewport (35.009958ms)
+✔ pagination and work-list regression checks (8638.008667ms)
+▶ release UI regressions on an isolated production database
+  ✔ mobile navigation and page controls fit a 390px viewport (1120.402125ms)
+  ✔ work table detail can be opened and closed with the keyboard (957.775584ms)
+  ✔ a late initial TODO response cannot erase a new draft (191.747875ms)
+  ✔ TODO failure is distinct from empty data and retry recovers (254.184ms)
+  ✔ calendar failure has a retry and recovers without changing month (203.46125ms)
+  ✔ the 51st member is available in management and assignment (921.384ms)
+  ✔ late TODO search results cannot replace the current filter (700.18575ms)
+  ✔ failed TODO save preserves its draft and retries as a single write (1410.60375ms)
+  ✔ calendar counts all pages of transfer work (466.111208ms)
+  ✔ a stale work detail response cannot replace the newly selected work (1079.38175ms)
+  ✔ concurrent TODO edits keep the draft and protect another user's checklist (286.794917ms)
+✔ release UI regressions on an isolated production database (10033.020333ms)
+▶ browser workflows on a disposable production database
+  ✔ actor registration, settings, members, codes and light/dark themes (2268.217958ms)
+  ✔ work item views, date picker and TODO Enter/checklist saving (6001.607083ms)
+  ✔ calendar event creation, backup controls and browser errors (2348.580583ms)
+✔ browser workflows on a disposable production database (13104.042875ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13618.790292

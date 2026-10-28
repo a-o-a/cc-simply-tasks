@@ -1,0 +1,67 @@
+▶ bounded cursor pages preserve filters, ties and date boundaries
+  ✔ all cursor pages match full ordering, including NULL transfer dates and tied timestamps (413.429834ms)
+  ✔ missing, soft-deleted and filtered-out anchors remain recoverable 400 errors (10.010125ms)
+  ✔ a cursor moved to another sort group uses its current position (3.621292ms)
+  ✖ transfer date's inclusive final day includes its final 999 milliseconds (1.69475ms)
+  ✖ TODO date filter and count both include the final millisecond, excluding next midnight (1.453917ms)
+✖ bounded cursor pages preserve filters, ties and date boundaries (708.787166ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 3
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 917.153292
+
+✖ failing tests:
+
+test at scripts/cursor-pagination.test.mjs:80:11
+✖ transfer date's inclusive final day includes its final 999 milliseconds (1.69475ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    [
+      'boundary-work-0',
+  -   'boundary-work-1',
+  -   'boundary-work-2'
+    ]
+
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/cursor-pagination.test.mjs:82:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/cursor-pagination.test.mjs:80:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'boundary-work-0' ],
+    expected: [ 'boundary-work-0', 'boundary-work-1', 'boundary-work-2' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/cursor-pagination.test.mjs:84:11
+✖ TODO date filter and count both include the final millisecond, excluding next midnight (1.453917ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    [
+      'boundary-todo-0',
+  -   'boundary-todo-1',
+  -   'boundary-todo-2'
+    ]
+
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/cursor-pagination.test.mjs:87:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/cursor-pagination.test.mjs:84:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'boundary-todo-0' ],
+    expected: [ 'boundary-todo-0', 'boundary-todo-1', 'boundary-todo-2' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

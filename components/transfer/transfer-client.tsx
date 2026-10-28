@@ -69,8 +69,8 @@ function toKstDateStr(iso: string): string {
 }
 
 function formatDateLabel(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00+09:00`);
-  const day = DAY_LABELS[d.getDay()];
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const day = DAY_LABELS[d.getUTCDay()];
   return `${dateStr} (${day})`;
 }
 
@@ -570,7 +570,7 @@ function DateTable({
                             {categoryNameByCode[item.category]}
                           </span>
                         )}
-                        <span className="font-medium leading-snug">{item.title}</span>
+                        <button type="button" className="rounded-sm text-left font-medium leading-snug break-all hover:underline focus-visible:outline-2 focus-visible:outline-ring" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.title}</button>
                       </div>
                       {item.additionalNotes && (
                         <span className="mt-1 block whitespace-pre-wrap text-[11px] text-muted-foreground">

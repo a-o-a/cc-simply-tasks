@@ -151,11 +151,17 @@ export function EventFormDialog({
 }: Props) {
   const [state, setState] = React.useState<FormState>(emptyState());
   const [submitting, setSubmitting] = React.useState(false);
+  const submittingRef = React.useRef(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const deletingRef = React.useRef(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
     setState(editing ? fromEvent(editing) : emptyState(defaultDate));
+    setError(null);
+    setConfirmDelete(false);
   }, [open, editing, defaultDate]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -191,6 +197,7 @@ export function EventFormDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current || deletingRef.current) return;
     const title = state.title.trim();
     if (!title) return;
 
@@ -224,7 +231,9 @@ export function EventFormDialog({
       ...datePayload,
     };
 
+    submittingRef.current = true;
     setSubmitting(true);
+    setError(null);
     try {
       if (editing) {
         await api.patch(
@@ -238,6 +247,7 @@ export function EventFormDialog({
       }
       onSaved();
     } catch (err) {
+      setError(err instanceof ApiError ? err.message : "저장하지 못했습니다. 다시 시도해주세요.");
       toast({
         title: editing
           ? "수정 실패"
@@ -246,12 +256,16 @@ export function EventFormDialog({
         variant: "destructive",
       });
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   async function handleDelete() {
-    if (!editing) return;
+    if (!editing || deletingRef.current || submittingRef.current) return;
+    deletingRef.current = true;
+    setDeleting(true);
+    setError(null);
     try {
       await api.delete(
         `/api/calendar-events/${editing.id}`
@@ -260,18 +274,27 @@ export function EventFormDialog({
       setConfirmDelete(false);
       onDeleted();
     } catch (err) {
+      setError(err instanceof ApiError ? err.message : "삭제하지 못했습니다. 다시 시도해주세요.");
       toast({
         title: "삭제 실패",
         description: err instanceof ApiError ? err.message : undefined,
         variant: "destructive",
       });
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
     }
   }
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent>
+      <Dialog open={open} onOpenChange={(o) => !o && !submittingRef.current && !deletingRef.current && onClose()}>
+        <DialogContent
+          className="max-h-[90dvh] flex flex-col"
+          hideCloseButton={submitting || deleting}
+          onEscapeKeyDown={(event) => { if (submittingRef.current || deletingRef.current) event.preventDefault(); }}
+          onInteractOutside={(event) => { if (submittingRef.current || deletingRef.current) event.preventDefault(); }}
+        >
           <DialogHeader>
             <DialogTitle>
               {editing ? "이벤트 수정" : "이벤트 추가"}
@@ -280,7 +303,9 @@ export function EventFormDialog({
               팀원의 일정을 캘린더에 표시합니다. (KST)
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+            <fieldset disabled={submitting || deleting} className="contents">
+            <div className="subtle-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">
             <div className="space-y-2">
               <Label htmlFor="ce-category">카테고리</Label>
               <Select
@@ -385,7 +410,9 @@ export function EventFormDialog({
               />
             </div>
 
-            <DialogFooter className="sm:justify-between">
+            </div>
+            {error && <p role="alert" className="pt-2 text-sm text-destructive">{error}</p>}
+            <DialogFooter className="shrink-0 border-t pt-4 mt-4 sm:justify-between">
               <div>
                 {editing ? (
                   <Button
@@ -406,12 +433,13 @@ export function EventFormDialog({
                 </Button>
               </div>
             </DialogFooter>
+            </fieldset>
           </form>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <DialogContent>
+      <Dialog open={confirmDelete} onOpenChange={(value) => { if (!deletingRef.current) setConfirmDelete(value); }}>
+        <DialogContent hideCloseButton={deleting} onEscapeKeyDown={(event) => { if (deletingRef.current) event.preventDefault(); }} onInteractOutside={(event) => { if (deletingRef.current) event.preventDefault(); }}>
           <DialogHeader>
             <DialogTitle>이벤트 삭제</DialogTitle>
             <DialogDescription>
@@ -419,12 +447,13 @@ export function EventFormDialog({
               {" "}이벤트를 삭제하시겠습니까?
             </DialogDescription>
           </DialogHeader>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            <Button disabled={deleting} variant="ghost" onClick={() => setConfirmDelete(false)}>
               취소
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              삭제
+            <Button disabled={deleting} variant="destructive" onClick={handleDelete}>
+              {deleting ? "삭제 중..." : "삭제"}
             </Button>
           </DialogFooter>
         </DialogContent>

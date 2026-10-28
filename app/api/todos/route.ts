@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, asc, desc, gte, inArray, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { contains, newId, now } from "@/lib/db/helpers";
 import { hydrateTodos, loadTodoDetail } from "@/lib/db/queries";
@@ -8,7 +8,7 @@ import { todoChecklist, todos } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { parsePagination, slicePageAfterCursor } from "@/lib/pagination";
+import { inclusiveCursorCondition, parsePagination, slicePageAfterCursor } from "@/lib/pagination";
 import {
   todoCreateSchema,
   todoListQuerySchema,
@@ -39,17 +39,26 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       ? gte(todos.dueDate, new Date(`${filters.dueDateFrom}T00:00:00+09:00`))
       : undefined,
     filters.dueDateTo
-      ? lte(todos.dueDate, new Date(`${filters.dueDateTo}T23:59:59+09:00`))
+      ? lt(todos.dueDate, new Date(Date.parse(`${filters.dueDateTo}T00:00:00+09:00`) + 86_400_000))
       : undefined,
   ].filter(Boolean);
 
-  const query = db
-    .select()
+  const anchor = db.$with("page_cursor").as(db
+    .select({ order: todos.order, createdAt: todos.createdAt, id: todos.id })
     .from(todos)
-    .where(and(...conditions))
-    .orderBy(asc(todos.order), desc(todos.createdAt), desc(todos.id));
-
-  const rows = await (cursor ? query : query.limit(take + 1));
+    .where(and(...conditions, cursor ? eq(todos.id, cursor) : undefined))
+    .limit(1));
+  const boundary = inclusiveCursorCondition([
+    { column: todos.order, anchor: anchor.order, direction: "asc" },
+    { column: todos.createdAt, anchor: anchor.createdAt, direction: "desc" },
+    { column: todos.id, anchor: anchor.id, direction: "desc" },
+  ]);
+  const query = cursor
+    ? db.with(anchor).select(getTableColumns(todos)).from(todos).innerJoin(anchor, boundary)
+    : db.select(getTableColumns(todos)).from(todos);
+  const rows = await query.where(and(...conditions))
+    .orderBy(asc(todos.order), desc(todos.createdAt), desc(todos.id))
+    .limit(take + (cursor ? 2 : 1));
 
   const { items: pageItems, nextCursor } = slicePageAfterCursor(rows, cursor, take);
   const withChecklist = filters.include?.includes("checklist") ?? false;

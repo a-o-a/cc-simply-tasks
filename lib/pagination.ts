@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { and, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { HttpError } from "@/lib/http";
 
 /**
@@ -66,4 +67,33 @@ export function slicePageAfterCursor<T extends { id: string }>(
   }
   const start = cursorIndex + 1;
   return toPage(rows.slice(start, start + take + 1), take);
+}
+
+/**
+ * SQL keyset boundary including the cursor itself. Join against a one-row
+ * cursor CTE restricted by the same filters, then LIMIT take + 2 and pass the
+ * result to slicePageAfterCursor. Keeping the anchor distinguishes an invalid
+ * cursor (no rows) from a valid cursor at the end (the anchor only), in one DB
+ * snapshot. Keys must match ORDER BY and end with a unique key.
+ */
+export function inclusiveCursorCondition(keys: readonly {
+  column: SQLWrapper;
+  anchor: SQLWrapper;
+  direction: "asc" | "desc";
+  nullable?: boolean;
+}[]): SQL {
+  const equal: SQL[] = [];
+  const after: SQL[] = [];
+  for (const { column, anchor, direction, nullable } of keys) {
+    const comparison = direction === "asc"
+      ? sql`${column} > ${anchor}`
+      : sql`${column} < ${anchor}`;
+    // SQLite sorts NULL first for ASC, last for DESC.
+    const nullBoundary = !nullable ? undefined : direction === "asc"
+      ? sql`${anchor} is null and ${column} is not null`
+      : sql`${anchor} is not null and ${column} is null`;
+    after.push(and(...equal, or(comparison, nullBoundary))!);
+    equal.push(sql`${column} is ${anchor}`);
+  }
+  return or(...after, and(...equal))!;
 }

@@ -1,0 +1,14 @@
+▶ long work activity histories remain accessible
+  ✔ the creator remains visible after more than 100 edits (570.988875ms)
+  ✔ all activity pages are reachable without duplicate entries on mobile (819.963084ms)
+  ✔ initial and subsequent activity failures can retry without losing visible entries (861.419458ms)
+  ✔ deleting a work item blocks dismissal and duplicate deletion until the request settles (1016.069ms)
+✔ long work activity histories remain accessible (3665.766875ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4027.17625

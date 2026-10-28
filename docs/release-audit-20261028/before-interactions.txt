@@ -1,0 +1,195 @@
+▶ release interactions preserve drafts and keep every event reachable
+  ✖ 작업 추가: pending save cannot close the form or accept a replacement draft (5597.819583ms)
+  ✖ 작업 추가: failed save preserves input and permits retry (5438.085333ms)
+  ✖ 이벤트 추가: pending save cannot close the form or accept a replacement draft (5459.170792ms)
+  ✖ 이벤트 추가: failed save preserves input and permits retry (5447.294ms)
+  ✖ mobile ticket controls remain readable and inside the form (455.563958ms)
+  ✖ event form remains reachable on a short mobile screen (5157.980459ms)
+  ✖ each holiday can be opened with the keyboard, edited and deleted (5090.560291ms)
+  ✖ transfer titles support keyboard detail and KST weekdays in a UTC browser (5090.901375ms)
+✖ release interactions preserve drafts and keep every event reachable (38357.392833ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 0
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39064.636292
+
+✖ failing tests:
+
+test at scripts/interaction-regression.test.mjs:29:13
+✖ 작업 추가: pending save cannot close the form or accept a replacement draft (5597.819583ms)
+  Error: expect(locator).toBeDisabled() failed
+
+  Locator: getByRole('dialog', { name: '작업 추가', exact: true }).getByLabel('제목 *', { exact: true })
+  Expected: disabled
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toBeDisabled" getByRole('dialog', { name: '작업 추가', exact: true }).getByLabel('제목 *', { exact: true }) with timeout 5000ms
+    - waiting for getByRole('dialog', { name: '작업 추가', exact: true }).getByLabel('제목 *', { exact: true })
+      3 × locator resolved to <input id="wi-title" placeholder="" maxlength="300" value="작업 추가 저장 중 초안" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"/>
+        - unexpected value "enabled"
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeDisabled (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:52:68)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:29:5) {
+    matcherResult: { message: `expect(locator).toBeDisabled() failed\n\nLocator: getByRole('dialog', { name: '작업 추가', exact: true }).getByLabel('제목 *', { exact: true })\nExpected: disabled\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toBeDisabled" getByRole('dialog', { name: '작업 추가', exact: true }).getByLabel('제목 *', { exact: true }) with timeout 5000ms\n  - waiting for getByRole('dialog', { name: '작업 추가', exact: true }).getByLabel('제목 *', { exact: true })\n    3 × locator resolved to <input id="wi-title" placeholder="" maxlength="300" value="작업 추가 저장 중 초안" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"/>\n      - unexpected value "enabled"\n`, pass: false, actual: undefined, name: 'toBeDisabled', expected: 'disabled', log: [ `  - Expect "toBeDisabled" getByRole('dialog', { name: '작업 추가', exact: true }).getByLabel('제목 *', { exact: true }) with timeout 5000ms`, "  - waiting for getByRole('dialog', { name: '작업 추가', exact: true }).getByLabel('제목 *', { exact: true })", '    3 × locator resolved to <input id="wi-title" placeholder="" maxlength="300" value="작업 추가 저장 중 초안" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"/>', '      - unexpected value "enabled"' ], timeout: 5000, ariaSnapshot: '- complementary:\n  - link "cc-simply-tasks":\n    - /url: /\n  - button "사이드바 접기"\n  - navigation "주 메뉴":\n    - link "홈":\n      - /url: /\n    - link "작업":\n      - /url: /work-items\n    - link "이관":\n      - /url: /transfer\n    - link "할 일":\n      - /url: /todos\n    - link "캘린더":\n      - /url: /calendar\n    - link "설정":\n      - /url: /settings\n  - button "출시 검수"\n  - button "테마 전환"\n- main:\n  - heading "작업" [level=1]\n  - button "진행 작업" [pressed]\n  - button "이관 완료"\n  - button "테이블" [pressed]\n  - button "칸반"\n  - button "간트"\n  - button "작업 추가"\n  - text: 분류 설정에서 분류를 추가하세요 상태\n  - button "대기"\n  - button "진행 중"\n  - button "내부테스트"\n  - button "현업테스트"\n  - button "QA테스트"\n  - button "이관대기"\n  - button "홀딩"\n  - text: 담당자\n  - button "팀원"\n  - text: 우선순위\n  - button "낮음"\n  - button "보통"\n  - button "높음"\n  - text: 이관일\n  - button "이관일": 날짜 선택\n  - text: 제목\n  - textbox "제목":\n    - /placeholder: ""\n  - text: 시스템\n  - button "시스템"\n  - text: 요청구분\n  - textbox "요청구분":\n    - /placeholder: ""\n  - text: 요청자\n  - textbox "요청자":\n    - /placeholder: ""\n  - text: 요청번호\n  - textbox "요청번호":\n    - /placeholder: ""\n  - button "필터 숨기기"\n  - button "초기화"\n  - paragraph: 조건에 맞는 작업이 없습니다\n  - paragraph: 새 작업을 추가하거나 필터를 초기화해보세요.\n  - button "작업 추가"\n- region "Notifications (F8)":\n  - list\n- alert' }
+  }
+
+test at scripts/interaction-regression.test.mjs:59:13
+✖ 작업 추가: failed save preserves input and permits retry (5438.085333ms)
+  Error: expect(locator).toContainText(expected) failed
+
+  Locator: getByRole('dialog', { name: '작업 추가', exact: true }).getByRole('alert')
+  Expected substring: "검수용 저장 실패"
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toContainText" getByRole('dialog', { name: '작업 추가', exact: true }).getByRole('alert') with timeout 5000ms
+    - waiting for getByRole('dialog', { name: '작업 추가', exact: true }).getByRole('alert')
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toContainText (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:70:47)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:59:5) {
+    matcherResult: { name: 'toContainText', expected: '검수용 저장 실패', message: `expect(locator).toContainText(expected) failed\n\nLocator: getByRole('dialog', { name: '작업 추가', exact: true }).getByRole('alert')\nExpected substring: "검수용 저장 실패"\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toContainText" getByRole('dialog', { name: '작업 추가', exact: true }).getByRole('alert') with timeout 5000ms\n  - waiting for getByRole('dialog', { name: '작업 추가', exact: true }).getByRole('alert')\n`, pass: false, actual: undefined, log: [ `  - Expect "toContainText" getByRole('dialog', { name: '작업 추가', exact: true }).getByRole('alert') with timeout 5000ms`, "  - waiting for getByRole('dialog', { name: '작업 추가', exact: true }).getByRole('alert')" ], timeout: 5000, ariaSnapshot: '- dialog "작업 추가":\n  - heading "작업 추가" [level=2]\n  - paragraph: 작업 정보를 입력한 후 저장하세요.\n  - text: 분류\n  - combobox "분류":\n    - option "미분류" [selected]\n  - text: 요청구분\n  - textbox "요청구분":\n    - /placeholder: ""\n  - text: 요청자\n  - textbox "요청자":\n    - /placeholder: ""\n  - text: 요청번호\n  - textbox "요청번호":\n    - /placeholder: ""\n  - text: 요청내용\n  - textbox "요청내용":\n    - /placeholder: ""\n  - text: 제목 *\n  - textbox "제목 *":\n    - /placeholder: ""\n    - text: 작업 추가 재시도 초안\n  - text: 상태\n  - combobox "상태":\n    - option "대기" [selected]\n    - option "진행 중"\n    - option "내부테스트"\n    - option "현업테스트"\n    - option "QA테스트"\n    - option "이관대기"\n    - option "이관완료"\n    - option "홀딩"\n  - text: 우선순위\n  - combobox "우선순위":\n    - option "낮음"\n    - option "보통" [selected]\n    - option "높음"\n  - text: 담당자\n  - button "미배정"\n  - text: 시스템 연동\n  - paragraph: 설정 > 코드관리에서 작업시스템을 먼저 추가하세요.\n  - text: 시작일\n  - button "시작일": 날짜 선택\n  - text: 종료일\n  - button "종료일": 날짜 선택\n  - text: 이관일\n  - button "이관일": 날짜 선택\n  - text: 추가 사항\n  - textbox "추가 사항":\n    - /placeholder: ""\n  - text: 설명\n  - textbox "설명":\n    - /placeholder: ""\n  - button "취소"\n  - button "추가"\n  - button "Close"' }
+  }
+
+test at scripts/interaction-regression.test.mjs:29:13
+✖ 이벤트 추가: pending save cannot close the form or accept a replacement draft (5459.170792ms)
+  Error: expect(locator).toBeDisabled() failed
+
+  Locator: getByRole('dialog', { name: '이벤트 추가', exact: true }).getByLabel('제목', { exact: true })
+  Expected: disabled
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toBeDisabled" getByRole('dialog', { name: '이벤트 추가', exact: true }).getByLabel('제목', { exact: true }) with timeout 5000ms
+    - waiting for getByRole('dialog', { name: '이벤트 추가', exact: true }).getByLabel('제목', { exact: true })
+      3 × locator resolved to <input id="ce-title" placeholder="" maxlength="300" value="이벤트 추가 저장 중 초안" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"/>
+        - unexpected value "enabled"
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeDisabled (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:52:68)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:29:5) {
+    matcherResult: { message: `expect(locator).toBeDisabled() failed\n\nLocator: getByRole('dialog', { name: '이벤트 추가', exact: true }).getByLabel('제목', { exact: true })\nExpected: disabled\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toBeDisabled" getByRole('dialog', { name: '이벤트 추가', exact: true }).getByLabel('제목', { exact: true }) with timeout 5000ms\n  - waiting for getByRole('dialog', { name: '이벤트 추가', exact: true }).getByLabel('제목', { exact: true })\n    3 × locator resolved to <input id="ce-title" placeholder="" maxlength="300" value="이벤트 추가 저장 중 초안" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"/>\n      - unexpected value "enabled"\n`, pass: false, actual: undefined, name: 'toBeDisabled', expected: 'disabled', log: [ `  - Expect "toBeDisabled" getByRole('dialog', { name: '이벤트 추가', exact: true }).getByLabel('제목', { exact: true }) with timeout 5000ms`, "  - waiting for getByRole('dialog', { name: '이벤트 추가', exact: true }).getByLabel('제목', { exact: true })", '    3 × locator resolved to <input id="ce-title" placeholder="" maxlength="300" value="이벤트 추가 저장 중 초안" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"/>', '      - unexpected value "enabled"' ], timeout: 5000, ariaSnapshot: '- complementary:\n  - link "cc-simply-tasks":\n    - /url: /\n  - button "사이드바 접기"\n  - navigation "주 메뉴":\n    - link "홈":\n      - /url: /\n    - link "작업":\n      - /url: /work-items\n    - link "이관":\n      - /url: /transfer\n    - link "할 일":\n      - /url: /todos\n    - link "캘린더":\n      - /url: /calendar\n    - link "설정":\n      - /url: /settings\n  - button "출시 검수"\n  - button "테마 전환"\n- main:\n  - heading "캘린더" [level=1]\n  - button "이전"\n  - text: 2026년 10월\n  - button "다음"\n  - button "오늘"\n  - button "팀원"\n  - button "이벤트 추가"\n  - text: 일 월 화 수 목 금 토 27\n  - button "이벤트 추가"\n  - text: "28"\n  - button "이벤트 추가"\n  - text: "29"\n  - button "이벤트 추가"\n  - text: "30"\n  - button "이벤트 추가"\n  - text: "1"\n  - button "이벤트 추가"\n  - text: "2"\n  - button "이벤트 추가"\n  - text: "3"\n  - button "이벤트 추가"\n  - text: "4"\n  - button "이벤트 추가"\n  - text: "5"\n  - button "이벤트 추가"\n  - text: "6"\n  - button "이벤트 추가"\n  - text: "7"\n  - button "이벤트 추가"\n  - text: "8"\n  - button "이벤트 추가"\n  - text: "9"\n  - button "이벤트 추가"\n  - text: "10"\n  - button "이벤트 추가"\n  - text: "11"\n  - button "이벤트 추가"\n  - text: "12"\n  - button "이벤트 추가"\n  - text: "13"\n  - button "이벤트 추가"\n  - text: "14"\n  - button "이벤트 추가"\n  - text: "15"\n  - button "이벤트 추가"\n  - text: "16"\n  - button "이벤트 추가"\n  - text: "17"\n  - button "이벤트 추가"\n  - text: "18"\n  - button "이벤트 추가"\n  - text: "19"\n  - button "이벤트 추가"\n  - text: "20"\n  - button "이벤트 추가"\n  - text: "21"\n  - button "이벤트 추가"\n  - text: "22"\n  - button "이벤트 추가"\n  - text: "23"\n  - button "이벤트 추가"\n  - text: "24"\n  - button "이벤트 추가"\n  - text: "25"\n  - button "이벤트 추가"\n  - text: "26"\n  - button "이벤트 추가"\n  - text: "27"\n  - button "이벤트 추가"\n  - text: "28"\n  - button "이벤트 추가"\n  - text: "29"\n  - button "이벤트 추가"\n  - text: "30"\n  - button "이벤트 추가"\n  - text: "31"\n  - button "이벤트 추가"\n  - text: "1"\n  - button "이벤트 추가"\n  - text: "2"\n  - button "이벤트 추가"\n  - text: "3"\n  - button "이벤트 추가"\n  - text: "4"\n  - button "이벤트 추가"\n  - text: "5"\n  - button "이벤트 추가"\n  - text: "6"\n  - button "이벤트 추가"\n  - text: "7"\n  - button "이벤트 추가"\n  - status\n- region "Notifications (F8)":\n  - list\n- alert' }
+  }
+
+test at scripts/interaction-regression.test.mjs:59:13
+✖ 이벤트 추가: failed save preserves input and permits retry (5447.294ms)
+  Error: expect(locator).toContainText(expected) failed
+
+  Locator: getByRole('dialog', { name: '이벤트 추가', exact: true }).getByRole('alert')
+  Expected substring: "검수용 저장 실패"
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toContainText" getByRole('dialog', { name: '이벤트 추가', exact: true }).getByRole('alert') with timeout 5000ms
+    - waiting for getByRole('dialog', { name: '이벤트 추가', exact: true }).getByRole('alert')
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toContainText (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:70:47)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:59:5) {
+    matcherResult: { name: 'toContainText', expected: '검수용 저장 실패', message: `expect(locator).toContainText(expected) failed\n\nLocator: getByRole('dialog', { name: '이벤트 추가', exact: true }).getByRole('alert')\nExpected substring: "검수용 저장 실패"\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toContainText" getByRole('dialog', { name: '이벤트 추가', exact: true }).getByRole('alert') with timeout 5000ms\n  - waiting for getByRole('dialog', { name: '이벤트 추가', exact: true }).getByRole('alert')\n`, pass: false, actual: undefined, log: [ `  - Expect "toContainText" getByRole('dialog', { name: '이벤트 추가', exact: true }).getByRole('alert') with timeout 5000ms`, "  - waiting for getByRole('dialog', { name: '이벤트 추가', exact: true }).getByRole('alert')" ], timeout: 5000, ariaSnapshot: '- main:\n  - status\n- dialog "이벤트 추가":\n  - heading "이벤트 추가" [level=2]\n  - paragraph: 팀원의 일정을 캘린더에 표시합니다. (KST)\n  - text: 카테고리\n  - combobox "카테고리":\n    - option "휴일"\n    - option "업무"\n    - option "부재"\n    - option "기타" [selected]\n  - text: 제목\n  - textbox "제목":\n    - /placeholder: ""\n    - text: 이벤트 추가 재시도 초안\n  - text: 담당자\n  - button "팀원"\n  - checkbox "종일 일정" [checked]\n  - text: 종일 일정 시작일\n  - button "시작일": 2026년 10월 28일\n  - text: 종료일\n  - button "종료일": 2026년 10월 28일\n  - text: 메모\n  - textbox "메모"\n  - button "취소"\n  - button "추가"\n  - button "Close"' }
+  }
+
+test at scripts/interaction-regression.test.mjs:78:11
+✖ mobile ticket controls remain readable and inside the form (455.563958ms)
+  AssertionError [ERR_ASSERTION]: ticket input must be usable: {"x":277,"y":429.203125,"width":36,"height":36}
+      at TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:88:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:78:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/interaction-regression.test.mjs:93:11
+✖ event form remains reachable on a short mobile screen (5157.980459ms)
+  Error: expect(locator).toBeInViewport() failed
+
+  Locator:  getByRole('dialog', { name: '이벤트 추가', exact: true })
+  Expected: in viewport
+  Received: viewport ratio 0.9866864085197449
+  Timeout:  5000ms
+
+  Call log:
+    - Expect "toBeInViewport" getByRole('dialog', { name: '이벤트 추가', exact: true }) with timeout 5000ms
+    - waiting for getByRole('dialog', { name: '이벤트 추가', exact: true })
+      - locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>
+      - unexpected value "viewport ratio 0.9319434762001038"
+      - locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>
+      - unexpected value "viewport ratio 0.9492160081863403"
+      - locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>
+      - unexpected value "viewport ratio 0.976988673210144"
+      11 × locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>
+         - unexpected value "viewport ratio 0.9866864085197449"
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeInViewport (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:98:26)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:93:3) {
+    matcherResult: { message: `expect(locator).toBeInViewport() failed\n\nLocator:  getByRole('dialog', { name: '이벤트 추가', exact: true })\nExpected: in viewport\nReceived: viewport ratio 0.9866864085197449\nTimeout:  5000ms\n\nCall log:\n  - Expect "toBeInViewport" getByRole('dialog', { name: '이벤트 추가', exact: true }) with timeout 5000ms\n  - waiting for getByRole('dialog', { name: '이벤트 추가', exact: true })\n    - locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>\n    - unexpected value "viewport ratio 0.9319434762001038"\n    - locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>\n    - unexpected value "viewport ratio 0.9492160081863403"\n    - locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>\n    - unexpected value "viewport ratio 0.976988673210144"\n    11 × locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>\n       - unexpected value "viewport ratio 0.9866864085197449"\n`, pass: false, actual: 'viewport ratio 0.9866864085197449', name: 'toBeInViewport', expected: 'in viewport', log: [ `  - Expect "toBeInViewport" getByRole('dialog', { name: '이벤트 추가', exact: true }) with timeout 5000ms`, "  - waiting for getByRole('dialog', { name: '이벤트 추가', exact: true })", '    - locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>', '    - unexpected value "viewport ratio 0.9319434762001038"', '    - locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>', '    - unexpected value "viewport ratio 0.9492160081863403"', '    - locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>', '    - unexpected value "viewport ratio 0.976988673210144"', '    11 × locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_1qlfiulb_" aria-labelledby="radix-_R_1qlfiulbH1_" aria-describedby="radix-_R_1qlfiulbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg data-[state=open]:[animation:dialog-slide-in_0.2s_ease-out_forwards] data-[state=closed]:[animation:dialog-slide-out_0.15s_ease-in_forwards]">…</div>', '       - unexpected value "viewport ratio 0.9866864085197449"' ], timeout: 5000, ariaSnapshot: '- dialog "이벤트 추가":\n  - heading "이벤트 추가" [level=2]\n  - paragraph: 팀원의 일정을 캘린더에 표시합니다. (KST)\n  - text: 카테고리\n  - combobox "카테고리"\n  - text: 제목\n  - textbox "제목":\n    - /placeholder: ""\n  - text: 담당자\n  - button "팀원"\n  - checkbox "종일 일정" [checked]\n  - text: 종일 일정 시작일\n  - button "시작일": 2026년 10월 28일\n  - text: 종료일\n  - button "종료일": 2026년 10월 28일\n  - text: 메모\n  - textbox "메모"\n  - button "취소"\n  - button "추가" [disabled]\n  - button "Close"' }
+  }
+
+test at scripts/interaction-regression.test.mjs:104:11
+✖ each holiday can be opened with the keyboard, edited and deleted (5090.560291ms)
+  Error: expect(locator).toBeVisible() failed
+
+  Locator: getByRole('button', { name: '개별 휴일 A', exact: true })
+  Expected: visible
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toBeVisible" getByRole('button', { name: '개별 휴일 A', exact: true }) with timeout 5000ms
+    - waiting for getByRole('button', { name: '개별 휴일 A', exact: true })
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeVisible (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:112:27)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:104:3) {
+    matcherResult: { message: `expect(locator).toBeVisible() failed\n\nLocator: getByRole('button', { name: '개별 휴일 A', exact: true })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toBeVisible" getByRole('button', { name: '개별 휴일 A', exact: true }) with timeout 5000ms\n  - waiting for getByRole('button', { name: '개별 휴일 A', exact: true })\n`, pass: false, actual: undefined, name: 'toBeVisible', expected: 'visible', log: [ `  - Expect "toBeVisible" getByRole('button', { name: '개별 휴일 A', exact: true }) with timeout 5000ms`, "  - waiting for getByRole('button', { name: '개별 휴일 A', exact: true })" ], timeout: 5000, ariaSnapshot: '- complementary:\n  - link "cc-simply-tasks":\n    - /url: /\n  - button "사이드바 접기"\n  - navigation "주 메뉴":\n    - link "홈":\n      - /url: /\n    - link "작업":\n      - /url: /work-items\n    - link "이관":\n      - /url: /transfer\n    - link "할 일":\n      - /url: /todos\n    - link "캘린더":\n      - /url: /calendar\n    - link "설정":\n      - /url: /settings\n  - button "출시 검수"\n  - button "테마 전환"\n- main:\n  - heading "캘린더" [level=1]\n  - button "이전"\n  - text: 2026년 10월\n  - button "다음"\n  - button "오늘"\n  - button "팀원"\n  - button "이벤트 추가"\n  - text: 일 월 화 수 목 금 토 27\n  - button "이벤트 추가"\n  - text: "28"\n  - button "이벤트 추가"\n  - text: "29"\n  - button "이벤트 추가"\n  - text: "30"\n  - button "이벤트 추가"\n  - text: "1"\n  - button "이벤트 추가"\n  - text: "2"\n  - button "이벤트 추가"\n  - text: "3"\n  - button "이벤트 추가"\n  - text: "4"\n  - button "이벤트 추가"\n  - text: "5"\n  - button "이벤트 추가"\n  - text: "6"\n  - button "이벤트 추가"\n  - text: "7"\n  - button "이벤트 추가"\n  - text: "8"\n  - button "이벤트 추가"\n  - text: "9"\n  - button "이벤트 추가"\n  - text: "10"\n  - button "이벤트 추가"\n  - text: "11"\n  - button "이벤트 추가"\n  - text: "12"\n  - button "이벤트 추가"\n  - text: "13"\n  - button "이벤트 추가"\n  - text: "14"\n  - button "이벤트 추가"\n  - text: "15"\n  - button "이벤트 추가"\n  - text: "16"\n  - button "이벤트 추가"\n  - text: "17"\n  - button "이벤트 추가"\n  - text: "18"\n  - button "이벤트 추가"\n  - text: "19"\n  - button "이벤트 추가"\n  - text: "20"\n  - button "이벤트 추가"\n  - text: "21"\n  - button "이벤트 추가"\n  - text: "22"\n  - button "이벤트 추가"\n  - text: "23"\n  - button "이벤트 추가"\n  - text: "24"\n  - button "이벤트 추가"\n  - text: "25"\n  - button "이벤트 추가"\n  - text: "26"\n  - button "이벤트 추가"\n  - text: "27"\n  - button "이벤트 추가"\n  - text: 28 개별 휴일 A · 개별 휴일 B\n  - button "이벤트 추가"\n  - text: "29"\n  - button "이벤트 추가"\n  - text: "30"\n  - button "이벤트 추가"\n  - text: "31"\n  - button "이벤트 추가"\n  - text: "1"\n  - button "이벤트 추가"\n  - text: "2"\n  - button "이벤트 추가"\n  - text: "3"\n  - button "이벤트 추가"\n  - text: "4"\n  - button "이벤트 추가"\n  - text: "5"\n  - button "이벤트 추가"\n  - text: "6"\n  - button "이벤트 추가"\n  - text: "7"\n  - button "이벤트 추가"\n  - status\n- region "Notifications (F8)":\n  - list\n- alert' }
+  }
+
+test at scripts/interaction-regression.test.mjs:126:11
+✖ transfer titles support keyboard detail and KST weekdays in a UTC browser (5090.901375ms)
+  Error: expect(locator).toBeVisible() failed
+
+  Locator: getByText('2026-10-28 (수)', { exact: true })
+  Expected: visible
+  Timeout: 5000ms
+  Error: element(s) not found
+
+  Call log:
+    - Expect "toBeVisible" getByText('2026-10-28 (수)', { exact: true }) with timeout 5000ms
+    - waiting for getByText('2026-10-28 (수)', { exact: true })
+
+      at captureRawStack (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+      at callMatcherAsStep (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13316:57)
+      at Object.toBeVisible (/Users/nonz/devdir/github/cc-simply-tasks/node_modules/playwright/lib/matchers/expect.js:13308:23)
+      at TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:131:76)
+      at async TestContext.<anonymous> (/Users/nonz/devdir/github/cc-simply-tasks/scripts/interaction-regression.test.mjs:126:3) {
+    matcherResult: { message: `expect(locator).toBeVisible() failed\n\nLocator: getByText('2026-10-28 (수)', { exact: true })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect "toBeVisible" getByText('2026-10-28 (수)', { exact: true }) with timeout 5000ms\n  - waiting for getByText('2026-10-28 (수)', { exact: true })\n`, pass: false, actual: undefined, name: 'toBeVisible', expected: 'visible', log: [ `  - Expect "toBeVisible" getByText('2026-10-28 (수)', { exact: true }) with timeout 5000ms`, "  - waiting for getByText('2026-10-28 (수)', { exact: true })" ], timeout: 5000, ariaSnapshot: '- complementary:\n  - link "cc-simply-tasks":\n    - /url: /\n  - button "사이드바 접기"\n  - navigation "주 메뉴":\n    - link "홈":\n      - /url: /\n    - link "작업":\n      - /url: /work-items\n    - link "이관":\n      - /url: /transfer\n    - link "할 일":\n      - /url: /todos\n    - link "캘린더":\n      - /url: /calendar\n    - link "설정":\n      - /url: /settings\n  - button "출시 검수"\n  - button "테마 전환"\n- main:\n  - heading "이관 현황" [level=1]\n  - paragraph: 이 달의 이관 작업 1건\n  - button "이전"\n  - text: 2026년 10월\n  - button "다음"\n  - button "이번 달"\n  - heading "2026-10-28 (화)" [level=2]\n  - text: 오늘 총 1건\n  - button "전체 이관완료"\n  - table:\n    - rowgroup:\n      - row "요청 정보 상태 작업명 담당자 이관 시스템":\n        - columnheader "요청 정보"\n        - columnheader "상태"\n        - columnheader "작업명"\n        - columnheader "담당자"\n        - columnheader "이관 시스템"\n    - rowgroup:\n      - row "— 대기 이관 키보드 작업 미배정 —":\n        - cell "—"\n        - cell "대기"\n        - cell "이관 키보드 작업"\n        - cell "미배정"\n        - cell "—"\n- region "Notifications (F8)":\n  - list\n- alert' }
+  }

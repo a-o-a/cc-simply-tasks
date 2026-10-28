@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { newId, now } from "@/lib/db/helpers";
 import { loadWorkItemDetail } from "@/lib/db/queries";
@@ -46,6 +46,16 @@ export const PATCH = withErrorHandler(
         .limit(1);
       const before = beforeRows[0];
       if (!before) throw new HttpError("NOT_FOUND", "작업을 찾을 수 없습니다");
+
+      // Capture relation values before replacing them, inside the same transaction.
+      // Timestamps/IDs of the replacement rows are not user-visible ticket changes.
+      const beforeTickets = input.tickets !== undefined
+        ? await tx
+            .select({ systemName: workTickets.systemName, ticketNumber: workTickets.ticketNumber })
+            .from(workTickets)
+            .where(and(eq(workTickets.workItemId, routeParams.id), isNull(workTickets.deletedAt)))
+            .orderBy(asc(workTickets.createdAt))
+        : undefined;
 
       const after = {
         ...before,
@@ -98,8 +108,8 @@ export const PATCH = withErrorHandler(
         entityType: "WorkItem",
         entityId: after.id,
         action: "UPDATE",
-        before: before as unknown as Record<string, unknown>,
-        after: after as unknown as Record<string, unknown>,
+        before: { ...before, ...(beforeTickets !== undefined ? { tickets: beforeTickets } : {}) },
+        after: { ...after, ...(input.tickets !== undefined ? { tickets: input.tickets } : {}) },
         actor,
       });
       return after;

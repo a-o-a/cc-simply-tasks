@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/work-items/status-badge";
 import { WorkItemDrawer } from "@/components/work-items/work-item-drawer";
 import { WorkItemFormDialog } from "@/components/work-items/work-item-form-dialog";
+import { Button } from "@/components/ui/button";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -69,6 +70,13 @@ export function DashboardClient() {
   const [systems, setSystems] = React.useState<WorkSystem[]>([]);
   const [logs, setLogs] = React.useState<AuditLog[] | null>(null);
   const [calEvents, setCalEvents] = React.useState<CalendarEvent[] | null>(null);
+  const [workError, setWorkError] = React.useState<string | null>(null);
+  const [workLoading, setWorkLoading] = React.useState(true);
+  const [logsError, setLogsError] = React.useState<string | null>(null);
+  const [calendarError, setCalendarError] = React.useState<string | null>(null);
+  const workRequestRef = React.useRef<AbortController | null>(null);
+  const logsRequestRef = React.useRef<AbortController | null>(null);
+  const calendarRequestRef = React.useRef<AbortController | null>(null);
 
   // 드로어 + 수정 폼
   const [drawerId, setDrawerId] = React.useState<string | null>(null);
@@ -77,111 +85,119 @@ export function DashboardClient() {
   const [editing, setEditing] = React.useState<WorkItemListItem | null>(null);
 
   const loadWorkItems = React.useCallback(async () => {
+    workRequestRef.current?.abort();
+    const controller = new AbortController();
+    workRequestRef.current = controller;
+    setWorkLoading(true);
+    setWorkError(null);
     const weekStart = weekDates[0];
     const weekEnd = weekDates[6];
-    const [countsRes, dueRes, inProgressRes] = await Promise.all([
-      api.get<WorkItemCounts>("/api/work-items/count"),
-      api.get<ListResponse<WorkItemListItem>>("/api/work-items", {
-        query: {
-          scope: "active",
-          transferDate: weekStart,
-          transferDateTo: weekEnd,
-          pageSize: "200",
-        },
-      }),
-      api.get<ListResponse<WorkItemListItem>>("/api/work-items", {
-        query: { scope: "active", status: "IN_PROGRESS", pageSize: "200" },
-      }),
-    ]);
-    setCounts(countsRes);
-    setDueThisWeek(
-      dueRes.items
-        .filter((item) => item.status !== "HOLDING")
-        .sort((a, b) => {
+    try {
+      const [countsRes, dueRes, inProgressRes] = await Promise.all([
+        api.get<WorkItemCounts>("/api/work-items/count", { signal: controller.signal }),
+        api.getAll<WorkItemListItem>("/api/work-items", {
+          signal: controller.signal,
+          query: { scope: "active", transferDate: weekStart, transferDateTo: weekEnd },
+        }),
+        api.getAll<WorkItemListItem>("/api/work-items", {
+          signal: controller.signal,
+          query: { scope: "active", status: "IN_PROGRESS" },
+        }),
+      ]);
+      if (controller.signal.aborted) return;
+      setCounts(countsRes);
+      setDueThisWeek(
+        dueRes.filter((item) => item.status !== "HOLDING").sort((a, b) => {
           const ad = utcMsToKstDateString(new Date(a.transferDate!).getTime());
           const bd = utcMsToKstDateString(new Date(b.transferDate!).getTime());
           return ad.localeCompare(bd);
         }),
-    );
-    setInProgress(inProgressRes.items);
+      );
+      setInProgress(inProgressRes);
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      setWorkError(err instanceof ApiError ? err.message : "작업 현황을 불러오지 못했습니다");
+    } finally {
+      if (!controller.signal.aborted) setWorkLoading(false);
+    }
   }, [weekDates]);
 
-  React.useEffect(() => {
-    let cancelled = false;
+  const loadLogs = React.useCallback(async () => {
+    logsRequestRef.current?.abort();
+    const controller = new AbortController();
+    logsRequestRef.current = controller;
+    setLogsError(null);
+    try {
+      const res = await api.get<ListResponse<AuditLog>>("/api/audit-logs", {
+        signal: controller.signal,
+        query: { pageSize: 10 },
+      });
+      if (!controller.signal.aborted) setLogs(res.items);
+    } catch (err) {
+      if (!controller.signal.aborted) setLogsError(err instanceof ApiError ? err.message : "활동 로그를 불러오지 못했습니다");
+    }
+  }, []);
+
+  const loadCalendar = React.useCallback(async () => {
+    calendarRequestRef.current?.abort();
+    const controller = new AbortController();
+    calendarRequestRef.current = controller;
+    setCalendarError(null);
     const todayFromMs = kstDateStringToUtcMs(todayKst);
     const todayToMs = todayFromMs + DAY_MS;
-
-    loadWorkItems().catch((err) => {
-      if (cancelled) return;
-      toast({
-        title: "작업 현황 조회 실패",
-        description: err instanceof ApiError ? err.message : undefined,
-        variant: "destructive",
+    try {
+      const res = await api.get<{ items: CalendarEvent[] }>("/api/calendar-events", {
+        signal: controller.signal,
+        query: { from: new Date(todayFromMs).toISOString(), to: new Date(todayToMs).toISOString() },
       });
-      setCounts({ byStatus: {}, total: 0 });
-      setDueThisWeek([]);
-      setInProgress([]);
-    });
+      if (controller.signal.aborted) return;
+      setCalEvents(res.items.slice().sort((a, b) => {
+        if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+        const catDiff = (CAT_ORDER[a.category] ?? 99) - (CAT_ORDER[b.category] ?? 99);
+        if (catDiff !== 0) return catDiff;
+        return a.title.localeCompare(b.title, "ko");
+      }));
+    } catch (err) {
+      if (!controller.signal.aborted) setCalendarError(err instanceof ApiError ? err.message : "오늘 일정을 불러오지 못했습니다");
+    }
+  }, [todayKst]);
 
-    api.get<ListResponse<AuditLog>>("/api/audit-logs")
-      .then((res) => { if (!cancelled) setLogs(res.items.slice(0, 10)); })
-      .catch((err) => {
-        if (cancelled) return;
-        toast({
-          title: "활동 로그 조회 실패",
-          description: err instanceof ApiError ? err.message : undefined,
-          variant: "destructive",
-        });
-        setLogs([]);
-      });
+  React.useEffect(() => {
+    void loadWorkItems();
+    return () => workRequestRef.current?.abort();
+  }, [loadWorkItems]);
+  React.useEffect(() => {
+    void loadLogs();
+    return () => logsRequestRef.current?.abort();
+  }, [loadLogs]);
+  React.useEffect(() => {
+    void loadCalendar();
+    return () => calendarRequestRef.current?.abort();
+  }, [loadCalendar]);
 
-    api.get<{ items: CalendarEvent[] }>("/api/calendar-events", {
-      query: {
-        from: new Date(todayFromMs).toISOString(),
-        to: new Date(todayToMs).toISOString(),
-      },
-    })
-      .then((res) => {
-        if (cancelled) return;
-        const sorted = res.items.slice().sort((a, b) => {
-          if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-          const catDiff = (CAT_ORDER[a.category] ?? 99) - (CAT_ORDER[b.category] ?? 99);
-          if (catDiff !== 0) return catDiff;
-          return a.title.localeCompare(b.title, "ko");
-        });
-        setCalEvents(sorted);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        toast({
-          title: "오늘 일정 조회 실패",
-          description: err instanceof ApiError ? err.message : undefined,
-          variant: "destructive",
-        });
-        setCalEvents([]);
-      });
-
+  React.useEffect(() => {
+    const controller = new AbortController();
     Promise.all([
-      api.getAll<Member>("/api/team-members"),
-      api.get<{ items: WorkCategory[] }>("/api/work-categories"),
-      api.get<{ items: WorkSystem[] }>("/api/work-systems"),
+      api.getAll<Member>("/api/team-members", { signal: controller.signal }),
+      api.get<{ items: WorkCategory[] }>("/api/work-categories", { signal: controller.signal }),
+      api.get<{ items: WorkSystem[] }>("/api/work-systems", { signal: controller.signal }),
     ])
       .then(([membersRes, catRes, sysRes]) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setMembers(membersRes);
         setCategories(catRes.items);
         setSystems(sysRes.items);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         toast({
           title: "참조 데이터 조회 실패",
           description: err instanceof ApiError ? err.message : undefined,
           variant: "destructive",
         });
       });
-    return () => { cancelled = true; };
-  }, [todayKst, loadWorkItems]);
+    return () => controller.abort();
+  }, []);
 
   React.useEffect(() => {
     const reload = () => {
@@ -221,6 +237,8 @@ export function DashboardClient() {
       </header>
 
       {/* 작업 현황 통계 */}
+      {workError && <DashboardError title="작업 현황 조회 실패" message={workError} stale={counts !== null} onRetry={() => void loadWorkItems()} />}
+      {workLoading && <p role="status" className="text-xs text-muted-foreground">작업 현황을 불러오는 중…</p>}
       <StatusStats counts={counts} />
 
       {/* 3열: 이번주 이관 예정 | 진행중인 작업 | 오늘 일정 */}
@@ -239,7 +257,7 @@ export function DashboardClient() {
           </header>
           <div className="p-2">
             {dueThisWeek === null ? (
-              <SkeletonRows />
+              workError ? <p className="p-2 text-sm text-muted-foreground">작업 현황을 불러오지 못했습니다.</p> : <SkeletonRows />
             ) : dueThisWeek.length === 0 ? (
               <EmptyRow icon={<CalendarClock className="h-4 w-4" />}>
                 이번주 이관 예정인 작업이 없습니다.
@@ -282,7 +300,7 @@ export function DashboardClient() {
           </header>
           <div className="p-2">
             {inProgress === null ? (
-              <SkeletonRows />
+              workError ? <p className="p-2 text-sm text-muted-foreground">작업 현황을 불러오지 못했습니다.</p> : <SkeletonRows />
             ) : inProgress.length === 0 ? (
               <EmptyRow icon={<Loader2 className="h-4 w-4" />}>
                 진행중인 작업이 없습니다.
@@ -322,8 +340,9 @@ export function DashboardClient() {
             </Link>
           </header>
           <div className="p-2">
+            {calendarError && <DashboardError title="오늘 일정 조회 실패" message={calendarError} stale={calEvents !== null} onRetry={() => void loadCalendar()} />}
             {calEvents === null ? (
-              <SkeletonRows />
+              calendarError ? null : <SkeletonRows />
             ) : calEvents.length === 0 ? (
               <EmptyRow icon={<CalendarDays className="h-4 w-4" />}>
                 오늘 일정이 없습니다.
@@ -366,8 +385,9 @@ export function DashboardClient() {
           </div>
         </header>
         <div className="p-2">
+          {logsError && <DashboardError title="활동 로그 조회 실패" message={logsError} stale={logs !== null} onRetry={() => void loadLogs()} />}
           {logs === null ? (
-            <SkeletonRows />
+            logsError ? null : <SkeletonRows />
           ) : logs.length === 0 ? (
             <EmptyRow icon={<ListChecks className="h-4 w-4" />}>
               기록된 활동이 없습니다.
@@ -522,6 +542,18 @@ function SkeletonRows() {
       {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="h-6 animate-pulse rounded-sm bg-muted" />
       ))}
+    </div>
+  );
+}
+
+function DashboardError({ title, message, stale, onRetry }: { title: string; message: string; stale: boolean; onRetry: () => void }) {
+  return (
+    <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md border border-destructive/50 p-3 text-sm">
+      <div className="min-w-0 flex-1">
+        <p className="break-words text-destructive">{title}: {message}</p>
+        {stale && <p className="mt-1 text-xs text-muted-foreground">이전 조회 결과를 표시하고 있습니다.</p>}
+      </div>
+      <Button variant="outline" size="sm" onClick={onRetry}>다시 시도</Button>
     </div>
   );
 }

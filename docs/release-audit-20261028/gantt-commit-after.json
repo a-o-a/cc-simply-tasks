@@ -1,0 +1,96 @@
+{
+  "scope": "React view click to first DOM commit and forced layout; excludes paint, not whole-page loading",
+  "results": [
+    {
+      "name": "one-month",
+      "warmup": {
+        "elapsedMs": 2.6999999955296516,
+        "layoutWidth": 1019,
+        "elements": 176,
+        "dayCells": 40
+      },
+      "samples": [
+        {
+          "elapsedMs": 2.600000001490116,
+          "layoutWidth": 1019,
+          "elements": 176,
+          "dayCells": 40
+        },
+        {
+          "elapsedMs": 2.5,
+          "layoutWidth": 1019,
+          "elements": 176,
+          "dayCells": 40
+        },
+        {
+          "elapsedMs": 2.7000000029802322,
+          "layoutWidth": 1019,
+          "elements": 176,
+          "dayCells": 40
+        },
+        {
+          "elapsedMs": 2.5,
+          "layoutWidth": 1019,
+          "elements": 176,
+          "dayCells": 40
+        },
+        {
+          "elapsedMs": 2.399999998509884,
+          "layoutWidth": 1019,
+          "elements": 176,
+          "dayCells": 40
+        }
+      ]
+    },
+    {
+      "name": "ten-years",
+      "warmup": {
+        "elapsedMs": 2.5,
+        "layoutWidth": 1019,
+        "elements": 174,
+        "dayCells": 40
+      },
+      "samples": [
+        {
+          "elapsedMs": 3.1999999955296516,
+          "layoutWidth": 1019,
+          "elements": 174,
+          "dayCells": 40
+        },
+        {
+          "elapsedMs": 2.5,
+          "layoutWidth": 1019,
+          "elements": 174,
+          "dayCells": 40
+        },
+        {
+          "elapsedMs": 2.6999999955296516,
+          "layoutWidth": 1019,
+          "elements": 174,
+          "dayCells": 40
+        },
+        {
+          "elapsedMs": 2.3000000044703484,
+          "layoutWidth": 1019,
+          "elements": 174,
+          "dayCells": 40
+        },
+        {
+          "elapsedMs": 2.600000001490116,
+          "layoutWidth": 1019,
+          "elements": 174,
+          "dayCells": 40
+        }
+      ]
+    }
+  ],
+  "settled": {
+    "elements": 141,
+    "dayCells": 31,
+    "scrollWidth": 117536,
+    "viewport": [
+      1323,
+      972
+    ]
+  }
+}
