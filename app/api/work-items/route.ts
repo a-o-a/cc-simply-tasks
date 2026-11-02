@@ -1,26 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   and,
-  asc,
-  desc,
   eq,
   exists,
-  getTableColumns,
   gte,
   inArray,
   isNotNull,
   isNull,
-  lt,
+  lte,
   ne,
 } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { contains, newId, now } from "@/lib/db/helpers";
 import { hydrateWorkItems } from "@/lib/db/queries";
-import { workItems, workTickets } from "@/lib/db/schema";
-import { withErrorHandler } from "@/lib/http";
+import { workItems, workTickets, type WorkItemRow } from "@/lib/db/schema";
+import { withErrorHandler, readJsonBody, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { inclusiveCursorCondition, parsePagination, slicePageAfterCursor } from "@/lib/pagination";
+import { parsePagination, createCursorPagination } from "@/lib/pagination";
 import {
   workItemCreateSchema,
   workItemListQuerySchema,
@@ -30,8 +28,11 @@ import {
  * GET /api/work-items
  *   ?status, ?assigneeId, ?category, ?priority, ?ticket, ?cursor, ?pageSize
  *
- * soft delete 제외. 목록은 담당자 및 시스템·티켓번호를 함께 반환한다.
+ * soft delete 제외. 정렬키 커서와 DB LIMIT으로 페이지를 조회한다.
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const { searchParams } = new URL(req.url);
@@ -92,35 +93,30 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       ? gte(workItems.transferDate, new Date(`${filters.transferDate}T00:00:00+09:00`))
       : undefined,
     filters.transferDateTo
-      ? lt(workItems.transferDate, new Date(Date.parse(`${filters.transferDateTo}T00:00:00+09:00`) + 86_400_000))
+      ? lte(workItems.transferDate, new Date(`${filters.transferDateTo}T23:59:59.999+09:00`))
       : undefined,
   ].filter(Boolean);
 
-  const anchor = db.$with("page_cursor").as(db
-    .select({ order: workItems.order, transferDate: workItems.transferDate, createdAt: workItems.createdAt, id: workItems.id })
-    .from(workItems)
-    .where(and(...conditions, cursor ? eq(workItems.id, cursor) : undefined))
-    .limit(1));
-  const boundary = inclusiveCursorCondition([
+  const pagination = createCursorPagination<WorkItemRow>(`work-items:${filters.scope === "transferred" ? "transferred" : "active"}`, [
     filters.scope === "transferred"
-      ? { column: workItems.transferDate, anchor: anchor.transferDate, direction: "desc", nullable: true }
-      : { column: workItems.order, anchor: anchor.order, direction: "asc" },
-    { column: workItems.createdAt, anchor: anchor.createdAt, direction: "desc" },
-    { column: workItems.id, anchor: anchor.id, direction: "desc" },
+      ? { column: workItems.transferDate, value: (row) => row.transferDate, direction: "desc" }
+      : { column: workItems.order, value: (row) => row.order, direction: "asc" },
+    { column: workItems.createdAt, value: (row) => row.createdAt, direction: "desc" },
+    { column: workItems.id, value: (row) => row.id, direction: "desc" },
   ]);
-  const query = cursor
-    ? db.with(anchor).select(getTableColumns(workItems)).from(workItems).innerJoin(anchor, boundary)
-    : db.select(getTableColumns(workItems)).from(workItems);
-  const rows = await query
-    .where(and(...conditions))
-    .orderBy(
-      ...(filters.scope === "transferred"
-        ? [desc(workItems.transferDate), desc(workItems.createdAt), desc(workItems.id)]
-        : [asc(workItems.order), desc(workItems.createdAt), desc(workItems.id)]),
-    )
-    .limit(take + (cursor ? 2 : 1));
+  const afterCursor = await pagination.condition(cursor, async (id) => {
+    const [row] = await db.select().from(workItems).where(and(...conditions, eq(workItems.id, id))).limit(1);
+    if (!row) throw new HttpError("BAD_REQUEST", "목록이 변경되었습니다. 처음부터 다시 조회해주세요.");
+    return row;
+  });
+  const rows = await db
+    .select()
+    .from(workItems)
+    .where(and(...conditions, afterCursor))
+    .orderBy(...pagination.orderBy)
+    .limit(take + 1);
 
-  const { items: pageItems, nextCursor } = slicePageAfterCursor(rows, cursor, take);
+  const { items: pageItems, nextCursor } = pagination.page(rows, take);
   const items = await hydrateWorkItems(pageItems, "list");
   return NextResponse.json({ items, nextCursor });
 });
@@ -132,10 +128,11 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
-  const input = workItemCreateSchema.parse(await req.json());
+  const input = workItemCreateSchema.parse(await readJsonBody(req));
   const timestamp = now();
 
   const created = await db.transaction(async (tx) => {
+    await assertAssignableMembers(tx, [{ id: input.assigneeId, path: ["assigneeId"] }]);
     const row = {
       id: newId(),
       title: input.title,
@@ -159,18 +156,18 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     } satisfies typeof workItems.$inferInsert;
     await tx.insert(workItems).values(row);
 
-    if (input.tickets?.length) {
-      await tx.insert(workTickets).values(
-        input.tickets.map((ticket) => ({
-          id: newId(),
-          workItemId: row.id,
-          systemName: ticket.systemName,
-          ticketNumber: ticket.ticketNumber,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          deletedAt: null,
-        })),
-      );
+    for (const ticket of input.tickets ?? []) {
+      const ticketRow = {
+        id: newId(),
+        workItemId: row.id,
+        systemName: ticket.systemName,
+        ticketNumber: ticket.ticketNumber,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        deletedAt: null,
+      };
+      await tx.insert(workTickets).values(ticketRow);
+      await withAudit(tx, { entityType: "WorkTicket", entityId: ticketRow.id, action: "CREATE", after: ticketRow, actor });
     }
 
     await withAudit(tx, {

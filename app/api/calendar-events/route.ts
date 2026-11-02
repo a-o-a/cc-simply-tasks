@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, asc, eq, exists, gt, isNull, lt } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { newId, now } from "@/lib/db/helpers";
 import { hydrateCalendarEvents } from "@/lib/db/queries";
 import { calendarEventMembers, calendarEvents } from "@/lib/db/schema";
-import { withErrorHandler } from "@/lib/http";
+import { withErrorHandler, readJsonBody } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { emitCalendarChanged } from "@/lib/calendar-bus";
@@ -20,6 +21,9 @@ import {
  *  - startDateTime < to AND endDateTime > from
  * range 조회는 페이지네이션 없음. 클라이언트는 from/to로 범위를 한정해야 한다.
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const { searchParams } = new URL(req.url);
@@ -61,10 +65,11 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
-  const input = calendarEventCreateSchema.parse(await req.json());
+  const input = calendarEventCreateSchema.parse(await readJsonBody(req));
   const timestamp = now();
 
   const created = await db.transaction(async (tx) => {
+    await assertAssignableMembers(tx, input.memberIds.map((id, index) => ({ id, path: ["memberIds", index] })));
     const row = {
       id: newId(),
       title: input.title,

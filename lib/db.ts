@@ -1,7 +1,8 @@
 import path from "path";
 import { pathToFileURL } from "url";
 import { drizzle } from "drizzle-orm/libsql";
-import { createClient, type Client } from "@libsql/client/node";
+import { createClient } from "@libsql/client/node";
+import type { Client } from "@libsql/client";
 import * as schema from "./db/schema";
 
 type DbClient = ReturnType<typeof drizzle>;
@@ -20,12 +21,12 @@ function resolveSqliteFilePath() {
 
   const filePath = rawUrl.slice("file:".length);
   if (path.isAbsolute(filePath)) return filePath;
-  // DATABASE_URL points to runtime data, which must never be traced into a build.
+  // The database is an external runtime resource, not a build dependency.
   return path.resolve(/* turbopackIgnore: true */ process.cwd(), filePath);
 }
 
-function resolveSqliteClientUrl() {
-  return pathToFileURL(resolveSqliteFilePath()).toString();
+export function openSqliteClient(filePath: string) {
+  return createClient({ url: pathToFileURL(filePath).toString() });
 }
 
 function initDb() {
@@ -33,11 +34,7 @@ function initDb() {
     return { sqlite: globalForDb.sqlite, db: globalForDb.db };
   }
 
-  const sqlite = createClient({
-    url: resolveSqliteClientUrl(),
-    // libsql 0.18 can open additional connections after the first PRAGMA call.
-    timeout: 5_000,
-  });
+  const sqlite = openSqliteClient(resolveSqliteFilePath());
 
   const db = drizzle(sqlite, { schema });
 

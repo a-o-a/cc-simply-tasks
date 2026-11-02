@@ -8,11 +8,11 @@ const codeSchema = z
 
 export const workCategoryCreateSchema = z.object({
   code: codeSchema,
-  name: z.string().min(1).max(100),
+  name: z.string().trim().min(1).max(100),
 });
 
 export const workCategoryUpdateSchema = z.object({
-  name: z.string().min(1).max(100),
+  name: z.string().trim().min(1).max(100),
 });
 
 export type WorkCategoryCreateInput = z.infer<typeof workCategoryCreateSchema>;

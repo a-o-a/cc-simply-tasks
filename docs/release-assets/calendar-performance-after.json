@@ -1,0 +1,21 @@
+{
+  "label": "after",
+  "node": "v22.23.3",
+  "scenario": "10 forty-year events indexed for the October 2026 month grid (42 days)",
+  "warmups": 1,
+  "repetitions": 5,
+  "range": {
+    "from": "2026-09-26T15:00:00.000Z",
+    "to": "2026-11-07T15:00:00.000Z"
+  },
+  "samplesMs": [
+    15.663,
+    17.683,
+    14.232,
+    15.859,
+    19.791
+  ],
+  "medianMs": 15.859,
+  "generatedDayKeys": 420,
+  "visibleDayKeys": 420
+}

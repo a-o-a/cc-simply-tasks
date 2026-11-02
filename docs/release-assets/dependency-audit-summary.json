@@ -1,0 +1,39 @@
+{
+  "node": "22.23.3",
+  "npm": "10.9.9",
+  "options": "--package-lock-only (same cache and registry snapshot)",
+  "results": {
+    "before": {
+      "info": 0,
+      "low": 0,
+      "moderate": 4,
+      "high": 5,
+      "critical": 0,
+      "total": 9
+    },
+    "lock-after": {
+      "info": 0,
+      "low": 0,
+      "moderate": 4,
+      "high": 4,
+      "critical": 0,
+      "total": 8
+    },
+    "prod-before": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 1,
+      "critical": 0,
+      "total": 1
+    },
+    "prod-after": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    }
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -10,12 +10,12 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
-import { ApiError, api } from "@/lib/client/api";
+import { ApiError, api, TODOS_CHANGED_EVENT, WORK_ITEMS_CHANGED_EVENT } from "@/lib/client/api";
+import { useRequestController } from "@/lib/client/use-request-controller";
 import {
   eventDayKeys,
   kstMonthGrid,
 } from "@/lib/client/calendar";
-import { toast } from "@/lib/client/use-toast";
 import type { CalendarEvent, Member, TodoItem, WorkItemListItem } from "@/lib/client/types";
 import { utcMsToKstDateString } from "@/lib/client/calendar";
 import { cn } from "@/lib/utils";
@@ -50,8 +50,12 @@ export function CalendarClient() {
   const [transferItems, setTransferItems] = React.useState<WorkItemListItem[]>([]);
   const [openTodos, setOpenTodos] = React.useState<TodoItem[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const requestRef = React.useRef<AbortController | null>(null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [membersError, setMembersError] = React.useState<string | null>(null);
+  const [membersReloadKey, setMembersReloadKey] = React.useState(0);
+  const [liveInterrupted, setLiveInterrupted] = React.useState(false);
+  const { beginRequest, cancelRequest } = useRequestController();
+  const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = React.useState(
     new Set<string>(),
   );
@@ -75,80 +79,115 @@ export function CalendarClient() {
   // ── 데이터 로드 ─────────────────────────────────────────────────────────────
 
   const loadEvents = React.useCallback(async () => {
-    requestRef.current?.abort();
-    const controller = new AbortController();
-    requestRef.current = controller;
+    const request = beginRequest();
     setLoading(true);
-    setError(null);
-    setEvents([]);
-    setTransferItems([]);
-    setOpenTodos([]);
+    setLoadError(null);
     try {
       const fromDate = utcMsToKstDateString(gridFromMs);
       const toDate = utcMsToKstDateString(gridToMs - 1);
       const [eventsRes, workRes, todoRes] = await Promise.all([
         api.get<ListResponse>("/api/calendar-events", {
-          signal: controller.signal,
+          signal: request.signal,
           query: {
             from: new Date(gridFromMs).toISOString(),
             to: new Date(gridToMs).toISOString(),
           },
         }),
-        api.getAll<WorkItemListItem>("/api/work-items", {
-          signal: controller.signal,
-          query: { transferDate: fromDate, transferDateTo: toDate },
+        api.getAllPages<WorkItemListItem>("/api/work-items", {
+          signal: request.signal,
+          query: { transferDate: fromDate, transferDateTo: toDate, pageSize: 100 },
         }),
-        api.getAll<TodoItem>("/api/todos", {
-          signal: controller.signal,
+        api.getAllPages<TodoItem>("/api/todos", {
+          signal: request.signal,
           query: {
             status: "OPEN",
             dueDateFrom: fromDate,
             dueDateTo: toDate,
+            pageSize: 100,
           },
         }),
       ]);
-      if (controller.signal.aborted) return;
+      if (!request.isCurrent()) return;
       setEvents(eventsRes.items);
       setTransferItems(workRes);
       setOpenTodos(todoRes);
     } catch (err) {
-      if (controller.signal.aborted) return;
-      setError(err instanceof ApiError ? err.message : "캘린더를 불러오지 못했습니다");
-      toast({
-        title: "캘린더 조회 실패",
-        description: err instanceof ApiError ? err.message : undefined,
-        variant: "destructive",
-      });
+      if (!request.isCurrent()) return;
+      setLoadError(err instanceof ApiError ? err.message : "캘린더를 불러오지 못했습니다.");
+      cancelRequest();
+      setLoading(false);
     } finally {
-      if (!controller.signal.aborted) setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, [gridFromMs, gridToMs]);
-
-  const loadMembers = React.useCallback(async () => {
-    try {
-      setMembers(await api.getAll<Member>("/api/team-members"));
-    } catch {
-      // 실패해도 캘린더는 동작
-    }
-  }, []);
+  }, [gridFromMs, gridToMs, beginRequest, cancelRequest]);
 
   React.useEffect(() => {
-    void loadMembers();
-  }, [loadMembers]);
+    const controller = new AbortController();
+    setMembersError(null);
+    api.getAllPages<Member>("/api/team-members", { signal: controller.signal })
+      .then((items) => {
+        if (!controller.signal.aborted) setMembers(items);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setMembersError(err instanceof ApiError ? err.message : "팀원 목록을 불러오지 못했습니다.");
+        }
+      });
+    return () => controller.abort();
+  }, [membersReloadKey]);
+
   React.useEffect(() => {
     void loadEvents();
-    return () => requestRef.current?.abort();
+    return () => {
+      cancelRequest();
+      if (refreshTimer.current !== null) {
+        clearTimeout(refreshTimer.current);
+        refreshTimer.current = null;
+      }
+    };
+  }, [loadEvents, cancelRequest]);
+
+  const latestLoad = React.useRef(loadEvents);
+  React.useEffect(() => {
+    latestLoad.current = loadEvents;
   }, [loadEvents]);
 
-  // ── SSE: 다른 클라이언트의 변경을 실시간으로 반영 ────────────────────────────
+  const refreshEvents = React.useCallback(() => {
+    if (refreshTimer.current !== null) return;
+    refreshTimer.current = setTimeout(() => {
+      refreshTimer.current = null;
+      void latestLoad.current();
+    }, 100);
+  }, []);
+
+  // 같은 탭의 작업 변경과 SSE를 함께 반영하고 연속 알림은 한 번만 조회한다.
   React.useEffect(() => {
     const es = new EventSource("/api/calendar-events/stream");
-    es.onmessage = () => void loadEvents();
-    es.onerror = () => {
-      // EventSource는 에러 시 자동 재연결. 별도 처리 불필요.
+    let connected = false;
+    es.onmessage = refreshEvents;
+    es.onopen = () => {
+      setLiveInterrupted(false);
+      if (connected) refreshEvents();
+      connected = true;
     };
-    return () => es.close();
-  }, [loadEvents]);
+    es.onerror = () => {
+      setLiveInterrupted(true);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshEvents();
+    };
+    window.addEventListener(WORK_ITEMS_CHANGED_EVENT, refreshEvents);
+    window.addEventListener(TODOS_CHANGED_EVENT, refreshEvents);
+    window.addEventListener("focus", refreshEvents);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      es.close();
+      window.removeEventListener(WORK_ITEMS_CHANGED_EVENT, refreshEvents);
+      window.removeEventListener(TODOS_CHANGED_EVENT, refreshEvents);
+      window.removeEventListener("focus", refreshEvents);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refreshEvents]);
 
   // ── 필터링 & dayMap ─────────────────────────────────────────────────────────
 
@@ -238,7 +277,7 @@ export function CalendarClient() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
-  const { handleDragEnd } = useCalendarDrag(setEvents, loadEvents);
+  const { handleDragEnd } = useCalendarDrag(setEvents, refreshEvents);
 
   const activeEvent = React.useMemo(
     () =>
@@ -266,22 +305,22 @@ export function CalendarClient() {
       }}
       onDragCancel={() => setActiveDragData(null)}
     >
-      <div className="flex min-h-full flex-col">
+      <div className="flex h-full flex-col overflow-hidden">
         {/* ── 헤더 ── */}
         <header className="flex shrink-0 flex-wrap items-center gap-3 px-4 py-4 md:px-8 md:py-6">
           {/* 왼쪽: 타이틀 */}
           <h1 className="text-xl font-semibold">캘린더</h1>
 
           {/* 가운데: 월 선택 + 오늘 + 팀원 필터 */}
-          <div className="order-3 flex w-full flex-wrap items-center gap-2 md:order-none md:w-auto md:flex-1 md:justify-center md:gap-3">
+          <div className="order-last flex w-full flex-wrap items-center justify-center gap-2 md:order-none md:w-auto md:flex-1 md:gap-3">
             <div className="flex items-center rounded-md border bg-card">
-              <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전">
+              <Button variant="ghost" size="icon" onClick={gotoPrev} aria-label="이전 달">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="min-w-[7rem] px-2 text-center text-sm font-medium tabular-nums">
+              <span className="min-w-28 px-2 text-center text-sm font-medium tabular-nums md:min-w-40 md:px-3">
                 {headerLabel}
               </span>
-              <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음">
+              <Button variant="ghost" size="icon" onClick={gotoNext} aria-label="다음 달">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -299,10 +338,13 @@ export function CalendarClient() {
           </div>
 
           {/* 오른쪽: 로딩 + 이벤트 추가 */}
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3 md:ml-0">
             {loading && (
-              <span role="status" className="text-xs text-muted-foreground">불러오는 중…</span>
+              <span className="text-xs text-muted-foreground" role="status">불러오는 중…</span>
             )}
+            <Button variant="ghost" size="icon" onClick={refreshEvents} disabled={loading} aria-label="캘린더 새로고침">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <Button
               onClick={() =>
                 setDialogState({ mode: "create", defaultDate: selectedDate })
@@ -314,13 +356,24 @@ export function CalendarClient() {
           </div>
         </header>
 
+        {loadError && (
+          <div className="mx-8 flex items-center justify-between gap-3 rounded-md border border-destructive/40 px-3 py-2 text-sm" role="alert">
+            <span>{loadError} 현재 표시된 내용은 최신 상태가 아닐 수 있습니다.</span>
+            <Button variant="outline" size="sm" onClick={refreshEvents}>다시 시도</Button>
+          </div>
+        )}
+        {membersError && (
+          <div className="mx-8 flex items-center justify-between gap-3 text-xs text-muted-foreground" role="alert">
+            <span>{membersError} 팀원 필터를 사용할 수 없습니다.</span>
+            <Button variant="ghost" size="sm" onClick={() => setMembersReloadKey((key) => key + 1)}>다시 시도</Button>
+          </div>
+        )}
+        {liveInterrupted && (
+          <p className="mx-8 text-xs text-muted-foreground" role="status">실시간 연결을 다시 연결하는 중입니다. 새로고침으로 최신 내용을 확인할 수 있습니다.</p>
+        )}
+
         {/* 캘린더 영역 */}
-        {error && <div role="alert" className="mx-4 mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-destructive p-4 md:mx-8">
-          <p className="text-sm">캘린더 조회 실패: {error}</p>
-          <Button variant="outline" onClick={() => void loadEvents()}>다시 시도</Button>
-        </div>}
-        <div aria-busy={loading} className="min-h-0 flex-1 overflow-x-auto px-4 pb-4 md:px-8 md:pb-6">
-          <div className="min-w-[700px]">
+        <div className="min-h-0 flex-1 overflow-hidden px-4 py-4 md:px-8 md:py-6" aria-busy={loading}>
           <MonthView
             grid={grid}
             cursor={cursor}
@@ -335,7 +388,6 @@ export function CalendarClient() {
               setDialogState({ mode: "edit", event })
             }
           />
-          </div>
         </div>
       </div>
 
@@ -367,11 +419,11 @@ export function CalendarClient() {
         onClose={() => setDialogState({ mode: "closed" })}
         onSaved={() => {
           setDialogState({ mode: "closed" });
-          void loadEvents();
+          refreshEvents();
         }}
         onDeleted={() => {
           setDialogState({ mode: "closed" });
-          void loadEvents();
+          refreshEvents();
         }}
       />
     </DndContext>

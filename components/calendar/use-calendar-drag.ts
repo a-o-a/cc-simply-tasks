@@ -67,6 +67,8 @@ export function useCalendarDrag(
         setEvents((prev) =>
           prev.map((ev) =>
             ev.id === data.eventId
+              && ev.startDateTime === newStart
+              && ev.endDateTime === newEnd
               ? {
                   ...ev,
                   startDateTime: data.originalStartDateTime,
@@ -80,6 +82,7 @@ export function useCalendarDrag(
           description: err instanceof Error ? err.message : undefined,
           variant: "destructive",
         });
+        onRefresh();
       }
     },
     [setEvents, onRefresh],

@@ -1,15 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { todos } from "@/lib/db/schema";
 import { withErrorHandler } from "@/lib/http";
 import { todoListQuerySchema } from "@/lib/validation/todo";
+import { contains } from "@/lib/db/helpers";
 
 /**
  * GET /api/todos/count
  *   ?status, ?assigneeId, ?dueDateFrom, ?dueDateTo
  * soft delete 제외 TODO 건수를 반환.
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const { searchParams } = new URL(req.url);
@@ -19,6 +23,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
   const conditions = [
     isNull(todos.deletedAt),
+    filters.title ? contains(todos.title, filters.title) : undefined,
     filters.status?.length ? inArray(todos.status, filters.status) : undefined,
     filters.assigneeId?.length
       ? inArray(todos.assigneeId, filters.assigneeId)
@@ -28,7 +33,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       ? gte(todos.dueDate, new Date(`${filters.dueDateFrom}T00:00:00+09:00`))
       : undefined,
     filters.dueDateTo
-      ? lt(todos.dueDate, new Date(Date.parse(`${filters.dueDateTo}T00:00:00+09:00`) + 86_400_000))
+      ? lte(todos.dueDate, new Date(`${filters.dueDateTo}T23:59:59.999+09:00`))
       : undefined,
   ].filter(Boolean);
 
@@ -37,5 +42,5 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     .from(todos)
     .where(and(...conditions));
 
-  return NextResponse.json({ count: Number(row?.count ?? 0) });
+  return NextResponse.json({ count: Number(row?.count ?? 0) }, { headers: { "Cache-Control": "no-store" } });
 });

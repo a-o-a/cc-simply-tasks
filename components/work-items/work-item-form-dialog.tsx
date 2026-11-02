@@ -42,7 +42,6 @@ import {
  * 작업 생성/수정 다이얼로그.
  *
  * - editing이 null이면 생성, 있으면 수정
- * - 저장 성공 시 목록과 상세를 다시 조회
  * - tickets 배열을 payload에 포함해 한 트랜잭션으로 sync
  */
 
@@ -127,7 +126,6 @@ export function WorkItemFormDialog({
   const [state, setState] = React.useState<FormState>(EMPTY);
   const [tickets, setTickets] = React.useState<TicketRow[]>([]);
   const [submitting, setSubmitting] = React.useState(false);
-
   const submittingRef = React.useRef(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -164,10 +162,19 @@ export function WorkItemFormDialog({
   React.useEffect(() => {
     if (!open) return;
     setError(null);
-    setState(editing ? fromWorkItem(editing) : EMPTY);
-    // Both list and detail responses include tickets; no destructive fallback
-    // request is needed while the user is editing.
-    setTickets(editing ? editing.tickets.map(({ systemName, ticketNumber }) => ({ systemName, ticketNumber })) : []);
+    if (!editing) {
+      setState(EMPTY);
+      setTickets([]);
+      return;
+    }
+    setState(fromWorkItem(editing));
+
+    setTickets(
+        editing.tickets.map((t) => ({
+          systemName: t.systemName,
+          ticketNumber: t.ticketNumber,
+        })),
+    );
   }, [open, editing]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -182,6 +189,7 @@ export function WorkItemFormDialog({
 
   // ─── 티켓 행 조작 ──────────────────────────────────────────
   function addTicketRow() {
+    if (tickets.length >= 1000) return;
     setTickets((prev) => [...prev, { systemName: "", ticketNumber: "" }]);
   }
 
@@ -279,7 +287,7 @@ export function WorkItemFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && !submittingRef.current && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !submittingRef.current) onClose(); }}>
       <DialogContent
         className="sm:max-w-2xl max-h-[90dvh] flex flex-col"
         hideCloseButton={submitting}
@@ -307,10 +315,10 @@ export function WorkItemFormDialog({
           onSubmit={handleSubmit}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <fieldset disabled={submitting} className="contents">
-          <div className="subtle-scrollbar min-h-0 flex-1 overflow-y-auto space-y-4 px-1 pb-1 pr-2">
+          <div className="subtle-scrollbar min-h-0 flex-1 overflow-y-auto px-1 pb-1 pr-2">
+          <fieldset disabled={submitting} className="min-w-0 space-y-4">
           {/* 분류 — 맨 위 단독 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="wi-category">분류</Label>
             <Select
               id="wi-category"
@@ -327,8 +335,8 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 요청 정보 3열 */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-2">
+          <div className="grid gap-x-3 gap-y-4 sm:grid-cols-3">
+            <div className="form-field">
               <Label htmlFor="wi-req-type">요청구분</Label>
               <Input
                 id="wi-req-type"
@@ -338,7 +346,7 @@ export function WorkItemFormDialog({
                 placeholder=""
               />
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-requestor">요청자</Label>
               <Input
                 id="wi-requestor"
@@ -348,7 +356,7 @@ export function WorkItemFormDialog({
                 placeholder=""
               />
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-req-number">요청번호</Label>
               <Input
                 id="wi-req-number"
@@ -361,7 +369,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 요청내용 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="wi-req-content">요청내용</Label>
             <Textarea
               id="wi-req-content"
@@ -374,7 +382,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 제목 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="wi-title">제목 *</Label>
             <Input
               id="wi-title"
@@ -386,8 +394,8 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 상태 / 우선순위 / 담당자 */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 items-end gap-3">
-            <div className="space-y-2">
+          <div className="grid items-end gap-x-3 gap-y-4 sm:grid-cols-3">
+            <div className="form-field">
               <Label htmlFor="wi-status">상태</Label>
               <Select
                 id="wi-status"
@@ -401,7 +409,7 @@ export function WorkItemFormDialog({
                 ))}
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-priority">우선순위</Label>
               <Select
                 id="wi-priority"
@@ -415,9 +423,11 @@ export function WorkItemFormDialog({
                 ))}
               </Select>
             </div>
-            <div className="space-y-2 self-end">
-              <Label className="block">담당자</Label>
+            <div className="form-field self-end">
+              <Label htmlFor="wi-assignee">담당자</Label>
               <MemberFilter
+                id="wi-assignee"
+                disabled={submitting}
                 members={members}
                 selectedIds={assigneeSet}
                 onToggle={(id) => update("assigneeId", id)}
@@ -430,7 +440,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 시스템 연동 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <div className="flex items-center justify-between">
               <Label>시스템 연동</Label>
               {systems.length > 0 && (
@@ -439,7 +449,7 @@ export function WorkItemFormDialog({
                   variant="ghost"
                   size="sm"
                   onClick={addTicketRow}
-                  disabled={tickets.length >= systems.length}
+                  disabled={submitting || tickets.length >= Math.min(systems.length, 1000)}
                   className="h-7 px-2 text-xs"
                 >
                   <Plus className="mr-1 h-3 w-3" />
@@ -469,11 +479,11 @@ export function WorkItemFormDialog({
                   <div key={index} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex">
                     <div className="col-span-2 min-w-0 sm:shrink-0">
                     <Select
+                      aria-label={`연동 시스템 ${index + 1}`}
                       value={row.systemName}
                       onChange={(e) =>
                         updateTicketRow(index, "systemName", e.target.value)
                       }
-                      aria-label={`연동 시스템 ${index + 1}`}
                       className="w-full min-w-0 sm:w-60"
                     >
                       <option value="">시스템 선택</option>
@@ -491,11 +501,11 @@ export function WorkItemFormDialog({
                     </Select>
                     </div>
                     <Input
+                      aria-label={`티켓번호 ${index + 1}`}
                       value={row.ticketNumber}
                       onChange={(e) =>
                         updateTicketRow(index, "ticketNumber", e.target.value)
                       }
-                      aria-label={`티켓번호 ${index + 1}`}
                       placeholder="티켓번호 (선택)"
                       maxLength={100}
                       className="min-w-0 flex-1"
@@ -517,8 +527,8 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 일정 */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-2">
+          <div className="grid gap-x-3 gap-y-4 sm:grid-cols-3">
+            <div className="form-field">
               <Label htmlFor="wi-start">시작일</Label>
               <DatePicker
                 id="wi-start"
@@ -526,7 +536,7 @@ export function WorkItemFormDialog({
                 onChange={(v) => update("startDate", v)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-end">종료일</Label>
               <DatePicker
                 id="wi-end"
@@ -534,7 +544,7 @@ export function WorkItemFormDialog({
                 onChange={(v) => update("endDate", v)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="wi-transfer">이관일</Label>
               <DatePicker
                 id="wi-transfer"
@@ -545,7 +555,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 추가 사항 */}
-          <div className="grid gap-1.5">
+          <div className="form-field">
             <Label htmlFor="wi-additional-notes">추가 사항</Label>
             <Textarea
               id="wi-additional-notes"
@@ -558,7 +568,7 @@ export function WorkItemFormDialog({
           </div>
 
           {/* 설명 */}
-          <div className="space-y-2">
+          <div className="form-field">
             <Label htmlFor="wi-desc">설명</Label>
             <Textarea
               id="wi-desc"
@@ -570,18 +580,18 @@ export function WorkItemFormDialog({
             />
           </div>
 
+          </fieldset>
           </div>
 
-          {error && <p role="alert" className="pt-2 text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter className="shrink-0 border-t pt-4">
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
               취소
             </Button>
             <Button type="submit" disabled={submitting || !state.title.trim()}>
               {submitting ? "저장 중..." : editing ? "저장" : "추가"}
             </Button>
           </DialogFooter>
-          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

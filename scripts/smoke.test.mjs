@@ -279,11 +279,12 @@ test("production application smoke tests (isolated SQLite database)", { timeout:
     const marker = await post("/api/work-items", { title: "WAL 포함 백업 검증" });
     const triggered = await request("/api/backup/trigger", { method: "POST" });
     assert.equal(triggered.data.ok, true);
-    assert.equal(path.dirname(triggered.data.path), directory);
+    assert.equal(triggered.data.path, undefined, "Backup responses must not expose the server filesystem path");
+    assert.equal(path.basename(triggered.data.filename), triggered.data.filename);
     const files = await request("/api/backup/files");
     assert.match(files.response.headers.get("cache-control"), /no-store/);
     assert.ok(files.data.files.length >= 1);
-    const filename = path.basename(triggered.data.path);
+    const filename = triggered.data.filename;
     assert.ok(files.data.files.some((file) => file.filename === filename && file.size > 0));
 
     for (const [index, route] of [`/api/backup/files/${filename}`, "/api/backup"].entries()) {

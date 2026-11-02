@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { api } from "@/lib/client/api";
-import { eventDayKeys } from "@/lib/client/calendar";
+import { api, isAbortError } from "@/lib/client/api";
+import { QueryError } from "@/components/ui/query-state";
+import { eventDayKeys, kstDateStringToUtcMs } from "@/lib/client/calendar";
 import type { CalendarEvent, WorkItemListItem } from "@/lib/client/types";
 import { STATUS_LABELS } from "@/lib/enum-labels";
 import { cn } from "@/lib/utils";
@@ -57,12 +58,15 @@ export function GanttView({
 
   // 휴일 날짜 세트 (yyyy-mm-dd)
   const [holidayDates, setHolidayDates] = React.useState<Set<string>>(new Set());
+  const [holidayError, setHolidayError] = React.useState<string | null>(null);
+  const [holidayReloadKey, setHolidayReloadKey] = React.useState(0);
 
   React.useEffect(() => {
+    if (scheduled.length === 0) return;
     const controller = new AbortController();
-    // The grid stores KST date labels on a UTC-midnight axis. Convert that
-    // label axis to actual KST midnights for API ranges and eventDayKeys.
-    const fromMs = window.startMs - 9 * 60 * 60 * 1000;
+    setHolidayError(null);
+    // 간트 축은 KST 날짜를 UTC 자정으로 인코딩하므로 실제 조회 범위로 변환합니다.
+    const fromMs = kstDateStringToUtcMs(new Date(window.startMs).toISOString().slice(0, 10));
     const toMs = fromMs + window.totalDays * DAY_MS;
     const from = new Date(fromMs).toISOString();
     const to = new Date(toMs).toISOString();
@@ -80,9 +84,11 @@ export function GanttView({
         }
         setHolidayDates(dates);
       })
-      .catch(() => {});
+      .catch((error) => {
+        if (!controller.signal.aborted && !isAbortError(error)) setHolidayError("휴일 정보를 불러오지 못했습니다.");
+      });
     return () => controller.abort();
-  }, [window.startMs, window.totalDays]);
+  }, [window.startMs, window.totalDays, holidayReloadKey, scheduled.length]);
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [visibleRange, setVisibleRange] = React.useState({ start: 0, end: 40 });
@@ -101,8 +107,6 @@ export function GanttView({
     if (!el) return;
     setCanLeft(el.scrollLeft > 2);
     setCanRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 2);
-    // Sticky labels cover the first LABEL_WIDTH pixels. Preserve the complete
-    // track and every work bar, but mount only viewport date cells + overscan.
     const start = Math.max(0, Math.floor(el.scrollLeft / COL_WIDTH) - OVERSCAN_COLUMNS);
     const end = Math.min(window.totalDays,
       Math.ceil((el.scrollLeft + Math.max(1, el.clientWidth - LABEL_WIDTH)) / COL_WIDTH) + OVERSCAN_COLUMNS);
@@ -192,12 +196,16 @@ export function GanttView({
   const todayCol = Math.floor((todayMs - window.startMs) / DAY_MS);
 
   return (
+    <div className="space-y-3">
+      {holidayError && <QueryError message={holidayError} onRetry={() => setHolidayReloadKey((key) => key + 1)} />}
+      {scheduled.length < items.length && <p className="text-xs text-muted-foreground">시작일·종료일이 없는 {items.length - scheduled.length}건은 테이블에서 확인할 수 있습니다.</p>}
     <div className="relative">
       {/* 좌측 화살표 — 담당자 고정 영역 오른쪽에 아이콘만 */}
       {canLeft && (
         <button
+          type="button"
+          aria-label="간트 왼쪽으로 이동"
           onClick={() => scrollBy(-320)}
-          aria-label="이전 날짜 보기"
           className="absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center h-6 w-6 rounded-full bg-card border shadow-xs hover:bg-accent"
           style={{ left: LABEL_WIDTH + 4 }}
         >
@@ -208,8 +216,9 @@ export function GanttView({
       {/* 우측 화살표 */}
       {canRight && (
         <button
+          type="button"
+          aria-label="간트 오른쪽으로 이동"
           onClick={() => scrollBy(320)}
-          aria-label="다음 날짜 보기"
           className="absolute right-0 top-0 bottom-0 z-20 flex items-center pr-1 pl-4 bg-linear-to-l from-card via-card/70 to-transparent"
         >
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -267,7 +276,7 @@ export function GanttView({
                     <div className="pb-1">{day}</div>
                     {/* 오늘 세로선 상단 */}
                     {isToday && (
-                      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-t-sm" />
+                      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-t" />
                     )}
                   </div>
                 );
@@ -370,6 +379,7 @@ export function GanttView({
           })}
         </div>
       </div>
+    </div>
     </div>
   );
 }

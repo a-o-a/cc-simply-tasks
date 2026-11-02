@@ -6,11 +6,12 @@ import { usePathname } from "next/navigation";
 import {
   ArrowRightFromLine,
   Calendar,
-  CheckSquare,
+  SquareCheck,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
   ListChecks,
+  Menu,
   Settings,
   UserCog,
 } from "lucide-react";
@@ -18,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -26,15 +26,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   ACTOR_NAME_STORAGE_KEY,
   api,
-  ApiError,
+  isAbortError,
   DEFAULT_SERVICE_NAME,
   SERVICE_NAME_STORAGE_KEY,
   TODOS_CHANGED_EVENT,
 } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
+import { useRequestController } from "@/lib/client/use-request-controller";
 
 /**
  * 좌측 사이드바.
@@ -57,7 +59,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "홈", icon: LayoutDashboard, exact: true },
   { href: "/work-items", label: "작업", icon: ListChecks },
   { href: "/transfer", label: "이관", icon: ArrowRightFromLine },
-  { href: "/todos", label: "할 일", icon: CheckSquare },
+  { href: "/todos", label: "할 일", icon: SquareCheck },
   { href: "/calendar", label: "캘린더", icon: Calendar },
   { href: "/settings", label: "설정", icon: Settings },
 ];
@@ -71,20 +73,27 @@ export function Sidebar() {
   const [serviceName, setServiceName] = React.useState<string>(DEFAULT_SERVICE_NAME);
   const [mounted, setMounted] = React.useState(false);
   const [nameDialogOpen, setNameDialogOpen] = React.useState(false);
+  const [mobileOpen, setMobileOpen] = React.useState(false);
   const [nameDraft, setNameDraft] = React.useState("");
   const [openTodoCount, setOpenTodoCount] = React.useState(0);
+  const [countError, setCountError] = React.useState<string | null>(null);
+  const { beginRequest } = useRequestController();
 
   const loadOpenTodoCount = React.useCallback(async () => {
+    const request = beginRequest();
     try {
       const res = await api.get<{ count: number }>("/api/todos/count", {
+        signal: request.signal,
         query: { status: "OPEN" },
       });
+      if (!request.isCurrent()) return;
       setOpenTodoCount(res.count);
+      setCountError(null);
     } catch (err) {
-      if (!(err instanceof ApiError)) return;
-      setOpenTodoCount(0);
+      if (!request.isCurrent() || isAbortError(err)) return;
+      setCountError("미완료 할 일 개수를 불러오지 못했습니다.");
     }
-  }, []);
+  }, [beginRequest]);
 
   React.useEffect(() => {
     setMounted(true);
@@ -95,12 +104,14 @@ export function Sidebar() {
     if (cached) setServiceName(cached);
 
     // API에서 최신 서비스명 동기화
-    fetch("/api/settings")
-      .then((r) => r.json())
+    const settingsController = new AbortController();
+    api.get<{ service_name: string }>("/api/settings", { signal: settingsController.signal })
       .then((data) => {
+        if (settingsController.signal.aborted) return;
         const name = data.service_name ?? DEFAULT_SERVICE_NAME;
         setServiceName(name);
         window.localStorage.setItem(SERVICE_NAME_STORAGE_KEY, name);
+        window.dispatchEvent(new CustomEvent("settings-changed"));
       })
       .catch(() => {/* 실패 시 캐시값 유지 */});
 
@@ -108,7 +119,6 @@ export function Sidebar() {
       setActorName(window.localStorage.getItem(ACTOR_NAME_STORAGE_KEY) ?? "");
     };
     syncActorName();
-    void loadOpenTodoCount();
 
     const syncServiceName = () => {
       const name = window.localStorage.getItem(SERVICE_NAME_STORAGE_KEY) ?? DEFAULT_SERVICE_NAME;
@@ -122,6 +132,7 @@ export function Sidebar() {
     window.addEventListener("visibilitychange", loadOpenTodoCount);
     window.addEventListener(TODOS_CHANGED_EVENT, loadOpenTodoCount);
     return () => {
+      settingsController.abort();
       window.removeEventListener("storage", syncActorName);
       window.removeEventListener("actor-name-changed", syncActorName);
       window.removeEventListener("settings-changed", syncServiceName);
@@ -142,6 +153,7 @@ export function Sidebar() {
   }
 
   function openNameDialog() {
+    setMobileOpen(false);
     setNameDraft(window.localStorage.getItem(ACTOR_NAME_STORAGE_KEY) ?? "");
     setNameDialogOpen(true);
   }
@@ -156,26 +168,18 @@ export function Sidebar() {
     setNameDialogOpen(false);
   }
 
-  return (
-    <aside
-      className={cn(
-        "sticky top-0 flex h-auto w-full shrink-0 flex-col border-b bg-card transition-[width] duration-200 md:h-dvh md:border-b-0 md:border-r",
-        collapsed ? "md:w-16" : "md:w-60",
-      )}
-    >
+  function renderNavigation(isCollapsed: boolean, mobile = false) {
+    return <>
       {/* 헤더 */}
       <div className="flex h-14 items-center justify-between border-b px-3">
-        <Link href="/" className={cn("min-w-0 truncate text-sm font-semibold tracking-tight", collapsed && "md:hidden")}>
+        {!isCollapsed ? (
+          <Link href="/" className="truncate text-sm font-semibold tracking-tight">
             {serviceName}
-        </Link>
-        <div className="ml-auto flex shrink-0 items-center md:hidden">
-          <Button variant="ghost" size="icon" onClick={openNameDialog} aria-label="이름 변경">
-            <UserCog className="h-4 w-4" />
-          </Button>
-          <ThemeToggle />
-        </div>
-        <Button
-          className="hidden md:inline-flex"
+          </Link>
+        ) : (
+          <span className="sr-only">{serviceName}</span>
+        )}
+        {mobile ? <SheetClose asChild><Button variant="ghost" size="icon" aria-label="메뉴 닫기"><ChevronLeft className="h-4 w-4" /></Button></SheetClose> : <Button
           variant="ghost"
           size="icon"
           onClick={toggleCollapsed}
@@ -186,11 +190,11 @@ export function Sidebar() {
           ) : (
             <ChevronLeft className="h-4 w-4" />
           )}
-        </Button>
+        </Button>}
       </div>
 
       {/* 네비게이션 */}
-      <nav aria-label="주 메뉴" className="grid grid-cols-6 gap-1 p-2 md:block md:flex-1 md:space-y-1">
+      <nav aria-label="주 메뉴" className="flex-1 space-y-1 overflow-y-auto p-2">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = item.exact
@@ -200,30 +204,31 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
+              onClick={() => setMobileOpen(false)}
               className={cn(
-                "relative flex min-h-11 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium transition-colors md:h-9 md:min-h-0 md:flex-row md:justify-start md:gap-3 md:px-3 md:text-sm",
+                "relative flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
                 active
                   ? "bg-secondary text-secondary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                collapsed && "md:justify-center md:px-0",
+                isCollapsed && "justify-center px-0",
               )}
-              aria-label={item.label}
               aria-current={active ? "page" : undefined}
-              title={collapsed ? item.label : undefined}
+              title={item.href === "/todos" && countError ? countError : isCollapsed ? item.label : undefined}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span className={cn("min-w-0 md:flex-1", collapsed && "md:hidden")}>{item.label}</span>
-              {!collapsed ? (
+              {!isCollapsed ? (
                 <>
-                  {item.href === "/todos" && openTodoCount > 0 ? (
-                    <span className="absolute right-0 top-0 inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-muted text-muted-foreground px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums md:static">
-                      {openTodoCount > 99 ? "99+" : openTodoCount}
+                  <span className="min-w-0 flex-1">{item.label}</span>
+                  {item.href === "/todos" && (openTodoCount > 0 || countError) ? (
+                    <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-muted text-muted-foreground px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums">
+                      {countError ? "?" : openTodoCount > 99 ? "99+" : openTodoCount}
                     </span>
                   ) : null}
                 </>
-              ) : item.href === "/todos" && openTodoCount > 0 ? (
+              ) : item.href === "/todos" && (openTodoCount > 0 || countError) ? (
                 <span className="absolute right-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-muted text-muted-foreground px-1 text-[10px] font-semibold leading-none tabular-nums">
-                  {openTodoCount > 9 ? "9+" : openTodoCount}
+                  {countError ? "?" : openTodoCount > 9 ? "9+" : openTodoCount}
                 </span>
               ) : null}
             </Link>
@@ -232,8 +237,8 @@ export function Sidebar() {
       </nav>
 
       {/* 하단: 액터 + 테마 */}
-      <div className="hidden border-t p-2 md:block">
-        {!collapsed ? (
+      <div className="border-t p-2">
+        {!isCollapsed ? (
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={openNameDialog}
@@ -263,16 +268,33 @@ export function Sidebar() {
         )}
       </div>
 
+    </>;
+  }
+
+  return (
+    <>
+      <aside className={cn("hidden h-dvh shrink-0 flex-col border-r bg-card transition-[width] duration-200 md:flex", collapsed ? "w-16" : "w-60")}>
+        {renderNavigation(collapsed)}
+      </aside>
+      <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-card px-4 md:hidden">
+        <Link href="/" className="min-w-0 truncate text-sm font-semibold">{serviceName}</Link>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild><Button variant="ghost" size="icon" aria-label="메뉴 열기"><Menu className="h-5 w-5" /></Button></SheetTrigger>
+          <SheetContent side="left" hideCloseButton className="w-60 max-w-[85vw] gap-0 bg-card p-0">
+            <SheetTitle className="sr-only">메뉴</SheetTitle>
+            <SheetDescription className="sr-only">화면 이동과 표시 이름, 테마 설정</SheetDescription>
+            {renderNavigation(false, true)}
+          </SheetContent>
+        </Sheet>
+      </div>
+
       <Dialog open={nameDialogOpen} onOpenChange={setNameDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>이름 변경</DialogTitle>
-            <DialogDescription className="sr-only">
-              작업 기록에 사용할 표시 이름을 변경합니다.
-            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleNameSubmit} className="space-y-4">
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="sidebar-name-input">표시 이름</Label>
               <Input
                 id="sidebar-name-input"
@@ -294,6 +316,6 @@ export function Sidebar() {
           </form>
         </DialogContent>
       </Dialog>
-    </aside>
+    </>
   );
 }

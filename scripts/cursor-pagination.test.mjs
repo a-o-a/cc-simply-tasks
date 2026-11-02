@@ -37,7 +37,7 @@ test("bounded cursor pages preserve filters, ties and date boundaries", { timeou
   ];
   await t.test("all cursor pages match full ordering, including NULL transfer dates and tied timestamps", async () => {
     for (const route of routes) {
-      const complete = await get(`${route}&pageSize=10000`);
+      const complete = await get(`${route}&pageSize=200`);
       for (const size of [1, 7, 50]) {
         const seen = [];
         let cursor;
@@ -66,7 +66,7 @@ test("bounded cursor pages preserve filters, ties and date boundaries", { timeou
   });
   await t.test("a cursor moved to another sort group uses its current position", async () => {
     await sqlite.execute({ sql: 'UPDATE WorkItem SET transferDate=NULL WHERE id=?', args: ["work-011"] });
-    const all = await get("/api/work-items?scope=transferred&pageSize=10000");
+    const all = await get("/api/work-items?scope=transferred&pageSize=200");
     const index = all.items.findIndex((row) => row.id === "work-011");
     const next = await get("/api/work-items?scope=transferred&cursor=work-011&pageSize=7");
     assert.deepEqual(next.items.map((row) => row.id), all.items.slice(index + 1, index + 8).map((row) => row.id));

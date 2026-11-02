@@ -70,7 +70,8 @@ test("browser workflows on a disposable production database", { timeout: 180_000
   }
 
   async function dragWithMouse(source, target) {
-    await source.scrollIntoViewIfNeeded();
+    await expect(source).toBeVisible();
+    await source.evaluate((element) => element.scrollIntoView({ block: "center", inline: "center" }));
     await target.scrollIntoViewIfNeeded();
     const from = await source.boundingBox();
     const to = await target.boundingBox();
@@ -159,6 +160,7 @@ test("browser workflows on a disposable production database", { timeout: 180_000
       const toggle = page.getByRole("button", { name, exact: true });
       await toggle.click();
       await expect(toggle).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator("main section[aria-busy]")).toHaveAttribute("aria-busy", "false");
       await expect(page.getByText(work.title, { exact: true }).first()).toBeVisible();
       if (name === "칸반") {
         const card = page.getByRole("button", { name: new RegExp(work.title) });
@@ -174,7 +176,7 @@ test("browser workflows on a disposable production database", { timeout: 180_000
     const drawer = page.getByRole("dialog");
     await visibleWithinViewport(drawer);
     await expect(drawer.getByRole("heading", { name: work.title })).toBeVisible();
-    await drawer.getByRole("button", { name: "Close", exact: true }).click();
+    await drawer.getByRole("button", { name: "닫기", exact: true }).click();
     await expect(drawer).toBeHidden();
 
     await page.getByRole("link", { name: /할 일/ }).click();
@@ -242,7 +244,7 @@ test("browser workflows on a disposable production database", { timeout: 180_000
     await mutation("/api/backup/trigger", "POST", () => page.getByRole("button", { name: "지금 백업", exact: true }).click());
     await expect(page.locator('a[href^="/api/backup/files/"]')).toHaveCount(1);
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "현재 DB 다운로드", exact: true }).click();
+    await page.getByRole("link", { name: "현재 DB 다운로드", exact: true }).click();
     const download = await downloadPromise;
     assert.match(download.suggestedFilename(), /^backup-.*\.db$/);
     assert.equal(await download.failure(), null);

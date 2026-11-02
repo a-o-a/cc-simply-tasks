@@ -21,6 +21,9 @@ import { withErrorHandler } from "@/lib/http";
  * GET /api/db-stats
  * 각 테이블의 레코드 수 반환 (deletedAt 무관 전체).
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async () => {
   await ensureSqlitePragma();
 
@@ -71,5 +74,5 @@ export const GET = withErrorHandler(async () => {
       { name: "Setting",             label: "설정",            count: settings },
       { name: "AuditLog",            label: "감사 로그",       count: auditLogs },
     ],
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 });

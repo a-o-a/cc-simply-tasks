@@ -47,6 +47,7 @@ function KanbanCard({
 
   return (
     <button
+      type="button"
       ref={setNodeRef}
       style={style}
       {...listeners}
@@ -87,10 +88,10 @@ function KanbanCard({
         <span>{item.assignee?.name ?? "미배정"}</span>
         {item.transferDate && (
           <span className={cn((() => {
-            const today = new Date().toDateString();
-            const transfer = new Date(item.transferDate!).toDateString();
+            const today = formatDate(new Date());
+            const transfer = formatDate(item.transferDate);
             if (transfer === today) return "text-blue-600 font-semibold";
-            if (new Date(item.transferDate!) < new Date()) return "text-red-600 font-semibold";
+            if (transfer < today) return "text-red-600 font-semibold";
             return "";
           })())}>
             이관 {formatDate(item.transferDate)}

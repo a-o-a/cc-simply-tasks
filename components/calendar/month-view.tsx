@@ -104,10 +104,12 @@ function DraggableChip({
 
   return (
     <button
+      type="button"
       ref={setNodeRef}
       {...listeners}
       {...attributes}
       onClick={onClick}
+      aria-label={`${dayKey} ${event.title}, ${event.allDay ? "종일" : kstTime(event.startDateTime)}${memberText ? `, ${memberText}` : ""}`}
       className={cn(
         "flex w-full flex-col rounded-sm bg-muted/60 px-1 py-0.5 text-left hover:bg-muted touch-none select-none gap-0.5",
         isDragging && "opacity-40",
@@ -152,6 +154,8 @@ function DroppableCell({
   return (
     <div
       ref={setNodeRef}
+      role="group"
+      aria-label={`${dayKey} 일정`}
       className={cn(className, isOver && "ring-2 ring-primary/30 ring-inset")}
     >
       {children}
@@ -176,7 +180,7 @@ export function MonthView({
 
   return (
     <div className="h-full overflow-auto">
-      <div className="overflow-hidden rounded-lg border bg-card">
+      <div className="min-w-[640px] overflow-hidden rounded-lg border bg-card">
         {/* Weekday header */}
         <div className="grid grid-cols-7 border-b text-xs font-medium text-muted-foreground">
           {Array.from({ length: 7 }).map((_, i) => (
@@ -238,13 +242,8 @@ export function MonthView({
                     {holidayEvents.length > 0 && (
                       <div className="flex min-w-0 flex-col items-start gap-0.5">
                         {holidayEvents.map((event) => (
-                          <button
-                            key={event.id}
-                            type="button"
-                            onClick={() => onEventClick(event)}
-                            title={event.title}
-                            className="max-w-full truncate rounded-sm text-left text-[10px] font-medium leading-tight text-rose-500 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-                          >
+                          <button key={event.id} type="button" onClick={() => onEventClick(event)} title={event.title}
+                            className="max-w-full truncate rounded-sm text-left text-[10px] font-medium leading-tight text-rose-500 hover:underline focus-visible:outline-2 focus-visible:outline-ring">
                             {event.title}
                           </button>
                         ))}
@@ -252,9 +251,10 @@ export function MonthView({
                     )}
                   </div>
                   <button
+                    type="button"
                     onClick={() => onAddClick(dayKey)}
-                    className="shrink-0 rounded-sm p-0.5 text-muted-foreground opacity-100 transition-opacity hover:bg-accent md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
-                    aria-label="이벤트 추가"
+                    className="shrink-0 rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                    aria-label={`${dayKey} 이벤트 추가`}
                   >
                     <Plus className="h-3 w-3" />
                   </button>

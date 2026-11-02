@@ -28,7 +28,10 @@ test("release UI regressions on an isolated production database", { timeout: 180
       await page.goto(path);
       await expect(page.locator("main h1")).toBeVisible();
       await expect.poll(() => page.locator("main").evaluate((el) => el.scrollWidth - el.clientWidth), { message: `${path}: page-level horizontal overflow` }).toBeLessThanOrEqual(1);
-      await expect(page.getByRole("link", { name: "설정", exact: true })).toBeInViewport();
+      await page.getByRole("button", { name: "메뉴 열기", exact: true }).click();
+      await expect(page.getByRole("dialog").getByRole("link", { name: "설정", exact: true })).toBeInViewport();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toBeHidden();
     }
     await page.goto("/todos");
     await page.getByRole("button", { name: "TODO 추가", exact: true }).first().click();
@@ -87,7 +90,7 @@ test("release UI regressions on an isolated production database", { timeout: 180
     fail = false;
     await alert.getByRole("button", { name: "다시 시도" }).click();
     await expect(alert).toBeHidden();
-    await expect(page.getByText("조건에 맞는 TODO가 없습니다", { exact: true })).toBeVisible();
+    await expect(page.getByText("등록된 TODO가 없습니다", { exact: true })).toBeVisible();
   });
 
   await t.test("calendar failure has a retry and recovers without changing month", async (t) => {
@@ -113,9 +116,9 @@ test("release UI regressions on an isolated production database", { timeout: 180
     await expect(page.getByRole("cell", { name: "검수 팀원 50", exact: true })).toBeVisible();
     await page.goto("/work-items");
     await page.getByRole("button", { name: "작업 추가", exact: true }).first().click();
-    await page.getByRole("dialog").getByRole("button", { name: "미배정", exact: true }).click();
+    await page.getByRole("dialog").getByLabel("담당자", { exact: true }).click();
     await page.getByRole("button", { name: "검수 팀원 50", exact: true }).click();
-    await expect(page.getByRole("dialog").getByRole("button", { name: /검수 팀원 50/ })).toBeVisible();
+    await expect(page.getByRole("dialog").getByLabel("담당자", { exact: true })).toContainText("검수 팀원 50");
   });
 
   await t.test("late TODO search results cannot replace the current filter", async (t) => {

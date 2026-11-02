@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db, ensureSqlitePragma } from "@/lib/db";
 import { desc } from "drizzle-orm";
-import { withErrorHandler } from "@/lib/http";
+import { withErrorHandler, readJsonBody } from "@/lib/http";
 import { now } from "@/lib/db/helpers";
 import { settings } from "@/lib/db/schema";
 import { settingUpdateSchema } from "@/lib/validation/setting";
@@ -14,6 +14,9 @@ const DEFAULT_SETTINGS = {
  * GET /api/settings
  * 전체 설정 반환. 없는 키는 기본값으로 채운다.
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async () => {
   await ensureSqlitePragma();
   const rows = await db.select().from(settings).orderBy(desc(settings.updatedAt));
@@ -31,7 +34,7 @@ export const GET = withErrorHandler(async () => {
  */
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
-  const input = settingUpdateSchema.parse(await req.json());
+  const input = settingUpdateSchema.parse(await readJsonBody(req));
   const updatedAt = now();
 
   const updates: { key: string; value: string }[] = [];

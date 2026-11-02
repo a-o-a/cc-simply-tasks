@@ -48,7 +48,7 @@ test("pagination and work-list regression checks", { timeout: 150_000 }, async (
       "/api/work-items?scope=active", "/api/work-items?scope=transferred", "/api/work-items?scope=active&category=odd",
       "/api/todos?status=OPEN", "/api/audit-logs?actorName=odd",
     ]) {
-      const complete = await get(`${route}&pageSize=10000`);
+      const complete = await get(`${route}&pageSize=200`);
       const seen = [];
       let cursor;
       do {
@@ -70,11 +70,19 @@ test("pagination and work-list regression checks", { timeout: 150_000 }, async (
       assert.ok((await get(route)).items.length > 0);
     }
     const first = await get("/api/work-items?scope=active&pageSize=17");
-    await sqlite.execute({ sql: "UPDATE WorkItem SET deletedAt=? WHERE id=?", args: [timestamp, first.nextCursor] });
-    assert.equal((await get(`/api/work-items?scope=active&cursor=${first.nextCursor}`, 400)).error.code, "BAD_REQUEST");
-    await sqlite.execute({ sql: "UPDATE WorkItem SET deletedAt=NULL WHERE id=?", args: [first.nextCursor] });
+    const anchorId = first.items.at(-1).id;
+    await sqlite.execute({ sql: "UPDATE WorkItem SET deletedAt=? WHERE id=?", args: [timestamp, anchorId] });
+    try {
+      const resumed = await get(`/api/work-items?scope=active&cursor=${encodeURIComponent(first.nextCursor)}&pageSize=17`);
+      assert.equal(resumed.items.length, 17);
+      assert.ok(resumed.items.every((item) => !first.items.some((seen) => seen.id === item.id)));
+      assert.equal((await get(`/api/work-items?scope=active&cursor=${anchorId}`, 400)).error.code, "BAD_REQUEST");
+    } finally {
+      await sqlite.execute({ sql: "UPDATE WorkItem SET deletedAt=NULL WHERE id=?", args: [anchorId] });
+    }
     const odd = await get("/api/work-items?scope=active&category=odd&pageSize=17");
-    assert.equal((await get(`/api/work-items?scope=active&category=even&cursor=${odd.nextCursor}`, 400)).error.code, "BAD_REQUEST");
+    const oddAnchor = odd.items.at(-1).id;
+    assert.equal((await get(`/api/work-items?scope=active&category=even&cursor=${oddAnchor}`, 400)).error.code, "BAD_REQUEST");
   });
 
   const browser = await chromium.launch({ headless: true });
@@ -88,43 +96,47 @@ test("pagination and work-list regression checks", { timeout: 150_000 }, async (
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await t.test("the 51st active item is reachable in table, kanban and gantt views", async () => {
-    const all = await get("/api/work-items?scope=active&pageSize=10000");
+    const all = await get("/api/work-items?scope=active&pageSize=200");
     const target = all.items[50];
     await page.goto("/work-items");
-    const more = page.getByRole("button", { name: "더 보기", exact: true });
+    const more = page.getByRole("button", { name: "다음", exact: true });
     await expect(more).toBeVisible();
     await expect(page.getByText(target.title, { exact: true })).toHaveCount(0);
     await more.click();
-    for (const view of ["테이블", "칸반", "간트"]) {
+    await expect(page.getByText(target.title, { exact: true }).first()).toBeVisible();
+    for (const view of ["칸반", "간트"]) {
       await page.getByRole("button", { name: view, exact: true }).click();
       const title = page.getByText(target.title, { exact: true }).first();
       await expect(title).toBeVisible();
       await title.click();
       await expect(page.getByRole("dialog").getByRole("heading", { name: target.title, exact: true })).toBeVisible();
-      await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "닫기", exact: true }).click();
     }
   });
 
-  await t.test("a deleted next-page cursor keeps visible work and offers a restart", async () => {
+  await t.test("a deleted next-page anchor can resume at the next page", async () => {
     await page.reload();
+    await page.getByRole("button", { name: "테이블", exact: true }).click();
     const first = await get("/api/work-items?scope=active&pageSize=50");
-    await expect(page.getByRole("button", { name: "더 보기", exact: true })).toBeVisible();
-    await sqlite.execute({ sql: "UPDATE WorkItem SET deletedAt=? WHERE id=?", args: [timestamp, first.nextCursor] });
+    const anchorId = first.items.at(-1).id;
+    const rows = page.locator("main tbody tr");
+    await expect(rows).toHaveCount(50);
+    await sqlite.execute({ sql: "UPDATE WorkItem SET deletedAt=? WHERE id=?", args: [timestamp, anchorId] });
     try {
-      await page.getByRole("button", { name: "더 보기", exact: true }).click();
-      await expect(page.getByRole("button", { name: "처음부터 다시 조회", exact: true })).toBeVisible();
-      await expect(page.getByText(first.items[0].title, { exact: true }).first()).toBeVisible();
-      await page.getByRole("button", { name: "처음부터 다시 조회", exact: true }).click();
-      await expect(page.getByRole("button", { name: "더 보기", exact: true })).toBeVisible();
-      await expect(page.getByRole("button", { name: "처음부터 다시 조회", exact: true })).toHaveCount(0);
+      await page.getByRole("button", { name: "다음", exact: true }).click();
+      await expect(page.getByText("2 페이지", { exact: true })).toBeVisible();
+      await expect(rows).toHaveCount(50);
+      await expect(page.getByText(first.items[0].title, { exact: true })).toBeHidden();
+      const expected = await get(`/api/work-items?scope=active&pageSize=50&cursor=${encodeURIComponent(first.nextCursor)}`);
+      assert.deepEqual((await rows.locator("td:nth-child(3)").allTextContents()).map((value) => value.trim()), expected.items.map((item) => item.title));
     } finally {
-      await sqlite.execute({ sql: "UPDATE WorkItem SET deletedAt=NULL WHERE id=?", args: [first.nextCursor] });
+      await sqlite.execute({ sql: "UPDATE WorkItem SET deletedAt=NULL WHERE id=?", args: [anchorId] });
     }
   });
 
   await t.test("debounced search ignores an older response and retries a failed load", async () => {
     await page.getByRole("button", { name: "테이블", exact: true }).click();
-    const title = page.getByRole("textbox", { name: "제목", exact: true });
+    const title = page.getByRole("textbox", { name: "작업 제목 검색", exact: true });
     const requests = [];
     let oldStarted;
     const oldRequestStarted = new Promise((resolve) => { oldStarted = resolve; });
@@ -163,13 +175,13 @@ test("pagination and work-list regression checks", { timeout: 150_000 }, async (
 
     fail = true;
     await title.fill("실패");
-    await expect(page.getByText("목록을 불러오지 못했습니다", { exact: true })).toBeVisible();
+    await expect(page.locator("main").getByRole("alert")).toContainText("검증용 일시 오류");
     fail = false;
     await page.getByRole("button", { name: "다시 시도", exact: true }).click();
     await expect(page.getByText("조건에 맞는 작업이 없습니다", { exact: true })).toBeVisible();
     await page.unroute("**/api/work-items?**");
     await page.getByRole("button", { name: "초기화", exact: true }).click();
-    await expect(page.getByRole("button", { name: "더 보기", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "다음", exact: true })).toBeVisible();
   });
 
   await t.test("holding work stays accessible in the default kanban and status filter", async () => {
@@ -182,7 +194,7 @@ test("pagination and work-list regression checks", { timeout: 150_000 }, async (
     await expect(card).toBeVisible();
     await card.click();
     await expect(page.getByRole("dialog").getByRole("heading", { name: holding[0].title, exact: true })).toBeVisible();
-    await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "닫기", exact: true }).click();
     const statusFilter = page.getByRole("button", { name: "홀딩", exact: true });
     const filteredResponse = page.waitForResponse((response) => {
       const url = new URL(response.url());
@@ -192,9 +204,11 @@ test("pagination and work-list regression checks", { timeout: 150_000 }, async (
     assert.equal((await filteredResponse).status(), 200);
     await expect(statusFilter).toHaveAttribute("aria-pressed", "true");
     await expect(card).toBeVisible();
-    await expect(page.getByText("1건 표시", { exact: true })).toBeVisible();
+    await expect(page.getByText("조건에 맞는 전체 작업 1건", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "초기화", exact: true }).click();
-    await expect(page.getByRole("button", { name: "더 보기", exact: true })).toBeVisible();
+    await expect(statusFilter).toHaveAttribute("aria-pressed", "false");
+    await page.getByRole("button", { name: "테이블", exact: true }).click();
+    await expect(page.getByRole("button", { name: "다음", exact: true })).toBeEnabled();
   });
 
   await t.test("mobile filter labels and controls remain within the viewport", async () => {
@@ -202,8 +216,8 @@ test("pagination and work-list regression checks", { timeout: 150_000 }, async (
     for (const locator of [
       page.getByRole("button", { name: "작업 추가", exact: true }),
       page.getByRole("button", { name: "진행 작업", exact: true }),
-      page.getByRole("textbox", { name: "제목", exact: true }),
-      page.getByRole("textbox", { name: "요청번호", exact: true }),
+      page.getByRole("textbox", { name: "작업 제목 검색", exact: true }),
+      page.getByRole("textbox", { name: "요청번호 검색", exact: true }),
     ]) {
       await expect(locator).toBeVisible();
       const box = await locator.boundingBox();

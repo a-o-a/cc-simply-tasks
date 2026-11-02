@@ -45,6 +45,8 @@ export function computeDiff<T extends Record<string, unknown>>(
 
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
   for (const k of keys) {
+    // The write timestamp is metadata; a no-op save should not create audit noise.
+    if (k === "updatedAt") continue;
     const bv = (before as Record<string, unknown>)[k];
     const av = (after as Record<string, unknown>)[k];
     if (!eq(bv, av)) {

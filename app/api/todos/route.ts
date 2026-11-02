@@ -1,14 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { contains, newId, now } from "@/lib/db/helpers";
 import { hydrateTodos, loadTodoDetail } from "@/lib/db/queries";
-import { todoChecklist, todos } from "@/lib/db/schema";
+import { todoChecklist, todos, type TodoRow } from "@/lib/db/schema";
 
-import { withErrorHandler } from "@/lib/http";
+import { withErrorHandler, readJsonBody, HttpError } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
-import { inclusiveCursorCondition, parsePagination, slicePageAfterCursor } from "@/lib/pagination";
+import { parsePagination, createCursorPagination } from "@/lib/pagination";
 import {
   todoCreateSchema,
   todoListQuerySchema,
@@ -19,6 +20,9 @@ import {
  *   ?status, ?assigneeId, ?title, ?include=checklist, ?cursor, ?pageSize
  * soft delete 제외.
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const { searchParams } = new URL(req.url);
@@ -39,28 +43,28 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       ? gte(todos.dueDate, new Date(`${filters.dueDateFrom}T00:00:00+09:00`))
       : undefined,
     filters.dueDateTo
-      ? lt(todos.dueDate, new Date(Date.parse(`${filters.dueDateTo}T00:00:00+09:00`) + 86_400_000))
+      ? lte(todos.dueDate, new Date(`${filters.dueDateTo}T23:59:59.999+09:00`))
       : undefined,
   ].filter(Boolean);
 
-  const anchor = db.$with("page_cursor").as(db
-    .select({ order: todos.order, createdAt: todos.createdAt, id: todos.id })
-    .from(todos)
-    .where(and(...conditions, cursor ? eq(todos.id, cursor) : undefined))
-    .limit(1));
-  const boundary = inclusiveCursorCondition([
-    { column: todos.order, anchor: anchor.order, direction: "asc" },
-    { column: todos.createdAt, anchor: anchor.createdAt, direction: "desc" },
-    { column: todos.id, anchor: anchor.id, direction: "desc" },
+  const pagination = createCursorPagination<TodoRow>("todos", [
+    { column: todos.order, value: (row) => row.order, direction: "asc" },
+    { column: todos.createdAt, value: (row) => row.createdAt, direction: "desc" },
+    { column: todos.id, value: (row) => row.id, direction: "desc" },
   ]);
-  const query = cursor
-    ? db.with(anchor).select(getTableColumns(todos)).from(todos).innerJoin(anchor, boundary)
-    : db.select(getTableColumns(todos)).from(todos);
-  const rows = await query.where(and(...conditions))
-    .orderBy(asc(todos.order), desc(todos.createdAt), desc(todos.id))
-    .limit(take + (cursor ? 2 : 1));
+  const afterCursor = await pagination.condition(cursor, async (id) => {
+    const [row] = await db.select().from(todos).where(and(...conditions, eq(todos.id, id))).limit(1);
+    if (!row) throw new HttpError("BAD_REQUEST", "목록이 변경되었습니다. 처음부터 다시 조회해주세요.");
+    return row;
+  });
+  const rows = await db
+    .select()
+    .from(todos)
+    .where(and(...conditions, afterCursor))
+    .orderBy(...pagination.orderBy)
+    .limit(take + 1);
 
-  const { items: pageItems, nextCursor } = slicePageAfterCursor(rows, cursor, take);
+  const { items: pageItems, nextCursor } = pagination.page(rows, take);
   const withChecklist = filters.include?.includes("checklist") ?? false;
   const items = await hydrateTodos(pageItems, { includeChecklist: withChecklist });
   return NextResponse.json({ items, nextCursor });
@@ -73,10 +77,14 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 export const POST = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const actor = getActorContext(req);
-  const input = todoCreateSchema.parse(await req.json());
+  const input = todoCreateSchema.parse(await readJsonBody(req));
   const timestamp = now();
 
   const createdId = await db.transaction(async (tx) => {
+    await assertAssignableMembers(tx, [
+      { id: input.assigneeId, path: ["assigneeId"] },
+      ...(input.checklist ?? []).map((item, index) => ({ id: item.assigneeId, path: ["checklist", index, "assigneeId"] })),
+    ]);
     const row = {
       id: newId(),
       title: input.title,

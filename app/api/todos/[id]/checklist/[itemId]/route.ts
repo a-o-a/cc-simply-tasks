@@ -1,25 +1,29 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
+import { assertAssignableMembers } from "@/lib/db/member-validation";
 import { now } from "@/lib/db/helpers";
 import { todoChecklist, todos } from "@/lib/db/schema";
-import { withErrorHandler, HttpError } from "@/lib/http";
+import { withErrorHandler, HttpError, readJsonBody } from "@/lib/http";
 import { getActorContext } from "@/lib/actor";
 import { withAudit } from "@/lib/audit";
 import { todoChecklistUpdateSchema } from "@/lib/validation/todo";
 
 type Params = { params: Promise<{ id: string; itemId: string }> };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const PATCH = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
-    const routeParams = await params;
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
-    const input = todoChecklistUpdateSchema.parse(await req.json());
+    const input = todoChecklistUpdateSchema.parse(await readJsonBody(req));
 
     const updated = await db.transaction(async (tx) => {
       const [parent] = await tx.select({ updatedAt: todos.updatedAt }).from(todos)
-        .where(and(eq(todos.id, routeParams.id), isNull(todos.deletedAt))).limit(1);
+        .where(and(eq(todos.id, params.id), isNull(todos.deletedAt))).limit(1);
       if (!parent) throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
       const updatedAt = new Date(Math.max(now().getTime(), parent.updatedAt.getTime() + 1));
       const beforeRows = await tx
@@ -27,8 +31,8 @@ export const PATCH = withErrorHandler(
         .from(todoChecklist)
         .where(
           and(
-            eq(todoChecklist.id, routeParams.itemId),
-            eq(todoChecklist.todoId, routeParams.id),
+            eq(todoChecklist.id, params.itemId),
+            eq(todoChecklist.todoId, params.id),
             isNull(todoChecklist.deletedAt),
           ),
         )
@@ -45,15 +49,16 @@ export const PATCH = withErrorHandler(
         ...(input.assigneeId !== undefined ? { assigneeId: input.assigneeId } : {}),
         updatedAt,
       };
+      await assertAssignableMembers(tx, [{ id: input.assigneeId, previousId: before.assigneeId, path: ["assigneeId"] }]);
       await tx
         .update(todoChecklist)
         .set(after)
-        .where(eq(todoChecklist.id, routeParams.itemId));
+        .where(eq(todoChecklist.id, params.itemId));
       // 부모 updatedAt도 갱신
       await tx
         .update(todos)
         .set({ updatedAt })
-        .where(eq(todos.id, routeParams.id));
+        .where(eq(todos.id, params.id));
       await withAudit(tx, {
         entityType: "TodoChecklist",
         entityId: after.id,
@@ -70,14 +75,14 @@ export const PATCH = withErrorHandler(
 );
 
 export const DELETE = withErrorHandler(
-  async (req: NextRequest, { params }: Params) => {
-    const routeParams = await params;
+  async (req: NextRequest, { params: paramsPromise }: Params) => {
+    const params = await paramsPromise;
     await ensureSqlitePragma();
     const actor = getActorContext(req);
 
     await db.transaction(async (tx) => {
       const [parent] = await tx.select({ updatedAt: todos.updatedAt }).from(todos)
-        .where(and(eq(todos.id, routeParams.id), isNull(todos.deletedAt))).limit(1);
+        .where(and(eq(todos.id, params.id), isNull(todos.deletedAt))).limit(1);
       if (!parent) throw new HttpError("NOT_FOUND", "TODO를 찾을 수 없습니다");
       const deletedAt = new Date(Math.max(now().getTime(), parent.updatedAt.getTime() + 1));
       const beforeRows = await tx
@@ -85,8 +90,8 @@ export const DELETE = withErrorHandler(
         .from(todoChecklist)
         .where(
           and(
-            eq(todoChecklist.id, routeParams.itemId),
-            eq(todoChecklist.todoId, routeParams.id),
+            eq(todoChecklist.id, params.itemId),
+            eq(todoChecklist.todoId, params.id),
             isNull(todoChecklist.deletedAt),
           ),
         )
@@ -99,11 +104,11 @@ export const DELETE = withErrorHandler(
       await tx
         .update(todoChecklist)
         .set(after)
-        .where(eq(todoChecklist.id, routeParams.itemId));
+        .where(eq(todoChecklist.id, params.itemId));
       await tx
         .update(todos)
         .set({ updatedAt: deletedAt })
-        .where(eq(todos.id, routeParams.id));
+        .where(eq(todos.id, params.id));
       await withAudit(tx, {
         entityType: "TodoChecklist",
         entityId: after.id,

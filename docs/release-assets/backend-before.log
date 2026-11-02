@@ -1,0 +1,18 @@
+AssertionError [ERR_ASSERTION]: POST /api/work-items: {"error":{"code":"INTERNAL","message":"서버 내부 오류"}}
+
+500 !== 400
+
+    at invalidMember (eval at <anonymous> ([stdin]:6:1), <anonymous>:4:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async runMemberValidationChecks (eval at <anonymous> ([stdin]:6:1), <anonymous>:13:3) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 500,
+  expected: 400,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+BEFORE /api/todos 500 { error: { code: 'INTERNAL', message: '서버 내부 오류' } }
+BEFORE /api/todos 500 { error: { code: 'INTERNAL', message: '서버 내부 오류' } }
+BEFORE /api/calendar-events 500 { error: { code: 'INTERNAL', message: '서버 내부 오류' } }
+BEFORE deleted member assignment 201 kcxif5pwbddhpel8l679cwck

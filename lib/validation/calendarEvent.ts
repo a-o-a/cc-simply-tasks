@@ -1,18 +1,11 @@
 import { z } from "zod";
-import { cuidSchema, isoDateTimeSchema } from "./common";
-import { CALENDAR_EVENT_CATEGORIES } from "@/lib/enums";
-
-export const calendarEventDateRangeSchema = z.object({
-  startDateTime: z.date(),
-  endDateTime: z.date(),
-}).refine((v) => v.startDateTime < v.endDateTime, {
-  error: "endDateTime은 startDateTime보다 이후여야 합니다", path: ["endDateTime"],
-});
+import { cuidSchema, isoDateTimeSchema, uniqueMemberIdsSchema } from "./common";
+import { CALENDAR_EVENT_CATEGORIES } from "../enums";
 
 export const calendarEventCreateSchema = z
   .object({
-    title: z.string().min(1).max(300),
-    memberIds: z.array(cuidSchema).default([]),
+    title: z.string().trim().min(1).max(300),
+    memberIds: uniqueMemberIdsSchema.default([]),
     category: z.enum(CALENDAR_EVENT_CATEGORIES).default("ETC"),
     startDateTime: isoDateTimeSchema,
     endDateTime: isoDateTimeSchema,
@@ -23,15 +16,15 @@ export const calendarEventCreateSchema = z
     (v) =>
       (v.startDateTime as Date).getTime() < (v.endDateTime as Date).getTime(),
     {
-      error: "endDateTime은 startDateTime보다 이후여야 합니다",
+      message: "endDateTime은 startDateTime보다 이후여야 합니다",
       path: ["endDateTime"],
     },
   );
 
 export const calendarEventUpdateSchema = z
   .object({
-    title: z.string().min(1).max(300).optional(),
-    memberIds: z.array(cuidSchema).optional(),
+    title: z.string().trim().min(1).max(300).optional(),
+    memberIds: uniqueMemberIdsSchema.optional(),
     category: z.enum(CALENDAR_EVENT_CATEGORIES).optional(),
     startDateTime: isoDateTimeSchema.optional(),
     endDateTime: isoDateTimeSchema.optional(),
@@ -44,7 +37,7 @@ export const calendarEventUpdateSchema = z
       !v.endDateTime ||
       (v.startDateTime as Date).getTime() < (v.endDateTime as Date).getTime(),
     {
-      error: "endDateTime은 startDateTime보다 이후여야 합니다",
+      message: "endDateTime은 startDateTime보다 이후여야 합니다",
       path: ["endDateTime"],
     },
   );
@@ -53,9 +46,7 @@ export const calendarEventRangeQuerySchema = z.object({
   from: isoDateTimeSchema,
   to: isoDateTimeSchema,
   memberId: cuidSchema.optional(),
-}).refine((v) => v.from < v.to, {
-  error: "조회 종료 시각은 시작 시각보다 이후여야 합니다", path: ["to"],
-});
+}).refine((value) => value.from < value.to, { path: ["to"], message: "조회 종료 시간은 시작 시간보다 이후여야 합니다" });
 
 export type CalendarEventCreateInput = z.infer<typeof calendarEventCreateSchema>;
 export type CalendarEventUpdateInput = z.infer<typeof calendarEventUpdateSchema>;

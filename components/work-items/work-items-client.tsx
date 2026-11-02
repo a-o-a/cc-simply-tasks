@@ -5,7 +5,7 @@ import * as Popover from "@radix-ui/react-popover";
 import {
   Check,
   ChevronDown,
-  GanttChartSquare,
+  SquareChartGantt,
   LayoutGrid,
   ListChecks,
   Plus,
@@ -17,7 +17,10 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MemberFilter } from "@/components/member-filter";
-import { ApiError, api, emitWorkItemsChanged } from "@/lib/client/api";
+import { ApiError, api, emitWorkItemsChanged, isAbortError } from "@/lib/client/api";
+import { useRequestController } from "@/lib/client/use-request-controller";
+import { useWorkReferences } from "@/lib/client/use-work-references";
+import { LoadingState, QueryError } from "@/components/ui/query-state";
 import { toast } from "@/lib/client/use-toast";
 import type {
   ListResponse,
@@ -44,7 +47,7 @@ import { WorkItemDrawer } from "./work-item-drawer";
 import { WorkItemFormDialog } from "./work-item-form-dialog";
 
 /**
- * 작업 페이지 클라이언트.
+ * 작업 페이지 클라이언트 — Phase 4 Step 4.
  *
  * 책임:
  *  - 팀원 + 작업 목록 fetch
@@ -52,7 +55,7 @@ import { WorkItemFormDialog } from "./work-item-form-dialog";
  *  - 보기 모드 토글 (table / kanban / gantt) — localStorage에 저장
  *  - 생성/수정 다이얼로그 + 상세 드로어 트리거
  *
- * 진행 작업은 50건씩 더 보기, 이관 완료 작업은 이전/다음 페이지로 조회한다.
+ * 테이블은 50건 단위 커서 페이지, 보드·간트는 필터에 맞는 전체 목록을 조회한다.
  */
 
 type ViewMode = "table" | "kanban" | "gantt";
@@ -102,27 +105,22 @@ export function WorkItemsClient() {
   const [scope, setScope] = React.useState<WorkScope>("active");
   const [filters, setFilters] = React.useState<Filters>(() => defaultFilters("active"));
   const [items, setItems] = React.useState<WorkItemListItem[]>([]);
-  const [transferredPageIndex, setTransferredPageIndex] = React.useState(0);
-  const [transferredPageCursors, setTransferredPageCursors] = React.useState<(string | null)[]>([null]);
-  const [transferredNextCursor, setTransferredNextCursor] = React.useState<string | null>(null);
-  const [activeNextCursor, setActiveNextCursor] = React.useState<string | null>(null);
-  const [members, setMembers] = React.useState<Member[]>([]);
-  const [categories, setCategories] = React.useState<WorkCategory[]>([]);
-  const [systems, setSystems] = React.useState<WorkSystem[]>([]);
+  const [pageIndex, setPageIndex] = React.useState(0);
+  const [pageCursors, setPageCursors] = React.useState<(string | null)[]>([null]);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [ready, setReady] = React.useState(false);
+  const { members, categories, systems, error: referenceError, reload: reloadReferences } = useWorkReferences();
+  const { beginRequest, cancelRequest } = useRequestController();
+  const allItemsView = scope === "active" && view !== "table";
   const [loading, setLoading] = React.useState(true);
-  const [loadingMore, setLoadingMore] = React.useState(false);
   const [filterVisible, setFilterVisible] = React.useState(true);
-  const [filterResetKey, setFilterResetKey] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
-  const [loadMoreError, setLoadMoreError] = React.useState<string | null>(null);
-  const [resetRequired, setResetRequired] = React.useState(false);
-  const itemsRequest = React.useRef<AbortController | null>(null);
-  const requestSequence = React.useRef(0);
 
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<WorkItemListItem | null>(null);
   const [drawerId, setDrawerId] = React.useState<string | null>(null);
   const [drawerReloadKey, setDrawerReloadKey] = React.useState(0);
+  const updatingIdsRef = React.useRef(new Set<string>());
 
   // 보기 모드 복원
   React.useEffect(() => {
@@ -134,11 +132,20 @@ export function WorkItemsClient() {
     if (savedScope === "active" || savedScope === "transferred") {
       setScope(savedScope);
       setFilters(defaultFilters(savedScope));
+      if (savedScope === "transferred") setView("table");
     }
+    setReady(true);
   }, []);
+
+  function resetPagination() {
+    setPageIndex(0);
+    setPageCursors([null]);
+    setNextCursor(null);
+  }
 
   function changeView(next: ViewMode) {
     setView(next);
+    resetPagination();
     window.localStorage.setItem(VIEW_KEY, next);
   }
 
@@ -148,89 +155,32 @@ export function WorkItemsClient() {
       setView("table");
     }
     setFilters(defaultFilters(next));
-    setTransferredPageIndex(0);
-    setTransferredPageCursors([null]);
-    setTransferredNextCursor(null);
-    setActiveNextCursor(null);
+    resetPagination();
     window.localStorage.setItem(SCOPE_KEY, next);
   }
 
-  const handleFilterChange = React.useCallback((next: Filters) => {
+  function handleFilterChange(next: Filters) {
     setFilters(next);
-    setActiveNextCursor(null);
-    if (scope === "transferred") {
-      setTransferredPageIndex(0);
-      setTransferredPageCursors([null]);
-      setTransferredNextCursor(null);
-    }
-  }, [scope]);
-
-  function handleReset() {
-    setFilterResetKey((value) => value + 1);
-    setFilters(defaultFilters(scope));
-    setActiveNextCursor(null);
-    if (scope === "transferred") {
-      setTransferredPageIndex(0);
-      setTransferredPageCursors([null]);
-      setTransferredNextCursor(null);
-    }
+    resetPagination();
   }
 
-  const loadMembers = React.useCallback(async () => {
-    try {
-      const allMembers = await api.getAll<Member>("/api/team-members");
-      setMembers(allMembers);
-    } catch (err) {
-      toast({
-        title: "팀원 목록 조회 실패",
-        description: err instanceof ApiError ? err.message : undefined,
-        variant: "destructive",
-      });
-    }
-  }, []);
+  function handleReset() {
+    setFilters(defaultFilters(scope));
+    resetPagination();
+  }
 
-  const loadCategories = React.useCallback(async () => {
+  const loadItems = React.useCallback(async () => {
+    if (!ready) return;
+    const request = beginRequest();
+    setLoading(true);
+    setError(null);
     try {
-      const res = await api.get<{ items: WorkCategory[] }>("/api/work-categories");
-      setCategories(res.items);
-    } catch {
-      // 분류 조회 실패는 치명적이지 않음 — 조용히 무시
-    }
-  }, []);
-
-  const loadSystems = React.useCallback(async () => {
-    try {
-      const res = await api.get<{ items: WorkSystem[] }>("/api/work-systems");
-      setSystems(res.items);
-    } catch {
-      // 시스템 조회 실패는 치명적이지 않음 — 조용히 무시
-    }
-  }, []);
-
-  const loadItems = React.useCallback(async (appendCursor?: string) => {
-    itemsRequest.current?.abort();
-    const controller = new AbortController();
-    itemsRequest.current = controller;
-    const sequence = ++requestSequence.current;
-    const isCurrent = () => !controller.signal.aborted && sequence === requestSequence.current;
-    setLoading(!appendCursor);
-    setLoadingMore(Boolean(appendCursor));
-    if (!appendCursor) setError(null);
-    setLoadMoreError(null);
-    setResetRequired(false);
-    try {
-      const cursor =
-        scope === "transferred"
-          ? transferredPageCursors[transferredPageIndex] ?? undefined
-          : appendCursor;
-      const res = await api.get<ListResponse<WorkItemListItem>>(
-        "/api/work-items",
-        {
-          signal: controller.signal,
-          query: {
+      const options = {
+        signal: request.signal,
+        query: {
             scope,
-            cursor,
-            pageSize: 50,
+            cursor: allItemsView ? undefined : pageCursors[pageIndex] ?? undefined,
+            pageSize: allItemsView ? 100 : 50,
             status:
               scope === "active" && filters.status.length > 0
                 ? filters.status.join(",")
@@ -244,59 +194,36 @@ export function WorkItemsClient() {
             requestType: filters.requestType || undefined,
             requestor: filters.requestor || undefined,
             requestNumber: filters.requestNumber || undefined,
-          },
         },
-      );
-      if (!isCurrent()) return;
-      setItems((previous) => {
-        if (!appendCursor) return res.items;
-        const existing = new Set(previous.map((item) => item.id));
-        return [...previous, ...res.items.filter((item) => !existing.has(item.id))];
-      });
-      if (scope === "transferred") {
-        setTransferredNextCursor(res.nextCursor);
-      } else {
-        setActiveNextCursor(res.nextCursor);
-      }
+      };
+      const result = allItemsView
+        ? { items: await api.getAllPages<WorkItemListItem>("/api/work-items", options), nextCursor: null }
+        : await api.get<ListResponse<WorkItemListItem>>("/api/work-items", options);
+      if (!request.isCurrent()) return;
+      setItems(result.items);
+      setNextCursor(result.nextCursor);
     } catch (err) {
-      if (!isCurrent()) return;
+      if (!request.isCurrent() || isAbortError(err)) return;
       const message = err instanceof ApiError ? err.message : "목록 조회 실패";
-      if (appendCursor) setLoadMoreError(message);
-      else setError(message);
-      setResetRequired(err instanceof ApiError && err.code === "BAD_REQUEST");
+      setError(message);
       toast({
         title: "작업 목록 조회 실패",
         description: message,
         variant: "destructive",
       });
     } finally {
-      if (isCurrent()) {
-        setLoading(false);
-        setLoadingMore(false);
-      }
+      if (request.isCurrent()) setLoading(false);
     }
-  }, [filters, scope, transferredPageCursors, transferredPageIndex]);
-
-  React.useEffect(() => {
-    void loadMembers();
-    void loadCategories();
-    void loadSystems();
-  }, [loadMembers, loadCategories, loadSystems]);
+  }, [filters, scope, pageCursors, pageIndex, allItemsView, ready, beginRequest]);
 
   React.useEffect(() => {
     void loadItems();
-    return () => itemsRequest.current?.abort();
+    return cancelRequest;
+  }, [loadItems, cancelRequest]);
+  const latestLoadItems = React.useRef(loadItems);
+  React.useEffect(() => {
+    latestLoadItems.current = loadItems;
   }, [loadItems]);
-
-  function retryItems() {
-    if (resetRequired && scope === "transferred" && transferredPageIndex > 0) {
-      setTransferredPageIndex(0);
-      setTransferredPageCursors([null]);
-      setTransferredNextCursor(null);
-      return;
-    }
-    void loadItems();
-  }
 
   function openCreate() {
     setEditing(null);
@@ -315,7 +242,8 @@ export function WorkItemsClient() {
   const updateItemStatus = React.useCallback(
     async (id: string, status: Status) => {
       const originalItem = items.find((item) => item.id === id);
-      if (!originalItem) return;
+      if (!originalItem || updatingIdsRef.current.has(id)) return;
+      updatingIdsRef.current.add(id);
 
       // Optimistic update
       setItems((prev) =>
@@ -331,10 +259,11 @@ export function WorkItemsClient() {
         );
         setItems((prev) =>
           prev.map((item) =>
-            item.id === id ? { ...item, ...updated, assignee: item.assignee } : item
+            item.id === id ? { ...item, ...updated } : item
           )
         );
         emitWorkItemsChanged();
+        void latestLoadItems.current();
         toast({
           title: "상태 변경됨",
           description: `${originalItem.title}의 상태가 ${STATUS_LABELS[status]}으로 변경되었습니다.`,
@@ -352,38 +281,30 @@ export function WorkItemsClient() {
           description: message,
           variant: "destructive",
         });
+      } finally {
+        updatingIdsRef.current.delete(id);
       }
     },
     [items],
   );
 
-  const tableItems = React.useMemo(() => {
-    if (scope === "transferred") return items;
-    return items.slice().sort((a, b) => {
-      const createdDiff =
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      if (createdDiff !== 0) return createdDiff;
-      return b.id.localeCompare(a.id);
-    });
-  }, [items, scope]);
-
   return (
-    <div className="px-4 py-6 sm:px-8">
+    <div className="px-4 py-4 md:px-8 md:py-6">
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold">작업</h1>
-        <div className="order-3 flex w-full flex-wrap items-center justify-center gap-2 lg:order-none lg:w-auto lg:flex-1 lg:gap-3">
+        <div className="order-last flex w-full flex-wrap items-center justify-center gap-3 md:order-none md:w-auto md:flex-1">
           <ScopeToggle value={scope} onChange={changeScope} />
           <ViewToggle value={view} onChange={changeView} scope={scope} />
         </div>
-        <Button onClick={openCreate} className="ml-auto lg:ml-0">
+        <Button className="ml-auto md:ml-0" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
           작업 추가
         </Button>
       </header>
 
+      {referenceError && <div className="mt-4"><QueryError message={referenceError} onRetry={() => void reloadReferences()} /></div>}
       {filterVisible && (
         <FilterBar
-          key={`${scope}:${filterResetKey}`}
           scope={scope}
           filters={filters}
           members={members}
@@ -398,6 +319,7 @@ export function WorkItemsClient() {
           variant="outline"
           size="sm"
           onClick={() => setFilterVisible((v) => !v)}
+          aria-expanded={filterVisible}
         >
           <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
           {filterVisible ? "필터 숨기기" : "필터 보기"}
@@ -407,14 +329,15 @@ export function WorkItemsClient() {
         </Button>
       </div>
 
-      {loading && <p role="status" className="mt-4 text-sm text-muted-foreground">작업을 불러오는 중…</p>}
-      <section aria-busy={loading || loadingMore} className={cn("mt-4", loading && "pointer-events-none opacity-60")}>
+      <section aria-busy={loading} className={cn("mt-4", loading && "pointer-events-none opacity-60")}>
         {error ? (
-          <ErrorState message={error} onRetry={retryItems} />
+          <QueryError message={error} onRetry={() => void loadItems()} />
+        ) : loading ? (
+          <LoadingState message={allItemsView ? "전체 작업을 불러오는 중…" : "작업을 불러오는 중…"} />
         ) : items.length === 0 && !loading ? (
           <EmptyState onCreate={openCreate} scope={scope} />
         ) : scope === "transferred" || view === "table" ? (
-          <TableView items={tableItems} categories={categories} onOpen={openDrawer} />
+          <TableView items={items} categories={categories} onOpen={openDrawer} />
         ) : view === "kanban" ? (
           <KanbanView
             items={items}
@@ -427,40 +350,25 @@ export function WorkItemsClient() {
           <GanttView items={items} onOpen={openDrawer} />
         )}
       </section>
+      {allItemsView && !loading && !error && items.length > 0 && <p role="status" className="mt-3 text-xs text-muted-foreground">조건에 맞는 전체 작업 {items.length}건</p>}
 
-      {scope === "active" && !error && !loading && items.length > 0 && (
-        <div className="mt-4 flex flex-col items-center gap-2">
-          <p className="text-xs text-muted-foreground" aria-live="polite">{items.length}건 표시{activeNextCursor ? " · 더 많은 작업이 있습니다" : ""}</p>
-          {loadMoreError ? (
-            <div role="alert" className="flex flex-wrap items-center justify-center gap-2">
-              <p className="text-sm text-destructive">{loadMoreError}</p>
-              <Button variant="outline" onClick={() => void loadItems(resetRequired ? undefined : activeNextCursor ?? undefined)}>
-                {resetRequired ? "처음부터 다시 조회" : "다시 시도"}
-              </Button>
-            </div>
-          ) : activeNextCursor ? (
-            <Button variant="outline" disabled={loadingMore} onClick={() => void loadItems(activeNextCursor)}>
-              {loadingMore ? "불러오는 중…" : "더 보기"}
-            </Button>
-          ) : null}
-        </div>
-      )}
-
-      {scope === "transferred" && !error && items.length > 0 ? (
-        <TransferredPagination
-          page={transferredPageIndex + 1}
-          hasPrevious={!loading && transferredPageIndex > 0}
-          hasNext={!loading && Boolean(transferredNextCursor)}
-          onPrevious={() => setTransferredPageIndex((p) => Math.max(0, p - 1))}
+      {!allItemsView && !error && (items.length > 0 || pageIndex > 0) ? (
+        <WorkPagination
+          page={pageIndex + 1}
+          count={items.length}
+          loading={loading}
+          hasPrevious={pageIndex > 0}
+          hasNext={Boolean(nextCursor)}
+          onPrevious={() => setPageIndex((p) => Math.max(0, p - 1))}
           onNext={() => {
-            if (!transferredNextCursor) return;
-            setTransferredPageCursors((prev) => {
-              if (prev[transferredPageIndex + 1] === transferredNextCursor) return prev;
-              const next = prev.slice(0, transferredPageIndex + 1);
-              next.push(transferredNextCursor);
+            if (!nextCursor) return;
+            setPageCursors((prev) => {
+              if (prev[pageIndex + 1] === nextCursor) return prev;
+              const next = prev.slice(0, pageIndex + 1);
+              next.push(nextCursor);
               return next;
             });
-            setTransferredPageIndex((p) => p + 1);
+            setPageIndex((p) => p + 1);
           }}
         />
       ) : null}
@@ -474,13 +382,12 @@ export function WorkItemsClient() {
         onClose={() => setFormOpen(false)}
         onSaved={(updated) => {
           setFormOpen(false);
-          // 수정 시: 서버 응답(최신 updatedAt)으로 items를 즉시 동기 갱신.
-          // loadItems()가 완료되기 전에 다시 편집해도 stale If-Match 문제가 발생하지 않음.
+          // 저장된 서버 응답으로 목록과 열린 드로어를 갱신합니다.
           if (updated) {
             setItems((prev) =>
               prev.map((item) =>
                 item.id === updated.id
-                  ? { ...item, ...updated, assignee: item.assignee }
+                  ? { ...item, ...updated }
                   : item,
               ),
             );
@@ -566,7 +473,7 @@ function ViewToggle({
         label="간트"
         disabled={scope === "transferred"}
       >
-        <GanttChartSquare className="h-4 w-4" />
+        <SquareChartGantt className="h-4 w-4" />
       </ToggleButton>
     </div>
   );
@@ -592,7 +499,7 @@ function ToggleButton({
       aria-pressed={active}
       disabled={disabled}
       className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-sm px-2 text-xs font-medium transition-colors",
+        "inline-flex h-7 items-center gap-1.5 rounded-xs px-2 text-xs font-medium transition-colors",
         active
           ? "bg-secondary text-secondary-foreground"
           : "text-muted-foreground hover:text-foreground",
@@ -620,7 +527,7 @@ function FilterBar({
   systems: WorkSystem[];
   onChange: (next: Filters) => void;
 }) {
-  // 입력 중인 값은 유지하고, 250ms 멈추거나 Enter/blur 시 검색한다.
+  // 조합 중인 입력을 보존하고 250ms 후 또는 Enter/blur 시 필터를 반영합니다.
   const [localTitle, setLocalTitle] = React.useState(filters.title);
   const [localRequestType, setLocalRequestType] = React.useState(filters.requestType);
   const [localRequestor, setLocalRequestor] = React.useState(filters.requestor);
@@ -642,12 +549,11 @@ function FilterBar({
   }, [composing, filters, localTitle, localRequestType, localRequestor, localRequestNumber, onChange]);
 
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
-    onChange({ ...filters, [key]: value });
+    if (filters[key] !== value) onChange({ ...filters, [key]: value });
   }
 
   function applyText(key: "title" | "requestType" | "requestor" | "requestNumber", value: string) {
-    if (filters[key] === value) return;
-    onChange({ ...filters, [key]: value });
+    if (filters[key] !== value) onChange({ ...filters, [key]: value });
   }
 
   function textInputProps(
@@ -657,6 +563,7 @@ function FilterBar({
   ) {
     return {
       value: local,
+      "aria-label": { title: "작업 제목 검색", requestType: "요청구분 검색", requestor: "요청자 검색", requestNumber: "요청번호 검색" }[key],
       onChange: (e: React.ChangeEvent<HTMLInputElement>) => setLocal(e.target.value),
       onCompositionStart: () => setComposing(true),
       onCompositionEnd: () => setComposing(false),
@@ -706,9 +613,9 @@ function FilterBar({
   return (
     <div className="mt-4 rounded-lg border bg-card p-3 space-y-3">
       {/* 1행: 분류 / 상태 / 담당자 / 우선순위 / 이관일 */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 xl:divide-x xl:divide-border xl:gap-0">
+      <div className="grid grid-cols-2 gap-3 md:flex md:divide-x md:divide-border md:gap-0 [&>div]:min-w-0 max-md:[&>div]:px-0">
         {/* 분류 */}
-        <div className="min-w-0 space-y-1.5 xl:pr-3">
+        <div className="form-field flex-1 pr-3">
           <Label className="text-xs">분류</Label>
           <div className="flex flex-wrap gap-1">
             {categories.length === 0 ? (
@@ -724,7 +631,7 @@ function FilterBar({
         </div>
 
         {/* 상태 */}
-        <div className="min-w-0 space-y-1.5 xl:px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">상태</Label>
           {scope === "active" ? (
             <div className="flex flex-wrap gap-1">
@@ -744,7 +651,7 @@ function FilterBar({
         </div>
 
         {/* 담당자 */}
-        <div className="min-w-0 space-y-1.5 xl:px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">담당자</Label>
           <div className="flex flex-wrap gap-1">
             <MemberFilter
@@ -763,7 +670,7 @@ function FilterBar({
         </div>
 
         {/* 우선순위 */}
-        <div className="min-w-0 space-y-1.5 xl:px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">우선순위</Label>
           <div className="flex flex-wrap gap-1">
             {PRIORITIES.map((p) => (
@@ -775,9 +682,9 @@ function FilterBar({
         </div>
 
         {/* 이관일 */}
-        <div className="min-w-0 space-y-1.5 xl:pl-3">
-          <Label className="text-xs" htmlFor="work-filter-transfer-date">이관일</Label>
-          <DatePicker id="work-filter-transfer-date" value={filters.transferDate} onChange={(v) => set("transferDate", v)} placeholder="날짜 선택" className="h-7 text-xs" />
+        <div className="form-field flex-1 pl-3">
+          <Label className="text-xs">이관일</Label>
+          <DatePicker value={filters.transferDate} onChange={(v) => set("transferDate", v)} placeholder="날짜 선택" className="h-7 text-xs" />
         </div>
       </div>
 
@@ -785,12 +692,11 @@ function FilterBar({
       <div className="border-t border-border" />
 
       {/* 2행: 제목 / 시스템 / 요청구분 / 요청자 / 요청번호 */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 xl:divide-x xl:divide-border xl:gap-0">
+      <div className="grid grid-cols-2 gap-3 md:flex md:divide-x md:divide-border md:gap-0 [&>div]:min-w-0 max-md:[&>div]:px-0">
         {/* 제목 */}
-        <div className="min-w-0 space-y-1.5 xl:pr-3">
-          <Label className="text-xs" htmlFor="work-filter-title">제목</Label>
+        <div className="form-field flex-1 pr-3">
+          <Label className="text-xs">제목</Label>
           <Input
-            id="work-filter-title"
             placeholder=""
             className="h-7 text-xs"
             {...textInputProps("title", localTitle, setLocalTitle)}
@@ -798,7 +704,7 @@ function FilterBar({
         </div>
 
         {/* 시스템 */}
-        <div className="min-w-0 space-y-1.5 xl:px-3">
+        <div className="form-field flex-1 px-3">
           <Label className="text-xs">시스템</Label>
           <div>
             <SystemFilter
@@ -811,10 +717,9 @@ function FilterBar({
         </div>
 
         {/* 요청구분 */}
-        <div className="min-w-0 space-y-1.5 xl:px-3">
-          <Label className="text-xs" htmlFor="work-filter-request-type">요청구분</Label>
+        <div className="form-field flex-1 px-3">
+          <Label className="text-xs">요청구분</Label>
           <Input
-            id="work-filter-request-type"
             placeholder=""
             className="h-7 text-xs"
             {...textInputProps("requestType", localRequestType, setLocalRequestType)}
@@ -822,10 +727,9 @@ function FilterBar({
         </div>
 
         {/* 요청자 */}
-        <div className="min-w-0 space-y-1.5 xl:px-3">
-          <Label className="text-xs" htmlFor="work-filter-requestor">요청자</Label>
+        <div className="form-field flex-1 px-3">
+          <Label className="text-xs">요청자</Label>
           <Input
-            id="work-filter-requestor"
             placeholder=""
             className="h-7 text-xs"
             {...textInputProps("requestor", localRequestor, setLocalRequestor)}
@@ -833,10 +737,9 @@ function FilterBar({
         </div>
 
         {/* 요청번호 */}
-        <div className="min-w-0 space-y-1.5 xl:pl-3">
-          <Label className="text-xs" htmlFor="work-filter-request-number">요청번호</Label>
+        <div className="form-field flex-1 pl-3">
+          <Label className="text-xs">요청번호</Label>
           <Input
-            id="work-filter-request-number"
             placeholder=""
             className="h-7 text-xs"
             {...textInputProps("requestNumber", localRequestNumber, setLocalRequestNumber)}
@@ -926,41 +829,27 @@ function SystemFilter({
   );
 }
 
-function ErrorState({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div role="alert" className="flex flex-col items-center gap-3 rounded-lg border bg-card py-16 text-center">
-      <p className="text-sm font-medium">목록을 불러오지 못했습니다</p>
-      <p className="text-xs text-muted-foreground">{message}</p>
-      <Button variant="outline" onClick={onRetry}>
-        다시 시도
-      </Button>
-    </div>
-  );
-}
-
-function TransferredPagination({
+function WorkPagination({
   page,
+  count,
+  loading,
   hasPrevious,
   hasNext,
   onPrevious,
   onNext,
 }: {
   page: number;
+  count: number;
+  loading: boolean;
   hasPrevious: boolean;
   hasNext: boolean;
   onPrevious: () => void;
   onNext: () => void;
 }) {
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
-      <p className="text-xs text-muted-foreground">
-        이관 완료 작업 50건씩 조회
+    <div className="mt-4 flex items-center justify-between rounded-lg border bg-card px-4 py-3">
+      <p role="status" className="text-xs text-muted-foreground">
+        {loading ? "불러오는 중…" : `이번 페이지 ${count}건 · 50건씩 조회`}
       </p>
       <div className="flex items-center gap-2">
         <Button
@@ -968,7 +857,7 @@ function TransferredPagination({
           variant="outline"
           size="sm"
           onClick={onPrevious}
-          disabled={!hasPrevious}
+          disabled={loading || !hasPrevious}
         >
           이전
         </Button>
@@ -980,7 +869,7 @@ function TransferredPagination({
           variant="outline"
           size="sm"
           onClick={onNext}
-          disabled={!hasNext}
+          disabled={loading || !hasNext}
         >
           다음
         </Button>

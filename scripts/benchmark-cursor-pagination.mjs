@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { readFile } from "node:fs/promises";
-import { and, asc, desc, eq, getTableColumns, isNull, ne } from "drizzle-orm";
+import { and, asc, desc, isNull, ne } from "drizzle-orm";
 import ts from "typescript";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@libsql/client/node";
@@ -26,9 +26,8 @@ async function moduleUrl(relativePath, replacements = {}) {
   for (const [specifier, resolved] of Object.entries(replacements)) compiled = compiled.replaceAll(JSON.stringify(specifier), JSON.stringify(resolved));
   return `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
 }
-const httpUrl = await moduleUrl("../lib/http.ts", { "next/server": import.meta.resolve("next/server.js"), zod: import.meta.resolve("zod") });
-const { inclusiveCursorCondition, slicePageAfterCursor } = await import(await moduleUrl("../lib/pagination.ts", {
-  "@/lib/http": httpUrl, zod: import.meta.resolve("zod"), "drizzle-orm": import.meta.resolve("drizzle-orm"),
+const { createCursorPagination } = await import(await moduleUrl("../lib/pagination.ts", {
+  zod: import.meta.resolve("zod"), "drizzle-orm": import.meta.resolve("drizzle-orm"),
 }));
 const { workItems, todos, auditLogs } = await import(await moduleUrl("../lib/db/schema.ts", {
   "drizzle-orm": import.meta.resolve("drizzle-orm"), "drizzle-orm/sqlite-core": import.meta.resolve("drizzle-orm/sqlite-core"),
@@ -69,18 +68,18 @@ try {
     const beforeQuery = db.select().from(table).where(filter).orderBy(...order);
     const complete = await beforeQuery;
     for (const cursorIndex of [49, 4999, 9499]) {
-      const cursor = complete[cursorIndex].id;
-      const anchor = db.$with("page_cursor").as(db.select(Object.fromEntries(keys.map(([column]) => [column, table[column]])))
-        .from(table).where(and(filter, eq(table.id, cursor))).limit(1));
-      const boundary = inclusiveCursorCondition(keys.map(([column, direction, nullable]) => ({ column: table[column], anchor: anchor[column], direction, nullable })));
-      const afterQuery = db.with(anchor).select(getTableColumns(table)).from(table).innerJoin(anchor, boundary)
-        .where(filter).orderBy(...order).limit(pageSize + 2);
+      const pagination = createCursorPagination(name, keys.map(([column, direction]) => ({
+        column: table[column], value: (row) => row[column], direction,
+      })));
+      const cursor = pagination.page([complete[cursorIndex], complete[cursorIndex + 1]], 1).nextCursor;
+      const boundary = await pagination.condition(cursor, async () => { throw new Error("Versioned cursors must not look up the anchor"); });
+      const afterQuery = db.select().from(table).where(and(filter, boundary))
+        .orderBy(...order).limit(pageSize + 1);
       const bounded = await afterQuery;
-      assert.deepEqual(bounded, complete.slice(cursorIndex, cursorIndex + pageSize + 2));
-      assert.deepEqual(slicePageAfterCursor(bounded, cursor, pageSize), slicePageAfterCursor(complete, cursor, pageSize));
+      assert.deepEqual(bounded, complete.slice(cursorIndex + 1, cursorIndex + pageSize + 2));
       const timing = await compare(
-        async () => slicePageAfterCursor(await beforeQuery, cursor, pageSize),
-        async () => slicePageAfterCursor(await afterQuery, cursor, pageSize),
+        async () => (await beforeQuery).slice(cursorIndex + 1, cursorIndex + pageSize + 2),
+        async () => await afterQuery,
       );
       console.log(JSON.stringify({
         name, node: process.version, fixture_rows: fixtureRows, pageSize, cursor_index: cursorIndex,

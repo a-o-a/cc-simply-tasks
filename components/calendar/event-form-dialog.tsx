@@ -158,10 +158,10 @@ export function EventFormDialog({
   const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   React.useEffect(() => {
-    if (!open) return;
-    setState(editing ? fromEvent(editing) : emptyState(defaultDate));
-    setError(null);
     setConfirmDelete(false);
+    if (!open) return;
+    setError(null);
+    setState(editing ? fromEvent(editing) : emptyState(defaultDate));
   }, [open, editing, defaultDate]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -303,10 +303,10 @@ export function EventFormDialog({
               팀원의 일정을 캘린더에 표시합니다. (KST)
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <form onSubmit={handleSubmit} aria-busy={submitting || deleting} className="flex min-h-0 flex-1 flex-col">
             <fieldset disabled={submitting || deleting} className="contents">
             <div className="subtle-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="ce-category">카테고리</Label>
               <Select
                 id="ce-category"
@@ -320,7 +320,7 @@ export function EventFormDialog({
                 ))}
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="ce-title">제목</Label>
               <Input
                 id="ce-title"
@@ -328,10 +328,11 @@ export function EventFormDialog({
                 value={state.title}
                 onChange={(e) => update("title", e.target.value)}
                 maxLength={300}
+                required
                 placeholder=""
               />
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="form-field">
               <Label>담당자</Label>
               <MemberFilter
                 members={members}
@@ -356,8 +357,8 @@ export function EventFormDialog({
             </label>
 
             {state.allDay ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
+              <div className="grid gap-x-3 gap-y-4 sm:grid-cols-2">
+                <div className="form-field">
                   <Label htmlFor="ce-start-date">시작일</Label>
                   <DatePicker
                     id="ce-start-date"
@@ -366,7 +367,7 @@ export function EventFormDialog({
                     clearable={false}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="form-field">
                   <Label htmlFor="ce-end-date">종료일</Label>
                   <DatePicker
                     id="ce-end-date"
@@ -377,8 +378,8 @@ export function EventFormDialog({
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
+              <div className="grid gap-x-3 gap-y-4 sm:grid-cols-2">
+                <div className="form-field">
                   <Label htmlFor="ce-start-dt">시작 시각</Label>
                   <DateTimePicker
                     id="ce-start-dt"
@@ -387,7 +388,7 @@ export function EventFormDialog({
                     clearable={false}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="form-field">
                   <Label htmlFor="ce-end-dt">종료 시각</Label>
                   <DateTimePicker
                     id="ce-end-dt"
@@ -399,7 +400,7 @@ export function EventFormDialog({
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="form-field">
               <Label htmlFor="ce-note">메모</Label>
               <Textarea
                 id="ce-note"
@@ -412,7 +413,7 @@ export function EventFormDialog({
 
             </div>
             {error && <p role="alert" className="pt-2 text-sm text-destructive">{error}</p>}
-            <DialogFooter className="shrink-0 border-t pt-4 mt-4 sm:justify-between">
+            <DialogFooter className="mt-4 shrink-0 border-t pt-4 sm:justify-between">
               <div>
                 {editing ? (
                   <Button
@@ -438,8 +439,11 @@ export function EventFormDialog({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={confirmDelete} onOpenChange={(value) => { if (!deletingRef.current) setConfirmDelete(value); }}>
-        <DialogContent hideCloseButton={deleting} onEscapeKeyDown={(event) => { if (deletingRef.current) event.preventDefault(); }} onInteractOutside={(event) => { if (deletingRef.current) event.preventDefault(); }}>
+      <Dialog open={confirmDelete} onOpenChange={(value) => !deletingRef.current && setConfirmDelete(value)}>
+        <DialogContent hideCloseButton={deleting}
+          onEscapeKeyDown={(event) => { if (deletingRef.current) event.preventDefault(); }}
+          onInteractOutside={(event) => { if (deletingRef.current) event.preventDefault(); }}>
+
           <DialogHeader>
             <DialogTitle>이벤트 삭제</DialogTitle>
             <DialogDescription>
@@ -449,10 +453,10 @@ export function EventFormDialog({
           </DialogHeader>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
-            <Button disabled={deleting} variant="ghost" onClick={() => setConfirmDelete(false)}>
+            <Button variant="ghost" disabled={deleting} onClick={() => setConfirmDelete(false)}>
               취소
             </Button>
-            <Button disabled={deleting} variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" disabled={deleting} onClick={handleDelete}>
               {deleting ? "삭제 중..." : "삭제"}
             </Button>
           </DialogFooter>

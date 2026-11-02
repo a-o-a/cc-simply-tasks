@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, desc, eq, getTableColumns } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, ensureSqlitePragma } from "@/lib/db";
-import { auditLogs } from "@/lib/db/schema";
-import { withErrorHandler } from "@/lib/http";
-import { inclusiveCursorCondition, parsePagination, slicePageAfterCursor } from "@/lib/pagination";
+import { auditLogs, type AuditLogRow } from "@/lib/db/schema";
+import { withErrorHandler, HttpError } from "@/lib/http";
+import { parsePagination, createCursorPagination } from "@/lib/pagination";
 import { auditLogListQuerySchema } from "@/lib/validation/auditLog";
 
 /**
@@ -12,6 +12,9 @@ import { auditLogListQuerySchema } from "@/lib/validation/auditLog";
  *
  * 읽기 전용. 감사 로그는 withAudit 헬퍼로만 생성된다 (write API 없음).
  */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const GET = withErrorHandler(async (req: NextRequest) => {
   await ensureSqlitePragma();
   const { searchParams } = new URL(req.url);
@@ -26,22 +29,22 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     filters.actorName ? eq(auditLogs.actorName, filters.actorName) : undefined,
   ].filter(Boolean);
 
-  const anchor = db.$with("page_cursor").as(db
-    .select({ createdAt: auditLogs.createdAt, id: auditLogs.id })
-    .from(auditLogs)
-    .where(and(...conditions, cursor ? eq(auditLogs.id, cursor) : undefined))
-    .limit(1));
-  const boundary = inclusiveCursorCondition([
-    { column: auditLogs.createdAt, anchor: anchor.createdAt, direction: "desc" },
-    { column: auditLogs.id, anchor: anchor.id, direction: "desc" },
+  const pagination = createCursorPagination<AuditLogRow>("audit-logs", [
+    { column: auditLogs.createdAt, value: (row) => row.createdAt, direction: "desc" },
+    { column: auditLogs.id, value: (row) => row.id, direction: "desc" },
   ]);
-  const query = cursor
-    ? db.with(anchor).select(getTableColumns(auditLogs)).from(auditLogs).innerJoin(anchor, boundary)
-    : db.select(getTableColumns(auditLogs)).from(auditLogs);
-  const rows = await query.where(and(...conditions))
-    .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
-    .limit(take + (cursor ? 2 : 1));
+  const afterCursor = await pagination.condition(cursor, async (id) => {
+    const [row] = await db.select().from(auditLogs).where(and(...conditions, eq(auditLogs.id, id))).limit(1);
+    if (!row) throw new HttpError("BAD_REQUEST", "목록이 변경되었습니다. 처음부터 다시 조회해주세요.");
+    return row;
+  });
+  const rows = await db
+    .select()
+    .from(auditLogs)
+    .where(and(...conditions, afterCursor))
+    .orderBy(...pagination.orderBy)
+    .limit(take + 1);
 
-  const { items, nextCursor } = slicePageAfterCursor(rows, cursor, take);
+  const { items, nextCursor } = pagination.page(rows, take);
   return NextResponse.json({ items, nextCursor });
 });
